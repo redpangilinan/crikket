@@ -1,0 +1,60 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": [
+    "ultracite/biome/core",
+    "ultracite/biome/react",
+    "ultracite/biome/next"
+  ],
+  "files": {
+    "ignoreUnknown": false,
+    "includes": [
+      "apps/**",
+      "packages/**",
+      "biome.jsonc",
+      "package.json",
+      "tsconfig.json",
+      "turbo.json",
+      "!**/*.md",
+      "!**/.claude",
+      "!**/.cursor",
+      "!**/.opencode",
+      "!**/.github",
+      "!packages/ui/components/ui"
+    ]
+  },
+  "javascript": {
+    "formatter": {
+      "semicolons": "asNeeded"
+    },
+    "globals": ["defineBackground", "defineContentScript", "browser", "chrome"]
+  },
+  "linter": {
+    "rules": {
+      "performance": {
+        "noImgElement": "off",
+        "noNamespaceImport": "off",
+        "noBarrelFile": "off"
+      },
+      "a11y": {
+        "noSvgWithoutTitle": "off",
+        "useButtonType": "off",
+        "noLabelWithoutControl": "off"
+      },
+      "style": {
+        "useConsistentTypeDefinitions": "off",
+        "useBlockStatements": "off",
+        "useFilenamingConvention": "off",
+        "noNonNullAssertion": "off",
+        "noNestedTernary": "off"
+      },
+      "correctness": {
+        "useImageSize": "off",
+        "noUnusedFunctionParameters": "off"
+      },
+      "suspicious": {
+        "useAwait": "off",
+        "noNonNullAssertedOptionalChain": "off"
+      }
+    }
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "name": "web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3001",
+    "build": "next build",
+    "start": "next start"
+  },
+  "dependencies": {
+    "@base-ui/react": "catalog:",
+    "@crikket/api": "workspace:*",
+    "@crikket/auth": "workspace:*",
+    "@crikket/env": "workspace:*",
+    "@crikket/ui": "workspace:*",
+    "@orpc/client": "catalog:",
+    "@orpc/server": "catalog:",
+    "@orpc/tanstack-query": "^1.12.2",
+    "@polar-sh/better-auth": "catalog:",
+    "@tanstack/react-form": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "babel-plugin-react-compiler": "catalog:",
+    "better-auth": "catalog:",
+    "lucide-react": "catalog:",
+    "next": "^16.1.1",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "zod": "catalog:",
+    "sonner": "catalog:"
+  },
+  "devDependencies": {
+    "@crikket/config": "workspace:*",
+    "@tailwindcss/postcss": "catalog:",
+    "@tanstack/react-query-devtools": "catalog:",
+    "@types/node": "^20",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:"
+  }
+}

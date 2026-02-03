@@ -1,0 +1,39 @@
+// Better-T-Stack
+//
+// Website: https://www.better-t-stack.dev/
+// Stack Builder: https://www.better-t-stack.dev/new
+// Analytics: https://www.better-t-stack.dev/analytics
+// Showcase: https://www.better-t-stack.dev/showcase
+// Sponsor: https://github.com/sponsors/AmanVarshney01
+//
+// Add new addons with: bun create better-t-stack add
+// This file is safe to delete
+
+{
+  "$schema": "https://r2.better-t-stack.dev/schema.json",
+  "version": "3.19.3",
+  "createdAt": "2026-02-03T15:09:20.371Z",
+  "reproducibleCommand": "bun create better-t-stack@latest crikket --frontend next --backend hono --runtime bun --database postgres --orm drizzle --api orpc --auth better-auth --payments polar --addons fumadocs husky pwa skills turborepo ultracite wxt --examples todo --db-setup none --web-deploy none --server-deploy none --git --package-manager bun --install",
+  "database": "postgres",
+  "orm": "drizzle",
+  "backend": "hono",
+  "runtime": "bun",
+  "frontend": ["next"],
+  "addons": [
+    "fumadocs",
+    "husky",
+    "pwa",
+    "skills",
+    "turborepo",
+    "ultracite",
+    "wxt"
+  ],
+  "examples": ["todo"],
+  "auth": "better-auth",
+  "payments": "polar",
+  "packageManager": "bun",
+  "dbSetup": "none",
+  "api": "orpc",
+  "webDeploy": "none",
+  "serverDeploy": "none"
+}
