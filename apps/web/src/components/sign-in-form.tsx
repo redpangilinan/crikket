@@ -1,3 +1,4 @@
+import { authClient } from "@crikket/auth/client"
 import { Icons } from "@crikket/ui/components/icons"
 import { Loader } from "@crikket/ui/components/loader"
 import { Button } from "@crikket/ui/components/ui/button"
@@ -10,7 +11,6 @@ import {
 } from "@crikket/ui/components/ui/card"
 import Image from "next/image"
 import { toast } from "sonner"
-import { authClient } from "@/lib/auth-client"
 
 export default function SignInForm() {
   const { isPending } = authClient.useSession()
@@ -38,8 +38,8 @@ export default function SignInForm() {
   }
 
   return (
-    <div className="flex flex-col items-center p-4 pt-[12vh] pb-20">
-      <div className="mb-10 flex items-center gap-4">
+    <div className="flex w-full flex-col items-center p-4 pt-[12vh] pb-20">
+      <div className="mb-6 flex items-center gap-2">
         <div className="relative h-10 w-10">
           <Image
             alt="Logo"
@@ -49,7 +49,7 @@ export default function SignInForm() {
             src="/favicon/favicon.svg"
           />
         </div>
-        <h1 className="font-bold text-4xl uppercase tracking-tight">Crikket</h1>
+        <h1 className="font-bold text-4xl tracking-tight">crikket</h1>
       </div>
 
       <Card className="w-full max-w-[400px] border-none shadow-xl ring-1 ring-border/50">

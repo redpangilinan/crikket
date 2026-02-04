@@ -11,7 +11,6 @@ import { polarClient } from "./lib/payments"
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
     provider: "pg",
-
     schema,
   }),
   trustedOrigins: [env.CORS_ORIGIN],
