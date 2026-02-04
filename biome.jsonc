@@ -14,12 +14,13 @@
       "package.json",
       "tsconfig.json",
       "turbo.json",
+      "!bun.lock",
       "!**/*.md",
       "!**/.claude",
       "!**/.cursor",
       "!**/.opencode",
       "!**/.github",
-      "!packages/ui/components/ui"
+      "!packages/ui/src/components/ui"
     ]
   },
   "javascript": {
