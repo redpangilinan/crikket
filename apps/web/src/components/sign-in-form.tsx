@@ -1,4 +1,5 @@
 import { authClient } from "@crikket/auth/client"
+import { env } from "@crikket/env/web"
 import { Icons } from "@crikket/ui/components/icons"
 import { Loader } from "@crikket/ui/components/loader"
 import { Button } from "@crikket/ui/components/ui/button"
@@ -19,7 +20,7 @@ export default function SignInForm() {
     await authClient.signIn.social(
       {
         provider: "google",
-        callbackURL: "/dashboard",
+        callbackURL: env.NEXT_PUBLIC_APP_URL,
       },
       {
         onError: (ctx) => {
