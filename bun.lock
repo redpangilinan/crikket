@@ -84,6 +84,7 @@
         "@crikket/api": "workspace:*",
         "@crikket/auth": "workspace:*",
         "@crikket/env": "workspace:*",
+        "@crikket/shared": "workspace:*",
         "@crikket/ui": "workspace:*",
         "@orpc/client": "catalog:",
         "@orpc/server": "catalog:",
@@ -184,6 +185,17 @@
         "typescript": "catalog:",
       },
     },
+    "packages/shared": {
+      "name": "@crikket/shared",
+      "version": "0.0.0",
+      "dependencies": {
+        "@crikket/env": "workspace:*",
+      },
+      "devDependencies": {
+        "@crikket/config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
     "packages/ui": {
       "name": "@crikket/ui",
       "version": "0.1.0",
@@ -199,6 +211,7 @@
       },
       "devDependencies": {
         "@crikket/config": "workspace:*",
+        "@crikket/env": "workspace:*",
         "@tailwindcss/postcss": "catalog:",
         "@types/react": "catalog:",
         "@types/react-dom": "catalog:",
@@ -364,6 +377,8 @@
     "@crikket/db": ["@crikket/db@workspace:packages/db"],
 
     "@crikket/env": ["@crikket/env@workspace:packages/env"],
+
+    "@crikket/shared": ["@crikket/shared@workspace:packages/shared"],
 
     "@crikket/ui": ["@crikket/ui@workspace:packages/ui"],
 

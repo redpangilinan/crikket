@@ -57,11 +57,11 @@ export default async function ProtectedLayout({
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem className="hidden md:block">
-                  <BreadcrumbLink href="/">Recordings</BreadcrumbLink>
+                  <BreadcrumbLink href="/">Bug Reports</BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator className="hidden md:block" />
                 <BreadcrumbItem>
-                  <BreadcrumbPage>All Recordings</BreadcrumbPage>
+                  <BreadcrumbPage>All Bug Reports</BreadcrumbPage>
                 </BreadcrumbItem>
               </BreadcrumbList>
             </Breadcrumb>

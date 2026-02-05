@@ -1,6 +1,7 @@
 "use client"
 
 import type { auth } from "@crikket/auth"
+import { authClient } from "@crikket/auth/client"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +19,11 @@ import {
   useSidebar,
 } from "@crikket/ui/components/ui/sidebar"
 import { ChevronsUpDown, Plus } from "lucide-react"
+import { useRouter } from "next/navigation"
+import * as React from "react"
+import { toast } from "sonner"
+
+import { CreateOrganizationDialog } from "@/components/create-organization-dialog"
 
 type Organization = typeof auth.$Infer.Organization
 
@@ -31,6 +37,21 @@ export function TeamSwitcher({
   activeOrganization,
 }: TeamSwitcherProps) {
   const { isMobile } = useSidebar()
+  const router = useRouter()
+  const [showCreateDialog, setShowCreateDialog] = React.useState(false)
+
+  const handleSwitchOrganization = async (orgId: string) => {
+    try {
+      await authClient.organization.setActive({
+        organizationId: orgId,
+      })
+      router.refresh()
+      toast.success("Organization switched successfully")
+    } catch (error) {
+      console.error(error)
+      toast.error("Failed to switch organization")
+    }
+  }
 
   return (
     <SidebarMenu>
@@ -80,10 +101,7 @@ export function TeamSwitcher({
                 <DropdownMenuItem
                   className="gap-2 p-2"
                   key={org.id}
-                  onClick={() => {
-                    // TODO: Implement organization switching
-                    console.log("Switch to", org.name)
-                  }}
+                  onClick={() => handleSwitchOrganization(org.id)}
                 >
                   <div className="flex size-6 items-center justify-center rounded-sm border">
                     {org.logo ? (
@@ -102,7 +120,10 @@ export function TeamSwitcher({
               ))}
             </DropdownMenuGroup>
             <DropdownMenuSeparator />
-            <DropdownMenuItem className="gap-2 p-2">
+            <DropdownMenuItem
+              className="gap-2 p-2"
+              onClick={() => setShowCreateDialog(true)}
+            >
               <div className="flex size-6 items-center justify-center rounded-md border bg-background">
                 <Plus className="size-4" />
               </div>
@@ -112,6 +133,10 @@ export function TeamSwitcher({
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+        <CreateOrganizationDialog
+          onOpenChange={setShowCreateDialog}
+          open={showCreateDialog}
+        />
       </SidebarMenuItem>
     </SidebarMenu>
   )

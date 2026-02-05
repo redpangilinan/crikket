@@ -3,6 +3,7 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 
 import "@crikket/ui/styles/globals.css"
+import { siteConfig } from "@crikket/shared/site"
 import Providers from "@/components/providers"
 
 const geistSans = Geist({
@@ -16,8 +17,12 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "crikket",
-  description: "crikket",
+  metadataBase: new URL(siteConfig.url),
+  title: {
+    default: siteConfig.title,
+    template: `%s | ${siteConfig.name}`,
+  },
+  description: siteConfig.description,
 }
 
 export default function RootLayout({
