@@ -1,5 +1,5 @@
 {
-  "name": "@crikket/api",
+  "name": "@crikket/bug-reports",
   "type": "module",
   "exports": {
     ".": {
@@ -12,22 +12,18 @@
   "scripts": {},
   "dependencies": {
     "@crikket/auth": "workspace:*",
-    "@crikket/bug-reports": "workspace:*",
     "@crikket/db": "workspace:*",
     "@crikket/env": "workspace:*",
     "@crikket/shared": "workspace:*",
-    "@orpc/client": "catalog:",
-    "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
     "@orpc/zod": "catalog:",
-    "@types/pg": "catalog:",
-    "dotenv": "catalog:",
     "drizzle-orm": "catalog:",
+    "drizzle-zod": "^0.8.3",
+    "nanoid": "^5.1.5",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@crikket/config": "workspace:*",
-    "hono": "catalog:",
     "typescript": "catalog:"
   }
 }

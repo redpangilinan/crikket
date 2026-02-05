@@ -15,14 +15,23 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3"
+    "@crikket/api": "workspace:*",
+    "@crikket/env": "workspace:*",
+    "@crikket/shared": "workspace:*",
+    "@crikket/ui": "workspace:*",
+    "@orpc/client": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
-    "@types/react": "^19.2.7",
-    "@types/react-dom": "^19.2.3",
+    "@tailwindcss/postcss": "catalog:",
+    "@types/chrome": "^0.1.36",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "@wxt-dev/module-react": "^1.1.5",
-    "typescript": "^5.9.3",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
     "wxt": "^0.20.6"
   }
 }
