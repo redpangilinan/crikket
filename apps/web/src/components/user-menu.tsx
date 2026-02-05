@@ -1,3 +1,4 @@
+import { authClient } from "@crikket/auth/client"
 import { Button } from "@crikket/ui/components/ui/button"
 import {
   DropdownMenu,
@@ -11,7 +12,6 @@ import {
 import { Skeleton } from "@crikket/ui/components/ui/skeleton"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { authClient } from "@/lib/auth-client"
 
 export default function UserMenu() {
   const router = useRouter()

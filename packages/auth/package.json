@@ -5,6 +5,9 @@
     ".": {
       "default": "./src/index.ts"
     },
+    "./client": {
+      "default": "./src/client.ts"
+    },
     "./*": {
       "default": "./src/*.ts"
     }
@@ -14,7 +17,8 @@
     "@crikket/db": "workspace:*",
     "@crikket/env": "workspace:*",
     "@polar-sh/better-auth": "catalog:",
-    "@polar-sh/sdk": "^0.42.2",
+    "@polar-sh/checkout": "catalog:",
+    "@polar-sh/sdk": "catalog:",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
     "zod": "catalog:"

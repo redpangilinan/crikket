@@ -4,11 +4,6 @@
   "workspaces": {
     "": {
       "name": "crikket",
-      "dependencies": {
-        "@crikket/env": "workspace:*",
-        "dotenv": "catalog:",
-        "zod": "catalog:",
-      },
       "devDependencies": {
         "@biomejs/biome": "2.3.13",
         "@crikket/config": "workspace:*",
@@ -89,6 +84,7 @@
         "@crikket/api": "workspace:*",
         "@crikket/auth": "workspace:*",
         "@crikket/env": "workspace:*",
+        "@crikket/shared": "workspace:*",
         "@crikket/ui": "workspace:*",
         "@orpc/client": "catalog:",
         "@orpc/server": "catalog:",
@@ -143,7 +139,8 @@
         "@crikket/db": "workspace:*",
         "@crikket/env": "workspace:*",
         "@polar-sh/better-auth": "catalog:",
-        "@polar-sh/sdk": "^0.42.2",
+        "@polar-sh/checkout": "catalog:",
+        "@polar-sh/sdk": "catalog:",
         "better-auth": "catalog:",
         "dotenv": "catalog:",
         "zod": "catalog:",
@@ -188,6 +185,17 @@
         "typescript": "catalog:",
       },
     },
+    "packages/shared": {
+      "name": "@crikket/shared",
+      "version": "0.0.0",
+      "dependencies": {
+        "@crikket/env": "workspace:*",
+      },
+      "devDependencies": {
+        "@crikket/config": "workspace:*",
+        "typescript": "catalog:",
+      },
+    },
     "packages/ui": {
       "name": "@crikket/ui",
       "version": "0.1.0",
@@ -203,6 +211,7 @@
       },
       "devDependencies": {
         "@crikket/config": "workspace:*",
+        "@crikket/env": "workspace:*",
         "@tailwindcss/postcss": "catalog:",
         "@types/react": "catalog:",
         "@types/react-dom": "catalog:",
@@ -225,6 +234,8 @@
     "@orpc/server": "^1.12.2",
     "@orpc/zod": "^1.12.2",
     "@polar-sh/better-auth": "^1.6.4",
+    "@polar-sh/checkout": "^0.2.0",
+    "@polar-sh/sdk": "^0.42.2",
     "@tailwindcss/postcss": "^4.1.10",
     "@tanstack/react-form": "^1.27.3",
     "@tanstack/react-query": "^5.90.12",
@@ -366,6 +377,8 @@
     "@crikket/db": ["@crikket/db@workspace:packages/db"],
 
     "@crikket/env": ["@crikket/env@workspace:packages/env"],
+
+    "@crikket/shared": ["@crikket/shared@workspace:packages/shared"],
 
     "@crikket/ui": ["@crikket/ui@workspace:packages/ui"],
 

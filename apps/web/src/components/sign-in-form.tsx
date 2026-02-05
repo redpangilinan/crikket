@@ -1,135 +1,89 @@
+import { authClient } from "@crikket/auth/client"
+import { env } from "@crikket/env/web"
+import { Icons } from "@crikket/ui/components/icons"
 import { Loader } from "@crikket/ui/components/loader"
 import { Button } from "@crikket/ui/components/ui/button"
-import { Input } from "@crikket/ui/components/ui/input"
-import { Label } from "@crikket/ui/components/ui/label"
-import { useForm } from "@tanstack/react-form"
-import { useRouter } from "next/navigation"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@crikket/ui/components/ui/card"
+import Image from "next/image"
 import { toast } from "sonner"
-import z from "zod"
-import { authClient } from "@/lib/auth-client"
 
-export default function SignInForm({
-  onSwitchToSignUp,
-}: {
-  onSwitchToSignUp: () => void
-}) {
-  const router = useRouter()
+export default function SignInForm() {
   const { isPending } = authClient.useSession()
 
-  const form = useForm({
-    defaultValues: {
-      email: "",
-      password: "",
-    },
-    onSubmit: async ({ value }) => {
-      await authClient.signIn.email(
-        {
-          email: value.email,
-          password: value.password,
+  const handleGoogleSignIn = async () => {
+    await authClient.signIn.social(
+      {
+        provider: "google",
+        callbackURL: env.NEXT_PUBLIC_APP_URL,
+      },
+      {
+        onError: (ctx) => {
+          toast.error(ctx.error.message)
         },
-        {
-          onSuccess: () => {
-            router.push("/dashboard")
-            toast.success("Sign in successful")
-          },
-          onError: (error) => {
-            toast.error(error.error.message || error.error.statusText)
-          },
-        }
-      )
-    },
-    validators: {
-      onSubmit: z.object({
-        email: z.email("Invalid email address"),
-        password: z.string().min(8, "Password must be at least 8 characters"),
-      }),
-    },
-  })
+      }
+    )
+  }
 
   if (isPending) {
-    return <Loader />
+    return (
+      <div className="flex min-h-[400px] items-center justify-center">
+        <Loader />
+      </div>
+    )
   }
 
   return (
-    <div className="mx-auto mt-10 w-full max-w-md p-6">
-      <h1 className="mb-6 text-center font-bold text-3xl">Welcome Back</h1>
-
-      <form
-        className="space-y-4"
-        onSubmit={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          form.handleSubmit()
-        }}
-      >
-        <div>
-          <form.Field name="email">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Email</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  type="email"
-                  value={field.state.value}
-                />
-                {field.state.meta.errors.map((error) => (
-                  <p className="text-red-500" key={error?.message}>
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
-          </form.Field>
+    <div className="flex w-full flex-col items-center p-4 pt-[12vh] pb-20">
+      <div className="mb-6 flex items-center gap-2">
+        <div className="relative h-10 w-10">
+          <Image
+            alt="Logo"
+            className="object-contain"
+            fill
+            priority
+            src="/favicon/favicon.svg"
+          />
         </div>
-
-        <div>
-          <form.Field name="password">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Password</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  type="password"
-                  value={field.state.value}
-                />
-                {field.state.meta.errors.map((error) => (
-                  <p className="text-red-500" key={error?.message}>
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
-          </form.Field>
-        </div>
-
-        <form.Subscribe>
-          {(state) => (
-            <Button
-              className="w-full"
-              disabled={!state.canSubmit || state.isSubmitting}
-              type="submit"
-            >
-              {state.isSubmitting ? "Submitting..." : "Sign In"}
-            </Button>
-          )}
-        </form.Subscribe>
-      </form>
-
-      <div className="mt-4 text-center">
-        <Button
-          className="text-indigo-600 hover:text-indigo-800"
-          onClick={onSwitchToSignUp}
-          variant="link"
-        >
-          Need an account? Sign Up
-        </Button>
+        <h1 className="font-bold text-4xl tracking-tight">crikket</h1>
       </div>
+
+      <Card className="w-full max-w-[400px] border-none shadow-xl ring-1 ring-border/50">
+        <CardHeader className="space-y-1 pt-8 text-center">
+          <CardTitle className="font-bold text-2xl tracking-tight">
+            Welcome back
+          </CardTitle>
+          <CardDescription className="text-muted-foreground">
+            Sign in to your account to continue
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-6 pt-2 pb-10">
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-muted border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-card px-2 font-medium text-muted-foreground">
+                Continue with socials
+              </span>
+            </div>
+          </div>
+          <Button
+            className="h-12 w-full font-semibold text-base shadow-sm transition-all hover:bg-muted/50 hover:shadow-md active:scale-[0.98]"
+            onClick={handleGoogleSignIn}
+            type="button"
+            variant="outline"
+          >
+            <Icons.google className="mr-3 h-5 w-5" />
+            Continue with Google
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   )
 }
