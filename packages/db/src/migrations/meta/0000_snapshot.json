@@ -1,5 +1,5 @@
 {
-  "id": "5cb27db2-29c6-4553-96a9-a10bd1fdce89",
+  "id": "c3ab88b8-a4e3-4f3b-a739-e28d279f5daf",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -110,17 +110,12 @@
           "name": "account_user_id_user_id_fk",
           "tableFrom": "account",
           "tableTo": "user",
-<<<<<<< Updated upstream
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-=======
           "columnsFrom": [
             "user_id"
           ],
           "columnsTo": [
             "id"
           ],
->>>>>>> Stashed changes
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -223,17 +218,12 @@
           "name": "invitation_organization_id_organization_id_fk",
           "tableFrom": "invitation",
           "tableTo": "organization",
-<<<<<<< Updated upstream
-          "columnsFrom": ["organization_id"],
-          "columnsTo": ["id"],
-=======
           "columnsFrom": [
             "organization_id"
           ],
           "columnsTo": [
             "id"
           ],
->>>>>>> Stashed changes
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -241,17 +231,12 @@
           "name": "invitation_inviter_id_user_id_fk",
           "tableFrom": "invitation",
           "tableTo": "user",
-<<<<<<< Updated upstream
-          "columnsFrom": ["inviter_id"],
-          "columnsTo": ["id"],
-=======
           "columnsFrom": [
             "inviter_id"
           ],
           "columnsTo": [
             "id"
           ],
->>>>>>> Stashed changes
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -335,17 +320,12 @@
           "name": "member_organization_id_organization_id_fk",
           "tableFrom": "member",
           "tableTo": "organization",
-<<<<<<< Updated upstream
-          "columnsFrom": ["organization_id"],
-          "columnsTo": ["id"],
-=======
           "columnsFrom": [
             "organization_id"
           ],
           "columnsTo": [
             "id"
           ],
->>>>>>> Stashed changes
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -353,17 +333,12 @@
           "name": "member_user_id_user_id_fk",
           "tableFrom": "member",
           "tableTo": "user",
-<<<<<<< Updated upstream
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-=======
           "columnsFrom": [
             "user_id"
           ],
           "columnsTo": [
             "id"
           ],
->>>>>>> Stashed changes
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -438,13 +413,9 @@
         "organization_slug_unique": {
           "name": "organization_slug_unique",
           "nullsNotDistinct": false,
-<<<<<<< Updated upstream
-          "columns": ["slug"]
-=======
           "columns": [
             "slug"
           ]
->>>>>>> Stashed changes
         }
       },
       "policies": {},
@@ -533,17 +504,12 @@
           "name": "session_user_id_user_id_fk",
           "tableFrom": "session",
           "tableTo": "user",
-<<<<<<< Updated upstream
-          "columnsFrom": ["user_id"],
-          "columnsTo": ["id"],
-=======
           "columnsFrom": [
             "user_id"
           ],
           "columnsTo": [
             "id"
           ],
->>>>>>> Stashed changes
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -553,13 +519,9 @@
         "session_token_unique": {
           "name": "session_token_unique",
           "nullsNotDistinct": false,
-<<<<<<< Updated upstream
-          "columns": ["token"]
-=======
           "columns": [
             "token"
           ]
->>>>>>> Stashed changes
         }
       },
       "policies": {},
@@ -623,13 +585,9 @@
         "user_email_unique": {
           "name": "user_email_unique",
           "nullsNotDistinct": false,
-<<<<<<< Updated upstream
-          "columns": ["email"]
-=======
           "columns": [
             "email"
           ]
->>>>>>> Stashed changes
         }
       },
       "policies": {},
@@ -751,15 +709,33 @@
           "notNull": true,
           "default": "'medium'"
         },
+        "tags": {
+          "name": "tags",
+          "type": "text[]",
+          "primaryKey": false,
+          "notNull": false
+        },
         "url": {
           "name": "url",
           "type": "text",
           "primaryKey": false,
           "notNull": false
         },
-        "recording_url": {
-          "name": "recording_url",
+        "attachment_url": {
+          "name": "attachment_url",
           "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attachment_type": {
+          "name": "attachment_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "metadata": {
+          "name": "metadata",
+          "type": "jsonb",
           "primaryKey": false,
           "notNull": false
         },
@@ -821,17 +797,12 @@
           "name": "bug_report_organization_id_organization_id_fk",
           "tableFrom": "bug_report",
           "tableTo": "organization",
-<<<<<<< Updated upstream
-          "columnsFrom": ["organization_id"],
-          "columnsTo": ["id"],
-=======
           "columnsFrom": [
             "organization_id"
           ],
           "columnsTo": [
             "id"
           ],
->>>>>>> Stashed changes
           "onDelete": "cascade",
           "onUpdate": "no action"
         },
@@ -839,17 +810,12 @@
           "name": "bug_report_reporter_id_user_id_fk",
           "tableFrom": "bug_report",
           "tableTo": "user",
-<<<<<<< Updated upstream
-          "columnsFrom": ["reporter_id"],
-          "columnsTo": ["id"],
-=======
           "columnsFrom": [
             "reporter_id"
           ],
           "columnsTo": [
             "id"
           ],
->>>>>>> Stashed changes
           "onDelete": "set null",
           "onUpdate": "no action"
         }
@@ -894,6 +860,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "offset": {
+          "name": "offset",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "metadata": {
           "name": "metadata",
           "type": "jsonb",
@@ -923,17 +895,12 @@
           "name": "bug_report_action_bug_report_id_bug_report_id_fk",
           "tableFrom": "bug_report_action",
           "tableTo": "bug_report",
-<<<<<<< Updated upstream
-          "columnsFrom": ["bug_report_id"],
-          "columnsTo": ["id"],
-=======
           "columnsFrom": [
             "bug_report_id"
           ],
           "columnsTo": [
             "id"
           ],
->>>>>>> Stashed changes
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -978,6 +945,12 @@
           "primaryKey": false,
           "notNull": true
         },
+        "offset": {
+          "name": "offset",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
         "metadata": {
           "name": "metadata",
           "type": "jsonb",
@@ -1007,17 +980,12 @@
           "name": "bug_report_log_bug_report_id_bug_report_id_fk",
           "tableFrom": "bug_report_log",
           "tableTo": "bug_report",
-<<<<<<< Updated upstream
-          "columnsFrom": ["bug_report_id"],
-          "columnsTo": ["id"],
-=======
           "columnsFrom": [
             "bug_report_id"
           ],
           "columnsTo": [
             "id"
           ],
->>>>>>> Stashed changes
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1097,6 +1065,12 @@
           "type": "timestamp",
           "primaryKey": false,
           "notNull": true
+        },
+        "offset": {
+          "name": "offset",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
         }
       },
       "indexes": {
@@ -1121,17 +1095,12 @@
           "name": "bug_report_network_request_bug_report_id_bug_report_id_fk",
           "tableFrom": "bug_report_network_request",
           "tableTo": "bug_report",
-<<<<<<< Updated upstream
-          "columnsFrom": ["bug_report_id"],
-          "columnsTo": ["id"],
-=======
           "columnsFrom": [
             "bug_report_id"
           ],
           "columnsTo": [
             "id"
           ],
->>>>>>> Stashed changes
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
@@ -1154,8 +1123,4 @@
     "schemas": {},
     "tables": {}
   }
-<<<<<<< Updated upstream
 }
-=======
-}
->>>>>>> Stashed changes

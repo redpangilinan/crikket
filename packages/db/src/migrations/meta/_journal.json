@@ -5,15 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1770220257570,
-      "tag": "0000_wakeful_makkari",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1770222407746,
-      "tag": "0001_slim_proteus",
+      "when": 1770319084516,
+      "tag": "0000_strong_centennial",
       "breakpoints": true
     }
   ]

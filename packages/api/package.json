@@ -14,6 +14,7 @@
     "@crikket/auth": "workspace:*",
     "@crikket/db": "workspace:*",
     "@crikket/env": "workspace:*",
+    "@crikket/shared": "workspace:*",
     "@orpc/client": "catalog:",
     "@orpc/openapi": "catalog:",
     "@orpc/server": "catalog:",
