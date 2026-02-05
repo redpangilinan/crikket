@@ -1,5 +1,6 @@
 "use client"
 
+import type { AppRouterClient } from "@crikket/api/routers/index"
 import {
   Avatar,
   AvatarFallback,
@@ -14,14 +15,36 @@ import {
   DropdownMenuTrigger,
 } from "@crikket/ui/components/ui/dropdown-menu"
 import { useQuery } from "@tanstack/react-query"
-import { Clock, MoreVertical, Play } from "lucide-react"
+import { Clock, Loader2, MoreVertical, Play } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
 
 import { orpc } from "@/utils/orpc"
 
+type BugReportListResponse = Awaited<
+  ReturnType<AppRouterClient["bugReport"]["list"]>
+>
+type BugReportItem = BugReportListResponse["items"][number]
+
 export function BugReportsList() {
-  const { data: bugReports, isLoading } = useQuery(
-    orpc.bugReport.list.queryOptions()
+  const [page, setPage] = useState(1)
+  const [allItems, setAllItems] = useState<BugReportItem[]>([])
+  const loadedPagesRef = useRef(new Set<number>())
+
+  const { data, isLoading, isFetching } = useQuery(
+    orpc.bugReport.list.queryOptions({ page })
   )
+
+  // Update accumulated items when new data arrives
+  useEffect(() => {
+    if (data?.items && !isFetching && !loadedPagesRef.current.has(page)) {
+      loadedPagesRef.current.add(page)
+      setAllItems((prev) => [...prev, ...data.items])
+    }
+  }, [data, isFetching, page])
+
+  const handleLoadMore = () => {
+    setPage((prev) => prev + 1)
+  }
 
   if (isLoading) {
     return (
@@ -36,7 +59,7 @@ export function BugReportsList() {
     )
   }
 
-  if (!bugReports || bugReports.length === 0) {
+  if (!data || allItems.length === 0) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-4 py-20">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-muted">
@@ -56,89 +79,112 @@ export function BugReportsList() {
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-      {bugReports.map((report) => (
-        <Card
-          className="group overflow-hidden transition-all hover:shadow-lg"
-          key={report.id}
-        >
-          <CardContent className="p-0">
-            {/* Thumbnail */}
-            <div className="relative aspect-video overflow-hidden bg-muted">
-              {report.thumbnail ? (
-                <img
-                  alt={report.title}
-                  className="h-full w-full object-cover transition-transform group-hover:scale-105"
-                  src={report.thumbnail}
-                />
-              ) : (
-                <div className="flex h-full w-full items-center justify-center">
-                  <Play className="h-12 w-12 text-muted-foreground" />
+    <div className="space-y-6">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {allItems.map((report) => (
+          <Card
+            className="group overflow-hidden transition-all hover:shadow-lg"
+            key={report.id}
+          >
+            <CardContent className="p-0">
+              {/* Thumbnail */}
+              <div className="relative aspect-video overflow-hidden bg-muted">
+                {report.thumbnail ? (
+                  <img
+                    alt={report.title}
+                    className="h-full w-full object-cover transition-transform group-hover:scale-105"
+                    src={report.thumbnail}
+                  />
+                ) : (
+                  <div className="flex h-full w-full items-center justify-center">
+                    <Play className="h-12 w-12 text-muted-foreground" />
+                  </div>
+                )}
+                {/* Play overlay */}
+                <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white">
+                    <Play className="h-6 w-6 fill-black text-black" />
+                  </div>
                 </div>
-              )}
-              {/* Play overlay */}
-              <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition-opacity group-hover:opacity-100">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white">
-                  <Play className="h-6 w-6 fill-black text-black" />
+                {/* Duration badge */}
+                <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded bg-black/70 px-2 py-1 text-white text-xs">
+                  <Clock className="h-3 w-3" />
+                  {report.duration}
                 </div>
               </div>
-              {/* Duration badge */}
-              <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded bg-black/70 px-2 py-1 text-white text-xs">
-                <Clock className="h-3 w-3" />
-                {report.duration}
-              </div>
-            </div>
 
-            {/* Info */}
-            <div className="flex items-start gap-3 p-3">
-              <Avatar className="h-9 w-9">
-                <AvatarImage
-                  alt={report.uploader.name}
-                  src={report.uploader.avatar}
-                />
-                <AvatarFallback>
-                  {report.uploader.name
-                    ?.split(" ")
-                    .map((n: string) => n[0])
-                    .join("")
-                    .toUpperCase() || "?"}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex-1 space-y-1">
-                <h3 className="line-clamp-2 font-semibold text-sm leading-tight">
-                  {report.title}
-                </h3>
-                <p className="text-muted-foreground text-xs">
-                  {report.uploader.name}
-                </p>
-                <p className="text-muted-foreground text-xs">
-                  {new Date(report.createdAt).toLocaleDateString()}
-                </p>
+              {/* Info */}
+              <div className="flex items-start gap-3 p-3">
+                <Avatar className="h-9 w-9">
+                  <AvatarImage
+                    alt={report.uploader.name}
+                    src={report.uploader.avatar}
+                  />
+                  <AvatarFallback>
+                    {report.uploader.name
+                      ?.split(" ")
+                      .map((n: string) => n[0])
+                      .join("")
+                      .toUpperCase() || "?"}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 space-y-1">
+                  <h3 className="line-clamp-2 font-semibold text-sm leading-tight">
+                    {report.title}
+                  </h3>
+                  <p className="text-muted-foreground text-xs">
+                    {report.uploader.name}
+                  </p>
+                  <p className="text-muted-foreground text-xs">
+                    {new Date(report.createdAt).toLocaleDateString()}
+                  </p>
+                </div>
+                <DropdownMenu>
+                  <DropdownMenuTrigger>
+                    <Button
+                      className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
+                      size="icon"
+                      variant="ghost"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                      <span className="sr-only">More options</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem>Share</DropdownMenuItem>
+                    <DropdownMenuItem>Download</DropdownMenuItem>
+                    <DropdownMenuItem>Rename</DropdownMenuItem>
+                    <DropdownMenuItem className="text-destructive">
+                      Delete
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
-              <DropdownMenu>
-                <DropdownMenuTrigger>
-                  <Button
-                    className="h-8 w-8 opacity-0 transition-opacity group-hover:opacity-100"
-                    size="icon"
-                    variant="ghost"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                    <span className="sr-only">More options</span>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Share</DropdownMenuItem>
-                  <DropdownMenuItem>Download</DropdownMenuItem>
-                  <DropdownMenuItem>Rename</DropdownMenuItem>
-                  <DropdownMenuItem className="text-destructive">
-                    Delete
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </CardContent>
-        </Card>
-      ))}
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Load More Button */}
+      {data.pagination.hasNextPage && (
+        <div className="flex justify-center">
+          <Button
+            disabled={isFetching}
+            onClick={handleLoadMore}
+            size="lg"
+            variant="outline"
+          >
+            {isFetching ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Loading...
+              </>
+            ) : (
+              "Load More"
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   )
 }

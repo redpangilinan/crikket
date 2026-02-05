@@ -118,6 +118,7 @@
         "@crikket/auth": "workspace:*",
         "@crikket/db": "workspace:*",
         "@crikket/env": "workspace:*",
+        "@crikket/shared": "workspace:*",
         "@orpc/client": "catalog:",
         "@orpc/openapi": "catalog:",
         "@orpc/server": "catalog:",
@@ -211,7 +212,6 @@
       },
       "devDependencies": {
         "@crikket/config": "workspace:*",
-        "@crikket/env": "workspace:*",
         "@tailwindcss/postcss": "catalog:",
         "@types/react": "catalog:",
         "@types/react-dom": "catalog:",
