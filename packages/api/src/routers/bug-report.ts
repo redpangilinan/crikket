@@ -20,16 +20,20 @@ export const bugReportRouter = {
       },
     })
 
-    return bugReports.map((r) => ({
-      id: r.id,
-      title: r.title || "Untitled Bug Report",
-      duration: "0:00", // Placeholder as it is not in schema yet or calculated
-      thumbnail: undefined,
-      uploader: {
-        name: r.reporter?.name || "Unknown User",
-        avatar: r.reporter?.image || undefined,
-      },
-      createdAt: r.createdAt.toISOString(),
-    }))
+    return bugReports.map((r) => {
+      const metadata = r.metadata as Record<string, unknown> | null
+
+      return {
+        id: r.id,
+        title: r.title || "Untitled Bug Report",
+        duration: metadata?.duration || "0:00",
+        thumbnail: metadata?.thumbnailUrl || undefined,
+        uploader: {
+          name: r.reporter?.name || "Unknown User",
+          avatar: r.reporter?.image || undefined,
+        },
+        createdAt: r.createdAt.toISOString(),
+      }
+    })
   }),
 }

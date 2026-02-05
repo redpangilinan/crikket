@@ -23,8 +23,11 @@ export const bugReport = pgTable(
     description: text("description"),
     status: text("status").default("open").notNull(), // open, in_progress, resolved, closed
     priority: text("priority").default("medium").notNull(), // low, medium, high, critical
+    tags: text("tags").array(), // optional tags for categorization
     url: text("url"),
-    recordingUrl: text("recording_url"),
+    attachmentUrl: text("attachment_url"), // video or screenshot URL
+    attachmentType: text("attachment_type"), // "video" or "screenshot"
+    metadata: jsonb("metadata"),
     deviceInfo: jsonb("device_info"), // browser, os, viewport, etc.
     createdAt: timestamp("created_at").defaultNow().notNull(),
     updatedAt: timestamp("updated_at")
