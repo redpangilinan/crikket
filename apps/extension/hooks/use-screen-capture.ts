@@ -5,10 +5,12 @@ export interface UseScreenCaptureReturn {
   recordedBlob: Blob | null
   screenshotBlob: Blob | null
   error: string | null
-  startRecording: () => Promise<void>
+  startRecording: () => Promise<boolean>
   stopRecording: () => Promise<Blob | null>
   takeScreenshot: () => Promise<Blob | null>
   reset: () => void
+  setRecordedBlob: (blob: Blob | null) => void
+  setScreenshotBlob: (blob: Blob | null) => void
 }
 
 export function useScreenCapture(): UseScreenCaptureReturn {
@@ -21,7 +23,7 @@ export function useScreenCapture(): UseScreenCaptureReturn {
   const streamRef = useRef<MediaStream | null>(null)
   const chunksRef = useRef<Blob[]>([])
 
-  const startRecording = useCallback(async () => {
+  const startRecording = useCallback(async (): Promise<boolean> => {
     try {
       setError(null)
       setRecordedBlob(null)
@@ -65,11 +67,13 @@ export function useScreenCapture(): UseScreenCaptureReturn {
 
       mediaRecorder.start(1000)
       setIsRecording(true)
+      return true
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Failed to start recording"
       setError(message)
       setIsRecording(false)
+      return false
     }
   }, [])
 
@@ -182,5 +186,7 @@ export function useScreenCapture(): UseScreenCaptureReturn {
     stopRecording,
     takeScreenshot,
     reset,
+    setRecordedBlob,
+    setScreenshotBlob,
   }
 }

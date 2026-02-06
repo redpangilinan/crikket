@@ -25,6 +25,7 @@
         "@crikket/ui": "workspace:*",
         "@orpc/client": "catalog:",
         "@tanstack/react-query": "catalog:",
+        "lucide-react": "catalog:",
         "react": "catalog:",
         "react-dom": "catalog:",
       },

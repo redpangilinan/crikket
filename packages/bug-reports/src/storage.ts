@@ -77,7 +77,7 @@ export class S3StorageProvider implements StorageProvider {
  * Uses local storage by default, can be extended to support S3
  */
 export function getStorageProvider(): StorageProvider {
-  const storagePath = env.STORAGE_PATH || "./uploads"
+  const storagePath = env.STORAGE_PATH
   return new LocalStorageProvider(storagePath)
 }
 

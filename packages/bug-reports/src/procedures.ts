@@ -116,7 +116,6 @@ export const createBugReport = protectedProcedure
       priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
       url: z.string().url().optional(),
       attachmentType: z.enum(["video", "screenshot"]),
-      // oRPC supports native File/Blob
       attachment: z.instanceof(Blob),
       deviceInfo: z
         .object({
@@ -134,15 +133,12 @@ export const createBugReport = protectedProcedure
       throw new ORPCError("BAD_REQUEST", { message: "No active organization" })
     }
 
-    // Generate URL-friendly ID
     const id = nanoid(12)
 
-    // Save attachment
     const storage = getStorageProvider()
     const filename = generateFilename(id, input.attachmentType)
     const attachmentUrl = await storage.save(filename, input.attachment)
 
-    // Insert bug report
     await db.insert(bugReport).values({
       id,
       organizationId: activeOrgId,
@@ -155,7 +151,6 @@ export const createBugReport = protectedProcedure
       attachmentType: input.attachmentType,
       deviceInfo: input.deviceInfo,
       status: "open",
-      // Empty logs for now as requested
       metadata: {},
     })
 

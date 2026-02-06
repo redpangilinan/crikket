@@ -22,7 +22,8 @@
     "@orpc/client": "catalog:",
     "@tanstack/react-query": "catalog:",
     "react": "catalog:",
-    "react-dom": "catalog:"
+    "react-dom": "catalog:",
+    "lucide-react": "catalog:"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "catalog:",

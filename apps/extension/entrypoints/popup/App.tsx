@@ -1,180 +1,142 @@
-import { env } from "@crikket/env/extension"
+import { Button } from "@crikket/ui/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@crikket/ui/components/ui/card"
+import { Camera, Video } from "lucide-react"
 import { useState } from "react"
-import { ErrorDisplay } from "./components/error-display"
-import { FormStep } from "./components/form-step"
-import { InitialStep } from "./components/initial-step"
-import { RecordingStep } from "./components/recording-step"
-import { SuccessStep } from "./components/success-step"
-import { useScreenCapture } from "./hooks/use-screen-capture"
-import { client } from "./lib/orpc"
-import { getDeviceInfo } from "./lib/utils"
-import type { Priority, Step } from "./types"
+
+type CaptureType = "video" | "screenshot"
 
 function App() {
-  const [step, setStep] = useState<Step>("initial")
-  const [captureType, setCaptureType] = useState<"video" | "screenshot">(
-    "video"
-  )
-  const [description, setDescription] = useState("")
-  const [priority, setPriority] = useState<Priority>("medium")
-  const [resultUrl, setResultUrl] = useState("")
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
+  const [isCapturing, setIsCapturing] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
-  const {
-    isRecording,
-    recordedBlob,
-    screenshotBlob,
-    error,
-    startRecording,
-    stopRecording,
-    takeScreenshot,
-    reset,
-  } = useScreenCapture()
-
-  const handleStartRecording = async () => {
-    setCaptureType("video")
-    await startRecording()
-    setStep("recording")
-  }
-
-  const handleStopRecording = async () => {
-    const blob = await stopRecording()
-    if (blob) {
-      setStep("form")
-    }
-  }
-
-  const handleTakeScreenshot = async () => {
-    setCaptureType("screenshot")
-    const blob = await takeScreenshot()
-    if (blob) {
-      setStep("form")
-    }
-  }
-
-  const handleSubmit = async () => {
-    const blob = captureType === "video" ? recordedBlob : screenshotBlob
-    if (!blob) return
-
-    setIsSubmitting(true)
-    setSubmitError(null)
+  const startCapture = async (captureType: CaptureType) => {
+    setIsCapturing(true)
+    setError(null)
 
     try {
-      let currentUrl: string | undefined
-      try {
-        const tabs = await chrome.tabs.query({
-          active: true,
-          currentWindow: true,
+      if (captureType === "screenshot") {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: { displaySurface: "browser" },
+          audio: false,
         })
-        currentUrl = tabs[0]?.url
-      } catch {
-        // Extension context may not have tab access
-      }
 
-      const result = await client.bugReport.create({
-        attachment: blob,
-        attachmentType: captureType,
-        priority,
-        description: description || undefined,
-        url: currentUrl,
-        deviceInfo: getDeviceInfo(),
-      })
+        const blob = await captureScreenshot(stream)
+        for (const track of stream.getTracks()) {
+          track.stop()
+        }
 
-      const fullUrl = `${env.VITE_SERVER_URL}${result.shareUrl}`
-      setResultUrl(fullUrl)
-      setStep("success")
-
-      chrome.tabs.create({ url: fullUrl })
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Failed to submit"
-      if (message.includes("UNAUTHORIZED") || message.includes("401")) {
-        setSubmitError("Please log in to the web app first.")
+        const reader = new FileReader()
+        reader.onloadend = () => {
+          const base64data = reader.result as string
+          chrome.storage.local.set({ pendingScreenshot: base64data }, () => {
+            chrome.tabs.create({
+              url: chrome.runtime.getURL(
+                "/recorder.html?captureType=screenshot"
+              ),
+            })
+            window.close()
+          })
+        }
+        reader.readAsDataURL(blob)
       } else {
-        setSubmitError(message)
+        chrome.storage.local.set({ startRecordingImmediately: true }, () => {
+          chrome.tabs.create({
+            url: chrome.runtime.getURL("/recorder.html?captureType=video"),
+          })
+          window.close()
+        })
       }
-    } finally {
-      setIsSubmitting(false)
+    } catch (err) {
+      console.error(err)
+      setError(err instanceof Error ? err.message : "Failed to access screen")
+      setIsCapturing(false)
     }
   }
 
-  const handleOpenRecording = () => {
-    chrome.tabs.create({ url: resultUrl })
-  }
+  const captureScreenshot = async (stream: MediaStream): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement("video")
+      video.srcObject = stream
+      video.autoplay = true
+      video.muted = true
 
-  const handleCopyLink = async () => {
-    await navigator.clipboard.writeText(resultUrl)
-  }
+      video.onloadedmetadata = () => {
+        video.play()
+        setTimeout(() => {
+          const canvas = document.createElement("canvas")
+          canvas.width = video.videoWidth
+          canvas.height = video.videoHeight
+          const ctx = canvas.getContext("2d")
+          ctx?.drawImage(video, 0, 0)
 
-  const handleReset = () => {
-    reset()
-    setStep("initial")
-    setDescription("")
-    setPriority("medium")
-    setResultUrl("")
-    setSubmitError(null)
-  }
+          canvas.toBlob((blob) => {
+            if (blob) {
+              resolve(blob)
+            } else {
+              reject(new Error("Failed to create blob"))
+            }
+          })
+        }, 500)
+      }
 
-  const previewUrl =
-    captureType === "video"
-      ? recordedBlob
-        ? URL.createObjectURL(recordedBlob)
-        : null
-      : screenshotBlob
-        ? URL.createObjectURL(screenshotBlob)
-        : null
+      video.onerror = () => reject(new Error("Video load error"))
+    })
+  }
 
   return (
-    <div className="min-h-[400px] w-[360px] bg-background">
-      <div className="bg-gradient-to-br from-purple-600 to-purple-800 p-4 text-center">
-        <h1 className="font-semibold text-lg text-white">🐛 Bug Report</h1>
-      </div>
+    <div className="w-[380px] p-4">
+      <Card>
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-xl">🦗 Crikket</CardTitle>
+          <CardDescription>
+            Capture and report bugs with screenshots or recordings
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {error && (
+            <div className="rounded-md border border-destructive bg-destructive/10 p-3">
+              <p className="text-destructive text-sm">{error}</p>
+            </div>
+          )}
 
-      <div className="p-5">
-        {/* Initial State */}
-        {step === "initial" && (
-          <InitialStep
-            onStartRecording={handleStartRecording}
-            onTakeScreenshot={handleTakeScreenshot}
-          />
-        )}
+          <div className="space-y-2">
+            <Button
+              className="w-full justify-start gap-3"
+              disabled={isCapturing}
+              onClick={() => startCapture("video")}
+              size="lg"
+              variant="default"
+            >
+              <Video className="h-5 w-5" />
+              <span>Record Screen</span>
+            </Button>
 
-        {/* Recording State */}
-        {step === "recording" && (
-          <RecordingStep
-            isRecording={isRecording}
-            onStopRecording={handleStopRecording}
-          />
-        )}
+            <Button
+              className="w-full justify-start gap-3"
+              disabled={isCapturing}
+              onClick={() => startCapture("screenshot")}
+              size="lg"
+              variant="outline"
+            >
+              <Camera className="h-5 w-5" />
+              <span>Take Screenshot</span>
+            </Button>
+          </div>
 
-        {/* Form State */}
-        {step === "form" && (
-          <FormStep
-            captureType={captureType}
-            description={description}
-            isSubmitting={isSubmitting}
-            onCancel={handleReset}
-            onDescriptionChange={setDescription}
-            onPriorityChange={setPriority}
-            onSubmit={handleSubmit}
-            previewUrl={previewUrl}
-            priority={priority}
-            submitError={submitError}
-          />
-        )}
-
-        {/* Success State */}
-        {step === "success" && (
-          <SuccessStep
-            onClose={handleReset}
-            onCopyLink={handleCopyLink}
-            onOpenRecording={handleOpenRecording}
-          />
-        )}
-
-        {/* Error Display */}
-        <ErrorDisplay error={error} onRetry={handleReset} />
-      </div>
+          <div className="rounded-md border bg-muted p-3">
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              Select your screen or window to capture. A new tab will open for
+              you to review and submit your report.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }
