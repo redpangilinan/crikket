@@ -77,7 +77,7 @@ export function useScreenCapture(): UseScreenCaptureReturn {
     }
   }, [])
 
-  const stopRecording = useCallback(async (): Promise<Blob | null> => {
+  const stopRecording = useCallback((): Promise<Blob | null> => {
     return new Promise((resolve) => {
       if (
         !mediaRecorderRef.current ||

@@ -59,7 +59,7 @@ function App() {
     }
   }
 
-  const captureScreenshot = async (stream: MediaStream): Promise<Blob> => {
+  const captureScreenshot = (stream: MediaStream): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const video = document.createElement("video")
       video.srcObject = stream

@@ -52,7 +52,7 @@ export function useRecordingSession() {
     }
   }, [])
 
-  const stopRecording = async () => {
+  const stopRecording = () => {
     chrome.runtime.sendMessage({ type: "STOP_RECORDING" })
   }
 

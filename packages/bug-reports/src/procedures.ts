@@ -18,7 +18,7 @@ type SessionContext = typeof auth.$Infer.Session
 
 const o = os.$context<{ session?: SessionContext }>()
 
-const requireAuth = o.middleware(async ({ context, next }) => {
+const requireAuth = o.middleware(({ context, next }) => {
   if (!context.session?.user) {
     throw new ORPCError("UNAUTHORIZED")
   }

@@ -52,10 +52,6 @@
       "correctness": {
         "useImageSize": "off",
         "noUnusedFunctionParameters": "off"
-      },
-      "suspicious": {
-        "useAwait": "off",
-        "noNonNullAssertedOptionalChain": "off"
       }
     }
   }

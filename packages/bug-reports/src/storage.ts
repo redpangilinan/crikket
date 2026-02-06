@@ -55,12 +55,14 @@ export class S3StorageProvider implements StorageProvider {
     this.region = region
   }
 
-  async save(_filename: string, _data: Buffer | Blob): Promise<string> {
+  save(_filename: string, _data: Buffer | Blob): Promise<string> {
     // TODO: Implement S3 upload when ready for production
     // const command = new PutObjectCommand({ Bucket: this.bucket, Key: filename, Body: data })
     // await s3Client.send(command)
-    throw new Error(
-      `S3 storage not implemented yet. Bucket: ${this.bucket}, Region: ${this.region}`
+    return Promise.reject(
+      new Error(
+        `S3 storage not implemented yet. Bucket: ${this.bucket}, Region: ${this.region}`
+      )
     )
   }
 
