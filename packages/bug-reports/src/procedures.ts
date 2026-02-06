@@ -137,7 +137,17 @@ export const createBugReport = protectedProcedure
 
     const storage = getStorageProvider()
     const filename = generateFilename(id, input.attachmentType)
-    const attachmentUrl = await storage.save(filename, input.attachment)
+
+    let attachmentUrl: string
+    try {
+      attachmentUrl = await storage.save(filename, input.attachment)
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Unknown storage error"
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message: `Attachment upload failed: ${message}`,
+      })
+    }
 
     await db.insert(bugReport).values({
       id,

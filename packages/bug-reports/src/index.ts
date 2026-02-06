@@ -9,9 +9,9 @@ export {
 } from "./procedures"
 
 export {
+  createLocalStorageProvider,
+  createS3StorageProvider,
   generateFilename,
   getStorageProvider,
-  LocalStorageProvider,
-  S3StorageProvider,
   type StorageProvider,
 } from "./storage"
