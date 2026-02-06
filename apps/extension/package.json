@@ -20,7 +20,9 @@
     "@crikket/shared": "workspace:*",
     "@crikket/ui": "workspace:*",
     "@orpc/client": "catalog:",
+    "@tanstack/react-form": "catalog:",
     "@tanstack/react-query": "catalog:",
+    "zod": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "lucide-react": "catalog:"

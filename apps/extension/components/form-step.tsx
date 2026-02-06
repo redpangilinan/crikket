@@ -1,5 +1,9 @@
+import {
+  PRIORITY_OPTIONS,
+  type Priority,
+} from "@crikket/shared/constants/priorities"
 import { Button } from "@crikket/ui/components/ui/button"
-import { Label } from "@crikket/ui/components/ui/label"
+import { Field, FieldError, FieldLabel } from "@crikket/ui/components/ui/field"
 import {
   Select,
   SelectContent,
@@ -8,34 +12,56 @@ import {
   SelectValue,
 } from "@crikket/ui/components/ui/select"
 import { Textarea } from "@crikket/ui/components/ui/textarea"
+import { useForm } from "@tanstack/react-form"
+import * as z from "zod"
 
-export type Priority = "low" | "medium" | "high" | "critical"
+const priorityValues = Object.values(PRIORITY_OPTIONS) as [
+  Priority,
+  ...Priority[],
+]
+
+const formSchema = z.object({
+  description: z
+    .string()
+    .max(1000, "Description must be at most 1000 characters."),
+  priority: z.enum(priorityValues),
+})
 
 interface FormStepProps {
   captureType: "video" | "screenshot"
-  description: string
-  priority: Priority
   previewUrl: string | null
   isSubmitting: boolean
   submitError: string | null
-  onDescriptionChange: (value: string) => void
-  onPriorityChange: (value: Priority) => void
-  onSubmit: () => void
+  onSubmit: (values: { description: string; priority: Priority }) => void
   onCancel: () => void
 }
 
 export function FormStep({
   captureType,
-  description,
-  priority,
   previewUrl,
   isSubmitting,
   submitError,
-  onDescriptionChange,
-  onPriorityChange,
   onSubmit,
   onCancel,
 }: FormStepProps) {
+  const form = useForm({
+    defaultValues: {
+      description: "",
+      priority: "medium" as Priority,
+    },
+    validators: {
+      onSubmit: formSchema,
+    },
+    onSubmit: async ({ value }) => {
+      await onSubmit({
+        description: value.description,
+        priority: value.priority,
+      })
+    },
+  })
+
+  const isBusy = isSubmitting || form.state.isSubmitting
+
   return (
     <div className="space-y-6">
       {/* Preview */}
@@ -61,64 +87,103 @@ export function FormStep({
         </div>
       )}
 
-      {/* Form */}
-      <div className="space-y-4">
-        <div className="space-y-2">
-          <Label htmlFor="description">Description (Optional)</Label>
-          <Textarea
-            className="resize-none"
-            id="description"
-            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) =>
-              onDescriptionChange(e.target.value)
-            }
-            placeholder="Describe what went wrong..."
-            rows={4}
-            value={description}
-          />
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="priority">Priority</Label>
-          <Select
-            onValueChange={(value) => {
-              if (value) onPriorityChange(value as Priority)
+      <form
+        onSubmit={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          form.handleSubmit()
+        }}
+      >
+        {/* Form */}
+        <div className="space-y-4">
+          <form.Field name="description">
+            {(field) => {
+              const isInvalid =
+                field.state.meta.isTouched && field.state.meta.errors.length > 0
+              return (
+                <Field data-invalid={isInvalid}>
+                  <FieldLabel htmlFor={field.name}>
+                    Description (Optional)
+                  </FieldLabel>
+                  <Textarea
+                    aria-invalid={isInvalid}
+                    className="resize-none"
+                    id={field.name}
+                    onBlur={field.handleBlur}
+                    onChange={(event) => field.handleChange(event.target.value)}
+                    placeholder="Describe what went wrong..."
+                    rows={4}
+                    value={field.state.value}
+                  />
+                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                </Field>
+              )
             }}
-            value={priority}
+          </form.Field>
+
+          <form.Field name="priority">
+            {(field) => {
+              const isInvalid =
+                field.state.meta.isTouched && field.state.meta.errors.length > 0
+              return (
+                <Field data-invalid={isInvalid}>
+                  <FieldLabel htmlFor={field.name}>Priority</FieldLabel>
+                  <Select
+                    onValueChange={(value) => {
+                      if (value) {
+                        field.handleChange(value as Priority)
+                      }
+                    }}
+                    value={field.state.value}
+                  >
+                    <SelectTrigger aria-invalid={isInvalid} id={field.name}>
+                      <SelectValue className="capitalize" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {priorityValues.map((priority) => (
+                        <SelectItem
+                          className="capitalize"
+                          key={priority}
+                          value={priority}
+                        >
+                          {priority}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
+                </Field>
+              )
+            }}
+          </form.Field>
+        </div>
+
+        {/* Error */}
+        {submitError && (
+          <div className="mt-6 rounded-lg border border-red-500/20 bg-red-500/10 p-4">
+            <p className="text-red-400 text-sm">{submitError}</p>
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="mt-6 flex gap-3">
+          <Button
+            className="flex-1"
+            disabled={isBusy}
+            onClick={() => {
+              form.reset()
+              onCancel()
+            }}
+            type="button"
+            variant="outline"
           >
-            <SelectTrigger id="priority">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="critical">Critical</SelectItem>
-            </SelectContent>
-          </Select>
+            Cancel
+          </Button>
+          <Button className="flex-1" disabled={isBusy} type="submit">
+            {isBusy ? "Submitting..." : "Submit Bug Report"}
+          </Button>
         </div>
-      </div>
-
-      {/* Error */}
-      {submitError && (
-        <div className="rounded-lg border border-red-500/20 bg-red-500/10 p-4">
-          <p className="text-red-400 text-sm">{submitError}</p>
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex gap-3">
-        <Button
-          className="flex-1"
-          disabled={isSubmitting}
-          onClick={onCancel}
-          variant="outline"
-        >
-          Cancel
-        </Button>
-        <Button className="flex-1" disabled={isSubmitting} onClick={onSubmit}>
-          {isSubmitting ? "Submitting..." : "Submit Bug Report"}
-        </Button>
-      </div>
+      </form>
     </div>
   )
 }

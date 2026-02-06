@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     "./config/*": "./src/config/*.ts",
+    "./constants/*": "./src/constants/*.ts",
     "./lib/*": "./src/lib/*.ts"
   },
   "dependencies": {

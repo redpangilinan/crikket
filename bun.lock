@@ -24,10 +24,12 @@
         "@crikket/shared": "workspace:*",
         "@crikket/ui": "workspace:*",
         "@orpc/client": "catalog:",
+        "@tanstack/react-form": "catalog:",
         "@tanstack/react-query": "catalog:",
         "lucide-react": "catalog:",
         "react": "catalog:",
         "react-dom": "catalog:",
+        "zod": "catalog:",
       },
       "devDependencies": {
         "@tailwindcss/postcss": "catalog:",

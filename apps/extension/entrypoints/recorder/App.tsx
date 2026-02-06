@@ -1,4 +1,5 @@
 import { env } from "@crikket/env/extension"
+import type { Priority } from "@crikket/shared/constants/priorities"
 import {
   Card,
   CardContent,
@@ -8,7 +9,7 @@ import {
 } from "@crikket/ui/components/ui/card"
 import { AlertCircle } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
-import { FormStep, type Priority } from "@/components/form-step"
+import { FormStep } from "@/components/form-step"
 import { IdleStep } from "@/components/idle-step"
 import { RecordingStep } from "@/components/recording-step"
 import { SuccessStep } from "@/components/success-step"
@@ -25,8 +26,6 @@ function App() {
   const [captureType, setCaptureType] = useState<CaptureType>("video")
   const [startTime, setStartTime] = useState<number | null>(null)
 
-  const [description, setDescription] = useState("")
-  const [priority, setPriority] = useState<Priority>("medium")
   const [resultUrl, setResultUrl] = useState("")
   const [submitError, setSubmitError] = useState<string | null>(null)
 
@@ -83,12 +82,14 @@ function App() {
     resetCapture()
     setState("idle")
     setResultUrl("")
-    setDescription("")
     setSubmitError(null)
     setStartTime(null)
   }
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (values: {
+    description: string
+    priority: Priority
+  }) => {
     const blob = captureType === "video" ? recordedBlob : screenshotBlob
     if (!blob) return
 
@@ -110,8 +111,8 @@ function App() {
       const result = await client.bugReport.create({
         attachment: blob,
         attachmentType: captureType,
-        priority,
-        description: description || undefined,
+        priority: values.priority,
+        description: values.description || undefined,
         url: currentUrl,
         deviceInfo: getDeviceInfo(),
       })
@@ -173,14 +174,10 @@ function App() {
           {(state === "stopped" || state === "submitting") && (
             <FormStep
               captureType={captureType}
-              description={description}
               isSubmitting={state === "submitting"}
               onCancel={handleReset}
-              onDescriptionChange={setDescription}
-              onPriorityChange={setPriority}
               onSubmit={handleSubmit}
               previewUrl={previewUrl}
-              priority={priority}
               submitError={submitError}
             />
           )}
