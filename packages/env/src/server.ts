@@ -18,7 +18,19 @@ export const env = createEnv({
       .transform((v) => v === "true"),
     GOOGLE_CLIENT_ID: z.string().min(1),
     GOOGLE_CLIENT_SECRET: z.string().min(1),
+    STORAGE_PROVIDER: z.enum(["auto", "local", "s3", "r2"]).default("auto"),
     STORAGE_PATH: z.string().min(1).default("./uploads"),
+    STORAGE_BASE_URL: z.string().min(1).default("/uploads"),
+    STORAGE_BUCKET: z.string().min(1).optional(),
+    STORAGE_REGION: z.string().min(1).optional(),
+    STORAGE_ENDPOINT: z.url().optional(),
+    STORAGE_ACCESS_KEY_ID: z.string().min(1).optional(),
+    STORAGE_SECRET_ACCESS_KEY: z.string().min(1).optional(),
+    STORAGE_PUBLIC_URL: z.url().optional(),
+    STORAGE_USE_PATH_STYLE: z
+      .enum(["true", "false"])
+      .default("false")
+      .transform((v) => v === "true"),
     NODE_ENV: z
       .enum(["development", "production", "staging"])
       .default("development"),

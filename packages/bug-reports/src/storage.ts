@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { env } from "@crikket/env/server"
+import { S3Client } from "bun"
 
 /**
  * Storage interface for flexible provider switching (local -> S3)
@@ -10,67 +11,109 @@ export interface StorageProvider {
   getUrl(filename: string): string
 }
 
+interface LocalStorageOptions {
+  basePath: string
+  baseUrl?: string
+  origin?: string
+}
+
+interface S3StorageOptions {
+  provider: "s3" | "r2"
+  bucket: string
+  region: string
+  endpoint?: string
+  accessKeyId: string
+  secretAccessKey: string
+  usePathStyle?: boolean
+  publicUrl?: string
+}
+
 /**
  * Local filesystem storage provider
  */
-export class LocalStorageProvider implements StorageProvider {
-  private readonly basePath: string
-  private readonly baseUrl: string
+export function createLocalStorageProvider(
+  options: LocalStorageOptions
+): StorageProvider {
+  const basePath = options.basePath
+  const baseUrl = options.baseUrl ?? "/uploads"
+  const origin = options.origin ?? env.BETTER_AUTH_URL
 
-  constructor(basePath: string, baseUrl = "/uploads") {
-    this.basePath = basePath
-    this.baseUrl = baseUrl
-  }
-
-  async save(filename: string, data: Buffer | Blob): Promise<string> {
-    await mkdir(this.basePath, { recursive: true })
-
-    const filePath = path.join(this.basePath, filename)
-
-    if (data instanceof Blob) {
-      const buffer = Buffer.from(await data.arrayBuffer())
-      await writeFile(filePath, buffer)
-    } else {
-      await writeFile(filePath, data)
+  const getUrl = (filename: string): string => {
+    const relativePath = `${trimTrailingSlash(baseUrl)}/${encodePathSegment(filename)}`
+    if (baseUrl.startsWith("http://") || baseUrl.startsWith("https://")) {
+      return relativePath
     }
 
-    return this.getUrl(filename)
+    return `${trimTrailingSlash(origin)}${relativePath}`
   }
 
-  getUrl(filename: string): string {
-    return `${this.baseUrl}/${filename}`
+  return {
+    async save(filename: string, data: Buffer | Blob): Promise<string> {
+      await mkdir(basePath, { recursive: true })
+
+      const filePath = path.join(basePath, filename)
+      if (data instanceof Blob) {
+        const buffer = Buffer.from(await data.arrayBuffer())
+        await writeFile(filePath, buffer)
+      } else {
+        await writeFile(filePath, data)
+      }
+
+      return getUrl(filename)
+    },
+    getUrl,
   }
 }
 
 /**
- * S3 storage provider (placeholder for production)
- * Implement this when ready to deploy to production
+ * S3-compatible storage provider (AWS S3, Cloudflare R2)
  */
-export class S3StorageProvider implements StorageProvider {
-  private readonly bucket: string
-  private readonly region: string
+export function createS3StorageProvider(
+  options: S3StorageOptions
+): StorageProvider {
+  const usePathStyle =
+    options.provider === "r2" ? true : Boolean(options.usePathStyle)
 
-  constructor(bucket: string, region: string) {
-    this.bucket = bucket
-    this.region = region
+  const client = new S3Client({
+    bucket: options.bucket,
+    region: options.region,
+    endpoint: options.endpoint,
+    accessKeyId: options.accessKeyId,
+    secretAccessKey: options.secretAccessKey,
+    virtualHostedStyle: !usePathStyle,
+  })
+
+  const getUrl = (filename: string): string => {
+    if (options.publicUrl) {
+      return `${trimTrailingSlash(options.publicUrl)}/${encodePathSegment(filename)}`
+    }
+
+    return client.presign(filename, {
+      method: "GET",
+      expiresIn: 604_800,
+    })
   }
 
-  save(_filename: string, _data: Buffer | Blob): Promise<string> {
-    // TODO: Implement S3 upload when ready for production
-    // const command = new PutObjectCommand({ Bucket: this.bucket, Key: filename, Body: data })
-    // await s3Client.send(command)
-    return Promise.reject(
-      new Error(
-        `S3 storage not implemented yet. Bucket: ${this.bucket}, Region: ${this.region}`
-      )
-    )
-  }
+  return {
+    async save(filename: string, data: Buffer | Blob): Promise<string> {
+      const contentType = getMimeTypeFromFilename(filename)
+      try {
+        await client.write(
+          filename,
+          data,
+          contentType ? { type: contentType } : undefined
+        )
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Unknown upload error"
+        throw new Error(
+          `Failed to upload file to cloud storage (bucket: ${options.bucket}, endpoint: ${options.endpoint ?? "aws-default"}): ${message}`
+        )
+      }
 
-  getUrl(_filename: string): string {
-    // TODO: Return S3 URL or CloudFront URL
-    throw new Error(
-      `S3 storage not implemented yet. Bucket: ${this.bucket}, Region: ${this.region}`
-    )
+      return getUrl(filename)
+    },
+    getUrl,
   }
 }
 
@@ -79,8 +122,28 @@ export class S3StorageProvider implements StorageProvider {
  * Uses local storage by default, can be extended to support S3
  */
 export function getStorageProvider(): StorageProvider {
-  const storagePath = env.STORAGE_PATH
-  return new LocalStorageProvider(storagePath)
+  const provider = env.STORAGE_PROVIDER
+  const cloudProvider = resolveCloudProvider(provider, env.STORAGE_ENDPOINT)
+  const cloudConfig = getCloudStorageConfig(cloudProvider)
+
+  if (provider === "s3" || provider === "r2") {
+    if (!cloudConfig) {
+      throw new Error(
+        "Cloud storage provider selected but STORAGE_BUCKET, STORAGE_REGION, STORAGE_ACCESS_KEY_ID, or STORAGE_SECRET_ACCESS_KEY is missing"
+      )
+    }
+    return createS3StorageProvider(cloudConfig)
+  }
+
+  if (provider === "auto" && cloudConfig) {
+    return createS3StorageProvider(cloudConfig)
+  }
+
+  return createLocalStorageProvider({
+    basePath: env.STORAGE_PATH,
+    baseUrl: env.STORAGE_BASE_URL,
+    origin: env.BETTER_AUTH_URL,
+  })
 }
 
 /**
@@ -94,4 +157,81 @@ export function generateFilename(
   const random = Math.random().toString(36).substring(2, 8)
   const ext = type === "video" ? "webm" : "png"
   return `${type}_${timestamp}_${random}.${ext}`
+}
+
+function getCloudStorageConfig(provider: "s3" | "r2"): {
+  provider: "s3" | "r2"
+  bucket: string
+  region: string
+  endpoint?: string
+  accessKeyId: string
+  secretAccessKey: string
+  usePathStyle: boolean
+  publicUrl?: string
+} | null {
+  const hasAnyCloudStorageValue =
+    Boolean(env.STORAGE_BUCKET) ||
+    Boolean(env.STORAGE_REGION) ||
+    Boolean(env.STORAGE_ENDPOINT) ||
+    Boolean(env.STORAGE_ACCESS_KEY_ID) ||
+    Boolean(env.STORAGE_SECRET_ACCESS_KEY) ||
+    Boolean(env.STORAGE_PUBLIC_URL)
+
+  if (
+    !(
+      env.STORAGE_BUCKET &&
+      env.STORAGE_ACCESS_KEY_ID &&
+      env.STORAGE_SECRET_ACCESS_KEY
+    )
+  ) {
+    if (hasAnyCloudStorageValue) {
+      throw new Error(
+        "Incomplete cloud storage config: set STORAGE_BUCKET, STORAGE_ACCESS_KEY_ID, and STORAGE_SECRET_ACCESS_KEY"
+      )
+    }
+    return null
+  }
+
+  const region = env.STORAGE_REGION ?? (env.STORAGE_ENDPOINT ? "auto" : null)
+  if (!region) {
+    return null
+  }
+
+  return {
+    provider,
+    bucket: env.STORAGE_BUCKET,
+    region,
+    endpoint: env.STORAGE_ENDPOINT,
+    accessKeyId: env.STORAGE_ACCESS_KEY_ID,
+    secretAccessKey: env.STORAGE_SECRET_ACCESS_KEY,
+    usePathStyle: env.STORAGE_USE_PATH_STYLE,
+    publicUrl: env.STORAGE_PUBLIC_URL,
+  }
+}
+
+function resolveCloudProvider(
+  provider: "auto" | "local" | "s3" | "r2",
+  endpoint: string | undefined
+): "s3" | "r2" {
+  if (provider === "r2") return "r2"
+  if (provider === "s3") return "s3"
+  if (endpoint?.includes(".r2.cloudflarestorage.com")) return "r2"
+  return "s3"
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.endsWith("/") ? value.slice(0, -1) : value
+}
+
+function encodePathSegment(filename: string): string {
+  return filename
+    .split("/")
+    .map((segment) => encodeURIComponent(segment))
+    .join("/")
+}
+
+function getMimeTypeFromFilename(filename: string): string | null {
+  if (filename.endsWith(".webm")) return "video/webm"
+  if (filename.endsWith(".png")) return "image/png"
+  return null
 }
