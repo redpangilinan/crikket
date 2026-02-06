@@ -1,5 +1,5 @@
-import { paginationConfig } from "@crikket/shared/pagination"
 import { z } from "zod"
+import { paginationConfig } from "../../config/pagination"
 
 const paginationParamsBaseSchema = z.object({
   page: z.number().int().positive().optional(),

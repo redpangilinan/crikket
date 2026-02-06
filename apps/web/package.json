@@ -16,7 +16,7 @@
     "@crikket/shared": "workspace:*",
     "@orpc/client": "catalog:",
     "@orpc/server": "catalog:",
-    "@orpc/tanstack-query": "^1.12.2",
+    "@orpc/tanstack-query": "catalog:",
     "@polar-sh/better-auth": "catalog:",
     "@tanstack/react-form": "catalog:",
     "@tanstack/react-query": "catalog:",

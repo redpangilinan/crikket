@@ -18,6 +18,7 @@ export const env = createEnv({
       .transform((v) => v === "true"),
     GOOGLE_CLIENT_ID: z.string().min(1),
     GOOGLE_CLIENT_SECRET: z.string().min(1),
+    STORAGE_PATH: z.string().min(1).default("./uploads"),
     NODE_ENV: z
       .enum(["development", "production", "staging"])
       .default("development"),

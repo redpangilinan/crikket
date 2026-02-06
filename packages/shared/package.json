@@ -4,10 +4,16 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./*": "./src/*.ts"
+    "./config/*": "./src/config/*.ts",
+    "./constants/*": "./src/constants/*.ts",
+    "./lib/*": "./src/lib/*.ts"
   },
   "dependencies": {
-    "@crikket/env": "workspace:*"
+    "@crikket/env": "workspace:*",
+    "@orpc/client": "catalog:",
+    "@orpc/tanstack-query": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@crikket/config": "workspace:*",

@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 
 import "@crikket/ui/styles/globals.css"
-import { siteConfig } from "@crikket/shared/site"
+import { siteConfig } from "@crikket/shared/config/site"
 import Providers from "@/components/providers"
 
 const geistSans = Geist({
