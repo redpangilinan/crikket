@@ -1,7 +1,14 @@
 import { useState } from "react"
 import {
+  discardDebuggerSession,
+  readStoredDebuggerSessionId,
+  startDebuggerSession,
+  storeDebuggerSessionId,
+} from "@/lib/bug-report-debugger"
+import {
   CAPTURE_CONTEXT_STORAGE_KEY,
   CAPTURE_TAB_ID_STORAGE_KEY,
+  type CaptureContext,
   getActiveTabContext,
   RECORDER_TAB_ID_STORAGE_KEY,
   RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY,
@@ -10,7 +17,10 @@ import {
 } from "@/lib/capture-context"
 
 export type PopupCaptureType = "video" | "screenshot"
+
 const RECORDING_COUNTDOWN_SECONDS = 3
+const ACTIVE_TAB_ERROR_MESSAGE =
+  "Could not find an active browser tab to capture."
 
 interface UsePopupCaptureReturn {
   isCapturing: boolean
@@ -20,6 +30,11 @@ interface UsePopupCaptureReturn {
   requestCapture: (captureType: PopupCaptureType) => void
   clearPendingCapture: () => void
   startCapture: (captureType: PopupCaptureType) => Promise<void>
+}
+
+interface ActiveCaptureTab {
+  id: number
+  windowId: number | null
 }
 
 export function usePopupCapture(): UsePopupCaptureReturn {
@@ -44,98 +59,37 @@ export function usePopupCapture(): UsePopupCaptureReturn {
     setIsCapturing(true)
     setCaptureError(null)
 
+    let debuggerSessionId: string | null = null
+
     try {
       const captureContext = await getActiveTabContext()
-      const tabs = await chrome.tabs.query({
-        active: true,
-        currentWindow: true,
-      })
-      const activeTab = tabs[0]
-      if (!activeTab) {
-        throw new Error("Could not find an active browser tab to capture.")
-      }
+      const activeTab = await getActiveCaptureTab()
+
+      debuggerSessionId = await initializeDebuggerSession(
+        captureType,
+        activeTab.id
+      )
 
       if (captureType === "screenshot") {
-        if (typeof activeTab.windowId !== "number") {
-          throw new Error("Could not find an active browser tab to capture.")
-        }
-
-        const base64data = await chrome.tabs.captureVisibleTab(
-          activeTab.windowId,
-          { format: "png" }
-        )
-
-        chrome.storage.local.set(
-          {
-            [CAPTURE_CONTEXT_STORAGE_KEY]: captureContext,
-            pendingScreenshot: base64data,
-          },
-          () => {
-            chrome.tabs.create({
-              url: chrome.runtime.getURL(
-                "/recorder.html?captureType=screenshot"
-              ),
-            })
-            window.close()
-          }
-        )
-        return
+        await startScreenshotCapture({ activeTab, captureContext })
+      } else {
+        await startVideoCapture({
+          activeTab,
+          captureContext,
+          setRecordingCountdown,
+        })
       }
 
-      if (typeof activeTab.id !== "number") {
-        throw new Error("Could not find an active browser tab to capture.")
-      }
-
-      const countdownEndsAt = Date.now() + RECORDING_COUNTDOWN_SECONDS * 1000
-      chrome.storage.local.set({
-        [RECORDING_IN_PROGRESS_STORAGE_KEY]: true,
-        [RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY]: countdownEndsAt,
-      })
-
-      for (let seconds = RECORDING_COUNTDOWN_SECONDS; seconds > 0; seconds--) {
-        setRecordingCountdown(seconds)
-        await new Promise((resolve) => setTimeout(resolve, 1000))
-      }
-
-      setRecordingCountdown(null)
-      chrome.storage.local.remove([RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY])
-
-      chrome.storage.local.set(
-        {
-          [CAPTURE_CONTEXT_STORAGE_KEY]: captureContext,
-          [CAPTURE_TAB_ID_STORAGE_KEY]: activeTab.id,
-          startRecordingImmediately: true,
-        },
-        () => {
-          chrome.tabs.create(
-            {
-              active: false,
-              url: chrome.runtime.getURL("/recorder.html?captureType=video"),
-            },
-            (tab) => {
-              if (typeof tab?.id === "number") {
-                chrome.storage.local.set({
-                  [RECORDER_TAB_ID_STORAGE_KEY]: tab.id,
-                })
-              }
-            }
-          )
-          window.close()
-        }
-      )
+      window.close()
     } catch (err) {
       console.error(err)
-      setCaptureError(err instanceof Error ? err.message : "Failed to capture")
-      setRecordingCountdown(null)
-      chrome.storage.local.set({
-        [RECORDING_IN_PROGRESS_STORAGE_KEY]: false,
+      await handleCaptureFailure({
+        debuggerSessionId,
+        error: err,
+        setCaptureError,
+        setIsCapturing,
+        setRecordingCountdown,
       })
-      chrome.storage.local.remove([
-        RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY,
-        RECORDER_TAB_ID_STORAGE_KEY,
-        RECORDING_STARTED_AT_STORAGE_KEY,
-      ])
-      setIsCapturing(false)
     } finally {
       setPendingCaptureType(null)
     }
@@ -150,4 +104,152 @@ export function usePopupCapture(): UsePopupCaptureReturn {
     clearPendingCapture,
     startCapture,
   }
+}
+
+async function getActiveCaptureTab(): Promise<ActiveCaptureTab> {
+  const tabs = await chrome.tabs.query({
+    active: true,
+    currentWindow: true,
+  })
+
+  const activeTab = tabs[0]
+  if (!activeTab || typeof activeTab.id !== "number") {
+    throw new Error(ACTIVE_TAB_ERROR_MESSAGE)
+  }
+
+  return {
+    id: activeTab.id,
+    windowId:
+      typeof activeTab.windowId === "number" ? activeTab.windowId : null,
+  }
+}
+
+async function initializeDebuggerSession(
+  captureType: PopupCaptureType,
+  captureTabId: number
+): Promise<string> {
+  const existingSessionId = await readStoredDebuggerSessionId()
+  if (existingSessionId) {
+    await discardDebuggerSession(existingSessionId).catch(() => {
+      // Keep capture flow resilient even if stale debugger cleanup fails.
+    })
+  }
+
+  const session = await startDebuggerSession({
+    captureTabId,
+    captureType,
+  })
+
+  await storeDebuggerSessionId(session.sessionId)
+
+  return session.sessionId
+}
+
+async function startScreenshotCapture(input: {
+  activeTab: ActiveCaptureTab
+  captureContext: CaptureContext
+}): Promise<void> {
+  if (input.activeTab.windowId === null) {
+    throw new Error(ACTIVE_TAB_ERROR_MESSAGE)
+  }
+
+  const base64data = await chrome.tabs.captureVisibleTab(
+    input.activeTab.windowId,
+    {
+      format: "png",
+    }
+  )
+
+  await chrome.storage.local.set({
+    [CAPTURE_CONTEXT_STORAGE_KEY]: input.captureContext,
+    pendingScreenshot: base64data,
+  })
+
+  await chrome.tabs.create({
+    url: chrome.runtime.getURL("/recorder.html?captureType=screenshot"),
+  })
+}
+
+async function startVideoCapture(input: {
+  activeTab: ActiveCaptureTab
+  captureContext: CaptureContext
+  setRecordingCountdown: (value: number | null) => void
+}): Promise<void> {
+  const countdownEndsAt = Date.now() + RECORDING_COUNTDOWN_SECONDS * 1000
+
+  await chrome.storage.local.set({
+    [RECORDING_IN_PROGRESS_STORAGE_KEY]: true,
+    [RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY]: countdownEndsAt,
+  })
+
+  await runCountdown(input.setRecordingCountdown)
+
+  await chrome.storage.local.remove([RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY])
+
+  await chrome.storage.local.set({
+    [CAPTURE_CONTEXT_STORAGE_KEY]: input.captureContext,
+    [CAPTURE_TAB_ID_STORAGE_KEY]: input.activeTab.id,
+    startRecordingImmediately: true,
+  })
+
+  const recorderTab = await chrome.tabs.create({
+    active: false,
+    url: chrome.runtime.getURL("/recorder.html?captureType=video"),
+  })
+
+  if (typeof recorderTab.id === "number") {
+    await chrome.storage.local.set({
+      [RECORDER_TAB_ID_STORAGE_KEY]: recorderTab.id,
+    })
+  }
+}
+
+async function runCountdown(
+  setRecordingCountdown: (value: number | null) => void
+): Promise<void> {
+  for (let seconds = RECORDING_COUNTDOWN_SECONDS; seconds > 0; seconds--) {
+    setRecordingCountdown(seconds)
+    await delay(1000)
+  }
+
+  setRecordingCountdown(null)
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
+
+async function handleCaptureFailure(input: {
+  debuggerSessionId: string | null
+  error: unknown
+  setCaptureError: (value: string) => void
+  setIsCapturing: (value: boolean) => void
+  setRecordingCountdown: (value: number | null) => void
+}): Promise<void> {
+  if (input.debuggerSessionId) {
+    await discardDebuggerSession(input.debuggerSessionId).catch(() => {
+      // Ignore debugger cleanup errors during failure handling.
+    })
+  }
+
+  await storeDebuggerSessionId(null)
+
+  input.setCaptureError(
+    input.error instanceof Error ? input.error.message : "Failed to capture"
+  )
+  input.setRecordingCountdown(null)
+
+  await chrome.storage.local.set({
+    [RECORDING_IN_PROGRESS_STORAGE_KEY]: false,
+  })
+
+  await chrome.storage.local.remove([
+    RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY,
+    RECORDER_TAB_ID_STORAGE_KEY,
+    RECORDING_STARTED_AT_STORAGE_KEY,
+  ])
+
+  input.setIsCapturing(false)
 }

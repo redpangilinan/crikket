@@ -18,6 +18,15 @@ import { type CaptureType, useRecorderInit } from "@/hooks/use-recorder-init"
 import { useRecorderRecordingSync } from "@/hooks/use-recorder-recording-sync"
 import { useScreenCapture } from "@/hooks/use-screen-capture"
 import { useTimer } from "@/hooks/use-timer"
+import {
+  buildDebuggerSubmissionPayload,
+  discardDebuggerSession,
+  getDebuggerSessionSnapshot,
+  hasDebuggerPayloadData,
+  markDebuggerRecordingStarted,
+  readStoredDebuggerSessionId,
+  storeDebuggerSessionId,
+} from "@/lib/bug-report-debugger"
 import { client } from "@/lib/orpc"
 import { formatDuration, getDeviceInfo } from "@/lib/utils"
 
@@ -45,6 +54,43 @@ function App() {
 
   const duration = useTimer(startTime, state === "recording")
 
+  const clearDebuggerState = useCallback(async () => {
+    const sessionId = await readStoredDebuggerSessionId()
+    if (sessionId) {
+      await discardDebuggerSession(sessionId).catch(() => {
+        // Keep reset flow resilient even if debugger cleanup fails.
+      })
+    }
+
+    await storeDebuggerSessionId(null)
+  }, [])
+
+  const getDebuggerSubmissionInput = useCallback(async () => {
+    const sessionId = await readStoredDebuggerSessionId()
+    if (!sessionId) {
+      return {
+        sessionId: null,
+        payload: undefined,
+      }
+    }
+
+    const snapshot = await getDebuggerSessionSnapshot(sessionId).catch(
+      () => null
+    )
+    if (!snapshot) {
+      return {
+        sessionId,
+        payload: undefined,
+      }
+    }
+
+    const payload = buildDebuggerSubmissionPayload(snapshot)
+    return {
+      sessionId,
+      payload: hasDebuggerPayloadData(payload) ? payload : undefined,
+    }
+  }, [])
+
   const handleStopRecording = useCallback(async () => {
     await stopCapture()
     setState("stopped")
@@ -59,7 +105,18 @@ function App() {
   const startVideoCapture = useCallback(async () => {
     const success = await startCapture()
     if (success) {
-      setStartTime(Date.now())
+      const startedAt = Date.now()
+      const sessionId = await readStoredDebuggerSessionId()
+      if (sessionId) {
+        await markDebuggerRecordingStarted({
+          sessionId,
+          recordingStartedAt: startedAt,
+        }).catch(() => {
+          // Continue recording even if debugger anchor sync fails.
+        })
+      }
+
+      setStartTime(startedAt)
       setState("recording")
     }
   }, [startCapture])
@@ -98,6 +155,7 @@ function App() {
     setResultUrl("")
     setSubmitError(null)
     setStartTime(null)
+    clearDebuggerState().catch(() => undefined)
   }
 
   const handleSubmit = async (values: {
@@ -114,6 +172,7 @@ function App() {
     try {
       const durationMs =
         captureType === "video" && startTime ? Date.now() - startTime : 0
+      const debuggerSubmission = await getDebuggerSubmissionInput()
 
       const result = await client.bugReport.create({
         attachment: blob,
@@ -128,7 +187,15 @@ function App() {
           pageTitle: captureContext.title,
         },
         deviceInfo: getDeviceInfo(),
+        debugger: debuggerSubmission.payload,
       })
+
+      if (debuggerSubmission.sessionId) {
+        await discardDebuggerSession(debuggerSubmission.sessionId).catch(() => {
+          // Ignore cleanup failure after successful submission.
+        })
+      }
+      await storeDebuggerSessionId(null)
 
       setResultUrl(`${env.VITE_APP_URL}${result.shareUrl}`)
       setState("success")

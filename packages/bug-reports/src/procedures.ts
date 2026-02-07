@@ -13,6 +13,11 @@ import { nanoid } from "nanoid"
 import { z } from "zod"
 
 import {
+  bugReportDebuggerInputSchema,
+  getBugReportDebuggerData,
+  persistBugReportDebuggerData,
+} from "./debugger"
+import {
   extractStorageKeyFromUrl,
   generateFilename,
   getStorageProvider,
@@ -185,6 +190,7 @@ export const createBugReport = protectedProcedure
       visibility: z.enum(visibilityValues).default("private"),
       attachment: z.instanceof(Blob),
       metadata: metadataInputSchema,
+      debugger: bugReportDebuggerInputSchema,
       deviceInfo: z
         .object({
           browser: z.string().optional(),
@@ -252,6 +258,8 @@ export const createBugReport = protectedProcedure
       metadata: normalizedMetadata,
     })
 
+    await persistBugReportDebuggerData(id, input.debugger)
+
     return {
       id,
       shareUrl: `/s/${id}`,
@@ -305,6 +313,8 @@ export const getBugReportById = o
       throw new ORPCError("NOT_FOUND", { message: "Bug report not found" })
     }
 
+    const debuggerData = await getBugReportDebuggerData(report.id)
+
     return {
       id: report.id,
       title: report.title,
@@ -329,6 +339,7 @@ export const getBugReportById = o
         name: report.organization.name,
         logo: report.organization.logo,
       },
+      debugger: debuggerData,
     }
   })
 
