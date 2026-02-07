@@ -30,7 +30,7 @@ interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
 
 const navMain = [
   {
-    title: "Recordings",
+    title: "Bug Reports",
     url: "/" as const,
     icon: Video,
     isActive: true,

@@ -31,20 +31,52 @@ const requireAuth = o.middleware(({ context, next }) => {
 
 const protectedProcedure = o.use(requireAuth)
 
-/**
- * Bug report list item shape for the UI
- */
 export interface BugReportListItem {
   id: string
   title: string
   duration: string
   thumbnail: string | undefined
+  attachmentUrl: string | undefined
+  attachmentType: "video" | "screenshot" | undefined
   uploader: {
     name: string
     avatar: string | undefined
   }
   createdAt: string
 }
+
+const attachmentTypes = ["video", "screenshot"] as const
+
+function isAttachmentType(
+  value: unknown
+): value is (typeof attachmentTypes)[number] {
+  return (
+    typeof value === "string" &&
+    (attachmentTypes as readonly string[]).includes(value)
+  )
+}
+
+const optionalText = (max: number) =>
+  z
+    .string()
+    .max(max)
+    .transform((value) => value.trim())
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined))
+
+const metadataInputSchema = z
+  .object({
+    duration: z.string().max(20).optional(),
+    durationMs: z
+      .number()
+      .int()
+      .nonnegative()
+      .max(24 * 60 * 60 * 1000)
+      .optional(),
+    thumbnailUrl: z.string().url().optional(),
+    pageTitle: z.string().max(300).optional(),
+  })
+  .optional()
 
 /**
  * List bug reports for the current organization (paginated)
@@ -83,13 +115,30 @@ export const listBugReports = protectedProcedure
 
       const items = bugReports.map((r) => {
         const metadata = r.metadata as Record<string, unknown> | null
+        const attachmentType = isAttachmentType(r.attachmentType)
+          ? r.attachmentType
+          : undefined
+        const durationMs = metadata?.durationMs
+        const normalizedDurationMs =
+          typeof durationMs === "number" && Number.isFinite(durationMs)
+            ? Math.max(0, Math.floor(durationMs))
+            : null
 
         return {
           id: r.id,
           title: r.title || "Untitled Bug Report",
-          duration: (metadata?.duration as string | undefined) ?? "0:00",
+          duration:
+            (metadata?.duration as string | undefined) ??
+            (normalizedDurationMs !== null
+              ? formatDurationMs(normalizedDurationMs)
+              : "0:00"),
           thumbnail:
-            (metadata?.thumbnailUrl as string | undefined) ?? undefined,
+            (metadata?.thumbnailUrl as string | undefined) ??
+            (attachmentType === "screenshot"
+              ? (r.attachmentUrl ?? undefined)
+              : undefined),
+          attachmentUrl: r.attachmentUrl ?? undefined,
+          attachmentType,
           uploader: {
             name: r.reporter?.name || "Unknown User",
             avatar: r.reporter?.image ?? undefined,
@@ -111,12 +160,13 @@ export const listBugReports = protectedProcedure
 export const createBugReport = protectedProcedure
   .input(
     z.object({
-      title: z.string().optional(),
-      description: z.string().optional(),
+      title: optionalText(200),
+      description: optionalText(3000),
       priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
       url: z.string().url().optional(),
       attachmentType: z.enum(["video", "screenshot"]),
       attachment: z.instanceof(Blob),
+      metadata: metadataInputSchema,
       deviceInfo: z
         .object({
           browser: z.string().optional(),
@@ -149,11 +199,29 @@ export const createBugReport = protectedProcedure
       })
     }
 
+    const normalizedMetadata = {
+      duration:
+        input.metadata?.duration ??
+        (typeof input.metadata?.durationMs === "number"
+          ? formatDurationMs(input.metadata.durationMs)
+          : undefined),
+      durationMs: input.metadata?.durationMs,
+      thumbnailUrl:
+        input.metadata?.thumbnailUrl ??
+        (input.attachmentType === "screenshot" ? attachmentUrl : undefined),
+      pageTitle: input.metadata?.pageTitle,
+    }
+
+    const inferredTitle =
+      input.title ??
+      input.metadata?.pageTitle?.trim() ??
+      buildFallbackTitle(input.attachmentType)
+
     await db.insert(bugReport).values({
       id,
       organizationId: activeOrgId,
       reporterId: context.session.user.id,
-      title: input.title,
+      title: inferredTitle,
       description: input.description,
       priority: input.priority,
       url: input.url,
@@ -161,7 +229,7 @@ export const createBugReport = protectedProcedure
       attachmentType: input.attachmentType,
       deviceInfo: input.deviceInfo,
       status: "open",
-      metadata: {},
+      metadata: normalizedMetadata,
     })
 
     return {
@@ -169,6 +237,22 @@ export const createBugReport = protectedProcedure
       shareUrl: `/s/${id}`,
     }
   })
+
+function buildFallbackTitle(attachmentType: "video" | "screenshot"): string {
+  const now = new Date()
+  const label =
+    attachmentType === "video" ? "Video Bug Report" : "Screenshot Bug Report"
+  const timestamp = now.toISOString().replace("T", " ").slice(0, 16)
+  return `${label} - ${timestamp}`
+}
+
+function formatDurationMs(durationMs: number): string {
+  const safeDurationMs = Math.max(0, Math.floor(durationMs))
+  const totalSeconds = Math.floor(safeDurationMs / 1000)
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+  return `${minutes}:${seconds.toString().padStart(2, "0")}`
+}
 
 /**
  * Get a bug report by ID (public access for shared links)

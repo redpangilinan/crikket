@@ -1,4 +1,3 @@
-import { Button } from "@crikket/ui/components/ui/button"
 import type { Metadata } from "next"
 
 import { BugReportsList } from "./_components/bug-reports-list"
@@ -21,7 +20,6 @@ export default function DashboardPage() {
           <h1 className="font-bold text-3xl tracking-tight">{META.title}</h1>
           <p className="mt-1 text-muted-foreground">{META.description}</p>
         </div>
-        <Button>New Bug Report</Button>
       </div>
       <BugReportsList />
     </div>

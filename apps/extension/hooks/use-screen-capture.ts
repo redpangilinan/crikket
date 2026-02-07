@@ -1,4 +1,6 @@
 import { useCallback, useRef, useState } from "react"
+import { readAndClearCaptureTabId } from "@/lib/capture-context"
+import { requestTabCaptureStream } from "@/lib/display-media"
 
 export interface UseScreenCaptureReturn {
   isRecording: boolean
@@ -28,12 +30,14 @@ export function useScreenCapture(): UseScreenCaptureReturn {
       setError(null)
       setRecordedBlob(null)
 
-      const stream = await navigator.mediaDevices.getDisplayMedia({
-        video: {
-          displaySurface: "browser",
-        },
-        audio: false,
-      })
+      const captureTabId = await readAndClearCaptureTabId()
+      if (!captureTabId) {
+        throw new Error(
+          "Could not lock the source tab. Please start recording from the extension popup."
+        )
+      }
+
+      const stream = await requestTabCaptureStream(captureTabId)
 
       streamRef.current = stream
 

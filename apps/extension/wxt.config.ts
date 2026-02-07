@@ -4,7 +4,11 @@ import { defineConfig } from "wxt"
 export default defineConfig({
   modules: ["@wxt-dev/module-react"],
   manifest: {
-    permissions: ["activeTab", "desktopCapture", "storage", "tabs"],
+    action: {
+      default_title: "Crikket",
+      default_popup: "popup.html",
+    },
+    permissions: ["activeTab", "storage", "tabCapture", "tabs"],
     host_permissions: ["<all_urls>"],
   },
 })
