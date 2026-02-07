@@ -40,7 +40,7 @@ export function BugReportSidebar({
   const deviceInfo = data.deviceInfo as DeviceInfo | null
 
   return (
-    <div className="z-20 flex h-full w-full max-w-[400px] flex-col border-l bg-background shadow-xl md:relative md:top-0 md:shadow-none">
+    <div className="z-20 flex h-full w-full flex-col border-l bg-background shadow-xl md:relative md:top-0 md:shadow-none">
       {/* Tabs Navigation */}
       <div className="flex items-center border-b px-1 py-1">
         <TabButton

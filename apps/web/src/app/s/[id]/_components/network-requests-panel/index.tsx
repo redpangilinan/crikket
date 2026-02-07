@@ -1,6 +1,11 @@
 "use client"
 
 import { Input } from "@crikket/ui/components/ui/input"
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@crikket/ui/components/ui/resizable"
 import { cn } from "@crikket/ui/lib/utils"
 import { Search } from "lucide-react"
 import { useMemo, useState } from "react"
@@ -10,6 +15,10 @@ import { NetworkRequestDetails } from "./network-request-details"
 import { EmptyState } from "./panel-sections"
 import type { NetworkRequestsPanelProps } from "./types"
 import { safeParseUrl, statusTone } from "./utils"
+
+const REQUEST_LIST_DEFAULT_HEIGHT = "300px"
+const REQUEST_LIST_MIN_HEIGHT = "190px"
+const DETAILS_MIN_HEIGHT = "220px"
 
 export function NetworkRequestsPanel({
   entries,
@@ -88,83 +97,91 @@ export function NetworkRequestsPanel({
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-rows-[minmax(180px,44%)_minmax(0,1fr)]">
-        <div className="overflow-y-auto border-b bg-background">
-          {filteredEntries.length === 0 ? (
-            <EmptyState
-              message={
-                normalizedQuery
-                  ? "No requests matched your search."
-                  : "No network requests captured."
-              }
-            />
-          ) : (
-            <div className="divide-y">
-              {filteredEntries.map((entry) => {
-                const request = requestsById.get(entry.id)
-                const status = request?.status ?? null
-                const duration = request?.duration ?? null
-                const parsed = safeParseUrl(request?.url)
-                const primaryText = parsed
-                  ? `${parsed.pathname}${parsed.search}`
-                  : (request?.url ?? entry.detail)
+      <ResizablePanelGroup className="min-h-0 flex-1" orientation="vertical">
+        <ResizablePanel
+          defaultSize={REQUEST_LIST_DEFAULT_HEIGHT}
+          minSize={REQUEST_LIST_MIN_HEIGHT}
+        >
+          <div className="h-full overflow-y-auto border-b bg-background">
+            {filteredEntries.length === 0 ? (
+              <EmptyState
+                message={
+                  normalizedQuery
+                    ? "No requests matched your search."
+                    : "No network requests captured."
+                }
+              />
+            ) : (
+              <div className="divide-y">
+                {filteredEntries.map((entry) => {
+                  const request = requestsById.get(entry.id)
+                  const status = request?.status ?? null
+                  const duration = request?.duration ?? null
+                  const parsed = safeParseUrl(request?.url)
+                  const primaryText = parsed
+                    ? `${parsed.pathname}${parsed.search}`
+                    : (request?.url ?? entry.detail)
 
-                return (
-                  <button
-                    className={cn(
-                      "flex w-full flex-col gap-1.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 focus:bg-muted/50 focus:outline-none",
-                      entry.id === selectedEntry?.id &&
-                        "bg-muted/60 shadow-[inset_2px_0_0_0] shadow-primary"
-                    )}
-                    key={entry.id}
-                    onClick={() => onEntrySelect(entry)}
-                    type="button"
-                  >
-                    <div className="flex items-center gap-1.5">
-                      <span className="rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] text-foreground">
-                        {(request?.method ?? entry.label).toUpperCase()}
-                      </span>
-                      <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground">
-                        {primaryText}
-                      </span>
-                      {status !== null && (
-                        <span
-                          className={cn(
-                            "rounded px-1.5 py-0.5 font-mono text-[10px]",
-                            statusTone(status)
-                          )}
-                        >
-                          {status}
-                        </span>
+                  return (
+                    <button
+                      className={cn(
+                        "flex w-full flex-col gap-1.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 focus:bg-muted/50 focus:outline-none",
+                        entry.id === selectedEntry?.id &&
+                          "bg-muted/60 shadow-[inset_2px_0_0_0] shadow-primary"
                       )}
-                    </div>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="truncate font-mono text-[10px] text-muted-foreground">
-                        {parsed?.host ?? "Unknown host"}
-                      </span>
-                      <div className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
-                        {typeof duration === "number" && (
-                          <span>{duration}ms</span>
-                        )}
-                        {typeof entry.offset === "number" && (
-                          <span>{formatOffset(entry.offset)}</span>
+                      key={entry.id}
+                      onClick={() => onEntrySelect(entry)}
+                      type="button"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span className="rounded border bg-background px-1.5 py-0.5 font-mono text-[10px] text-foreground">
+                          {(request?.method ?? entry.label).toUpperCase()}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-foreground">
+                          {primaryText}
+                        </span>
+                        {status !== null && (
+                          <span
+                            className={cn(
+                              "rounded px-1.5 py-0.5 font-mono text-[10px]",
+                              statusTone(status)
+                            )}
+                          >
+                            {status}
+                          </span>
                         )}
                       </div>
-                    </div>
-                  </button>
-                )
-              })}
-            </div>
-          )}
-        </div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="truncate font-mono text-[10px] text-muted-foreground">
+                          {parsed?.host ?? "Unknown host"}
+                        </span>
+                        <div className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground">
+                          {typeof duration === "number" && (
+                            <span>{duration}ms</span>
+                          )}
+                          {typeof entry.offset === "number" && (
+                            <span>{formatOffset(entry.offset)}</span>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </ResizablePanel>
+        <ResizableHandle withHandle />
 
-        <div className="overflow-y-auto bg-muted/20 p-3">
-          <NetworkRequestDetails
-            key={selectedEntry?.id ?? "empty"}
-            request={selectedRequest ?? null}
-          />
-        </div>
-      </div>
+        <ResizablePanel minSize={DETAILS_MIN_HEIGHT}>
+          <div className="h-full overflow-y-auto bg-muted/20 p-3">
+            <NetworkRequestDetails
+              key={selectedEntry?.id ?? "empty"}
+              request={selectedRequest ?? null}
+            />
+          </div>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </div>
   )
 }
