@@ -19,19 +19,37 @@ export function useRecorderRecordingSync({
   state,
 }: UseRecorderRecordingSyncProps) {
   useEffect(() => {
+    const clearRecordingFlags = async () => {
+      await chrome.storage.local.set({
+        [RECORDING_IN_PROGRESS_STORAGE_KEY]: false,
+      })
+      await chrome.storage.local.remove([
+        RECORDER_TAB_ID_STORAGE_KEY,
+        RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY,
+        RECORDING_STARTED_AT_STORAGE_KEY,
+      ])
+    }
+
     const syncRecordingState = async () => {
       if (captureType !== "video") {
-        await chrome.storage.local.set({
-          [RECORDING_IN_PROGRESS_STORAGE_KEY]: false,
-        })
-        await chrome.storage.local.remove([
-          RECORDER_TAB_ID_STORAGE_KEY,
-          RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY,
-        ])
+        await clearRecordingFlags()
         return
       }
 
       if (state === "idle") {
+        const result = await chrome.storage.local.get([
+          RECORDING_IN_PROGRESS_STORAGE_KEY,
+          RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY,
+        ])
+        const isRecordingInProgress = Boolean(
+          result[RECORDING_IN_PROGRESS_STORAGE_KEY]
+        )
+        const hasActiveCountdown =
+          typeof result[RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY] === "number"
+
+        if (isRecordingInProgress && !hasActiveCountdown) {
+          await clearRecordingFlags()
+        }
         return
       }
 
@@ -48,14 +66,7 @@ export function useRecorderRecordingSync({
         return
       }
 
-      await chrome.storage.local.set({
-        [RECORDING_IN_PROGRESS_STORAGE_KEY]: false,
-      })
-      await chrome.storage.local.remove([
-        RECORDER_TAB_ID_STORAGE_KEY,
-        RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY,
-        RECORDING_STARTED_AT_STORAGE_KEY,
-      ])
+      await clearRecordingFlags()
     }
 
     syncRecordingState().catch(() => {
