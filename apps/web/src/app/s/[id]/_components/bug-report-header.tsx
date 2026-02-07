@@ -7,17 +7,21 @@ interface BugReportHeaderProps {
   data: SharedBugReport
 }
 
-export function BugReportHeader({ data }: BugReportHeaderProps) {
+export function BugReportHeader({
+  data,
+  sidebarTrigger,
+}: BugReportHeaderProps & { sidebarTrigger?: React.ReactNode }) {
   return (
     <header className="flex h-14 shrink-0 items-center justify-between border-b bg-background px-4">
       <div className="flex items-center gap-4">
+        <div className="md:hidden">{sidebarTrigger}</div>
         <Link
           className="flex items-center gap-2 text-muted-foreground transition-colors hover:text-foreground"
           href="/"
         >
           <span className="font-semibold text-foreground">crikket</span>
         </Link>
-        <Separator className="h-4" orientation="vertical" />
+        <Separator orientation="vertical" />
         <div className="flex items-center gap-2">
           <h1
             className="max-w-[300px] truncate font-medium text-sm"
@@ -35,7 +39,7 @@ export function BugReportHeader({ data }: BugReportHeaderProps) {
         <span className="hidden text-muted-foreground text-xs sm:inline-block">
           {new Date(data.createdAt).toLocaleString()}
         </span>
-        <Separator className="hidden h-4 sm:block" orientation="vertical" />
+        <Separator className="hidden sm:block" orientation="vertical" />
         <Button
           nativeButton={false}
           render={<Link href="/">Dashboard</Link>}
