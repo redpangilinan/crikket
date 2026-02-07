@@ -1,3 +1,5 @@
+import { registerDebuggerBackgroundListeners } from "@/lib/bug-report-debugger"
+
 export default defineBackground(() => {
-  console.log("Crikket background script loaded", { id: browser.runtime.id })
+  registerDebuggerBackgroundListeners()
 })
