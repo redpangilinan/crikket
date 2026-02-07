@@ -4,13 +4,17 @@
 export {
   type BugReportListItem,
   createBugReport,
+  deleteBugReport,
+  deleteBugReportsBulk,
   getBugReportById,
   listBugReports,
+  updateBugReportVisibility,
 } from "./procedures"
 
 export {
   createLocalStorageProvider,
   createS3StorageProvider,
+  extractStorageKeyFromUrl,
   generateFilename,
   getStorageProvider,
   type StorageProvider,

@@ -26,7 +26,9 @@ export const bugReport = pgTable(
     tags: text("tags").array(), // optional tags for categorization
     url: text("url"),
     attachmentUrl: text("attachment_url"), // video or screenshot URL
+    attachmentKey: text("attachment_key"), // storage key/filename for delete operations
     attachmentType: text("attachment_type"), // "video" or "screenshot"
+    visibility: text("visibility").default("private").notNull(), // public | private
     metadata: jsonb("metadata"),
     deviceInfo: jsonb("device_info"), // browser, os, viewport, etc.
     createdAt: timestamp("created_at").defaultNow().notNull(),
