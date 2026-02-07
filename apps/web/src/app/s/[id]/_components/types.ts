@@ -15,3 +15,9 @@ export interface DebuggerTimelineEntry {
   timestamp: string
   offset: number | null
 }
+
+export interface DeviceInfo {
+  browser?: string
+  os?: string
+  viewport?: string
+}

@@ -194,7 +194,7 @@ function normalizeNetworkRequest(
   }
 }
 
-function formatOffset(offsetMs: number): string {
+export function formatOffset(offsetMs: number): string {
   const safeOffset = Math.max(0, Math.floor(offsetMs))
   const totalSeconds = Math.floor(safeOffset / 1000)
   const minutes = Math.floor(totalSeconds / 60)

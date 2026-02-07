@@ -1,17 +1,15 @@
 "use client"
 
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from "@crikket/ui/components/ui/card"
+import { Button } from "@crikket/ui/components/ui/button"
 import { useQuery } from "@tanstack/react-query"
 import { AlertCircle, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useRef, useState } from "react"
 import { orpc } from "@/utils/orpc"
-import { DebuggerSection } from "./debugger-section"
+
+import { BugReportCanvas } from "./bug-report-canvas"
+import { BugReportHeader } from "./bug-report-header"
+import { BugReportSidebar, type SidebarTab } from "./bug-report-sidebar"
 import type { DebuggerTimelineEntry } from "./types"
 import {
   buildActionEntry,
@@ -36,11 +34,10 @@ export function BugReportView({ id }: BugReportViewProps) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [playbackOffsetMs, setPlaybackOffsetMs] = useState(0)
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<SidebarTab>("details")
 
   const showVideo =
     data?.attachmentType === "video" && Boolean(data.attachmentUrl)
-  const showImage =
-    data?.attachmentType === "screenshot" && Boolean(data.attachmentUrl)
 
   const debuggerData = normalizeDebuggerData(data?.debugger)
 
@@ -65,14 +62,13 @@ export function BugReportView({ id }: BugReportViewProps) {
   const playbackEntryId = useMemo(
     () =>
       getPlaybackEntryId({
-        showVideo,
+        showVideo: showVideo ?? false,
         playbackOffsetMs,
         entries: allEntries,
       }),
     [allEntries, playbackOffsetMs, showVideo]
   )
 
-  const hasDebuggerEvents = allEntries.length > 0
   const activeEntryId = selectedEntryId ?? playbackEntryId
 
   const handleEntrySelect = (entry: DebuggerTimelineEntry) => {
@@ -96,172 +92,52 @@ export function BugReportView({ id }: BugReportViewProps) {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto max-w-7xl px-4 py-8">
-        <div className="flex min-h-[40vh] items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-        </div>
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     )
   }
 
   if (error || !data) {
     return (
-      <div className="container mx-auto max-w-7xl px-4 py-8">
-        <Card>
-          <CardContent className="flex flex-col items-center gap-4 py-12 text-center">
-            <AlertCircle className="h-8 w-8 text-destructive" />
-            <div>
-              <h1 className="font-semibold text-xl">Bug report not found</h1>
-              <p className="text-muted-foreground text-sm">
-                This share link is invalid or the report was removed.
-              </p>
-            </div>
-            <Link
-              className="font-medium text-primary text-sm underline"
-              href="/"
-            >
-              Back to dashboard
-            </Link>
-          </CardContent>
-        </Card>
+      <div className="flex h-screen items-center justify-center bg-background p-4">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <AlertCircle className="h-12 w-12 text-destructive" />
+          <div>
+            <h1 className="font-semibold text-xl">Bug report not found</h1>
+            <p className="text-muted-foreground text-sm">
+              This share link is invalid or the report was removed.
+            </p>
+          </div>
+          <Link href="/">
+            <Button variant="outline">Back to dashboard</Button>
+          </Link>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="container mx-auto max-w-7xl space-y-6 px-4 py-8">
-      <div className="space-y-2">
-        <h1 className="font-bold text-3xl">
-          {data.title ?? "Untitled Bug Report"}
-        </h1>
-        <p className="text-muted-foreground text-sm">
-          Report ID: {data.id} • {new Date(data.createdAt).toLocaleString()}
-        </p>
-      </div>
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
+      <BugReportHeader data={data} />
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="space-y-6">
-          <Card className="overflow-hidden p-0">
-            <CardContent className="p-0">
-              {showVideo ? (
-                <>
-                  {/* biome-ignore lint/a11y/useMediaCaption: uploaded bug recordings do not have caption tracks yet */}
-                  <video
-                    className="h-auto max-h-[70vh] w-full bg-black"
-                    controls
-                    onTimeUpdate={(event) => {
-                      setPlaybackOffsetMs(
-                        event.currentTarget.currentTime * 1000
-                      )
-                    }}
-                    ref={videoRef}
-                    src={data.attachmentUrl ?? undefined}
-                  />
-                </>
-              ) : null}
+      <div className="flex flex-1 overflow-hidden">
+        <BugReportCanvas
+          data={data}
+          onTimeUpdate={setPlaybackOffsetMs}
+          ref={videoRef}
+        />
 
-              {showImage ? (
-                <img
-                  alt={data.title ?? "Bug report attachment"}
-                  className="h-auto w-full object-contain"
-                  src={data.attachmentUrl ?? undefined}
-                />
-              ) : null}
-
-              {showVideo || showImage ? null : (
-                <div className="flex min-h-[280px] items-center justify-center bg-muted p-6 text-center text-muted-foreground text-sm">
-                  No attachment available for this report.
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Details</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <p>
-                  <span className="font-medium">Status:</span> {data.status}
-                </p>
-                <p>
-                  <span className="font-medium">Priority:</span> {data.priority}
-                </p>
-                <p>
-                  <span className="font-medium">Reporter:</span>{" "}
-                  {data.reporter?.name ?? "Unknown"}
-                </p>
-                <p>
-                  <span className="font-medium">Organization:</span>{" "}
-                  {data.organization.name}
-                </p>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Context</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-2 text-sm">
-                <p className="break-all">
-                  <span className="font-medium">URL:</span> {data.url ?? "N/A"}
-                </p>
-                <p>
-                  <span className="font-medium">Attachment Type:</span>{" "}
-                  {data.attachmentType ?? "N/A"}
-                </p>
-                <p className="text-muted-foreground">
-                  {data.description ?? "No description provided."}
-                </p>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-
-        <div className="space-y-4 lg:sticky lg:top-6 lg:self-start">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Debugger Timeline</CardTitle>
-            </CardHeader>
-            <CardContent>
-              {hasDebuggerEvents ? (
-                <p className="text-muted-foreground text-xs">
-                  Select any entry to jump to the matching moment in the
-                  recording.
-                </p>
-              ) : (
-                <p className="text-muted-foreground text-xs">
-                  No debugger events were captured for this report.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-
-          <DebuggerSection
-            activeEntryId={activeEntryId}
-            emptyState="No reproduction steps captured."
-            entries={actionEntries}
-            onSelect={handleEntrySelect}
-            title="Reproduction Steps"
-          />
-
-          <DebuggerSection
-            activeEntryId={activeEntryId}
-            emptyState="No console logs captured."
-            entries={logEntries}
-            onSelect={handleEntrySelect}
-            title="Console Logs"
-          />
-
-          <DebuggerSection
-            activeEntryId={activeEntryId}
-            emptyState="No network requests captured."
-            entries={networkEntries}
-            onSelect={handleEntrySelect}
-            title="Network Requests"
-          />
-        </div>
+        <BugReportSidebar
+          actionEntries={actionEntries}
+          activeEntryId={activeEntryId}
+          activeTab={activeTab}
+          data={data}
+          logEntries={logEntries}
+          networkEntries={networkEntries}
+          onEntrySelect={handleEntrySelect}
+          onTabChange={setActiveTab}
+        />
       </div>
     </div>
   )
