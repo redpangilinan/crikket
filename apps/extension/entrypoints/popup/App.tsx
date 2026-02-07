@@ -22,6 +22,7 @@ function App() {
   const {
     isRecordingInProgress,
     recordingCountdown: syncedRecordingCountdown,
+    recordingDurationMs,
     isStoppingFromPopup,
     stopError,
     stopFromPopup,
@@ -57,6 +58,7 @@ function App() {
             onStopFromPopup={stopFromPopup}
             pendingCaptureType={pendingCaptureType}
             recordingCountdown={recordingCountdown}
+            recordingDurationMs={recordingDurationMs}
           />
 
           <div className="rounded-md border bg-muted p-3">

@@ -4,6 +4,7 @@ import {
   RECORDER_TAB_ID_STORAGE_KEY,
   RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY,
   RECORDING_IN_PROGRESS_STORAGE_KEY,
+  RECORDING_STARTED_AT_STORAGE_KEY,
 } from "@/lib/capture-context"
 
 interface UseRecorderRecordingSyncProps {
@@ -38,6 +39,7 @@ export function useRecorderRecordingSync({
         const currentTab = await chrome.tabs.getCurrent()
         await chrome.storage.local.set({
           [RECORDING_IN_PROGRESS_STORAGE_KEY]: true,
+          [RECORDING_STARTED_AT_STORAGE_KEY]: Date.now(),
           [RECORDER_TAB_ID_STORAGE_KEY]: currentTab?.id,
         })
         await chrome.storage.local.remove([
@@ -52,6 +54,7 @@ export function useRecorderRecordingSync({
       await chrome.storage.local.remove([
         RECORDER_TAB_ID_STORAGE_KEY,
         RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY,
+        RECORDING_STARTED_AT_STORAGE_KEY,
       ])
     }
 
@@ -84,6 +87,7 @@ export function useRecorderRecordingSync({
       chrome.storage.local.remove([
         RECORDER_TAB_ID_STORAGE_KEY,
         RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY,
+        RECORDING_STARTED_AT_STORAGE_KEY,
       ])
     }
   }, [])

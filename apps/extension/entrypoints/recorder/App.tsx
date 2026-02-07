@@ -151,6 +151,15 @@ function App() {
 
   const error = captureError || submitError
 
+  useEffect(() => {
+    if (state === "recording") {
+      document.title = `Recording ${formatDuration(duration)} - Crikket`
+      return
+    }
+
+    document.title = "Crikket Bug Report"
+  }, [duration, state])
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-slate-50 p-8">
       <Card className="w-full max-w-2xl shadow-lg">

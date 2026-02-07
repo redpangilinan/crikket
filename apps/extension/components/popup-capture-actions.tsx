@@ -1,11 +1,13 @@
 import { Button } from "@crikket/ui/components/ui/button"
 import { Camera, Video } from "lucide-react"
 import type { PopupCaptureType } from "@/hooks/use-popup-capture"
+import { formatDuration } from "@/lib/utils"
 
 interface PopupCaptureActionsProps {
   isBusy: boolean
   isRecordingInProgress: boolean
   recordingCountdown: number | null
+  recordingDurationMs: number
   pendingCaptureType: PopupCaptureType | null
   onRequestCapture: (captureType: PopupCaptureType) => void
   onStopFromPopup: () => Promise<void>
@@ -17,6 +19,7 @@ export function PopupCaptureActions({
   isBusy,
   isRecordingInProgress,
   recordingCountdown,
+  recordingDurationMs,
   pendingCaptureType,
   onRequestCapture,
   onStopFromPopup,
@@ -36,6 +39,14 @@ export function PopupCaptureActions({
     <>
       {isRecordingInProgress ? (
         <div className="space-y-2">
+          <div className="rounded-md border bg-destructive/5 p-3 text-center">
+            <p className="font-medium text-destructive text-sm">
+              Recording now
+            </p>
+            <p className="font-mono font-semibold text-destructive text-xl">
+              {formatDuration(recordingDurationMs)}
+            </p>
+          </div>
           <Button
             className="w-full justify-start gap-3"
             disabled={isBusy}

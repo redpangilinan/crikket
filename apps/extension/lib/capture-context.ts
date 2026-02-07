@@ -6,6 +6,7 @@ export const RECORDING_IN_PROGRESS_STORAGE_KEY = "recordingInProgress"
 export const RECORDER_TAB_ID_STORAGE_KEY = "recorderTabId"
 export const RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY =
   "recordingCountdownEndsAt"
+export const RECORDING_STARTED_AT_STORAGE_KEY = "recordingStartedAt"
 
 const isExtensionUrl = (url?: string): boolean =>
   typeof url === "string" &&

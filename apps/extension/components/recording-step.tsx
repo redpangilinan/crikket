@@ -11,18 +11,10 @@ export function RecordingStep({
   onStopRecording,
 }: RecordingStepProps) {
   return (
-    <div className="flex flex-col items-center justify-center space-y-8 py-12">
-      <div className="relative">
-        <div className="flex h-32 w-32 animate-pulse items-center justify-center rounded-full border-4 border-red-500 bg-red-500/10">
-          <div className="h-16 w-16 rounded-full bg-red-500" />
-        </div>
-      </div>
-
-      <div className="text-center">
-        <p className="mb-2 font-medium text-slate-300 text-sm uppercase tracking-wider">
-          Recording in Progress
-        </p>
-        <p className="font-mono text-5xl text-white">
+    <div className="flex flex-col items-center justify-center space-y-6 py-12">
+      <div className="w-full max-w-sm rounded-md border border-destructive/20 bg-destructive/5 p-4 text-center">
+        <p className="font-medium text-destructive text-sm">Recording now</p>
+        <p className="font-mono font-semibold text-5xl text-destructive">
           {formatDuration(duration)}
         </p>
       </div>
@@ -36,7 +28,7 @@ export function RecordingStep({
         ⏹ Stop Recording
       </Button>
 
-      <p className="max-w-md text-center text-slate-400 text-sm">
+      <p className="max-w-md text-center text-muted-foreground text-sm">
         Click "Stop Recording" when you're done capturing the issue. You'll be
         able to add details and submit your bug report next.
       </p>

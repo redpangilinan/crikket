@@ -162,7 +162,7 @@ export function BugReportsList() {
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 space-y-1">
-                    <h3 className="line-clamp-2 font-semibold text-sm leading-tight">
+                    <h3 className="line-clamp-1 font-semibold text-sm leading-tight">
                       {report.title}
                     </h3>
                     <p className="text-muted-foreground text-xs">

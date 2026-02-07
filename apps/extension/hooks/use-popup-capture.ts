@@ -6,6 +6,7 @@ import {
   RECORDER_TAB_ID_STORAGE_KEY,
   RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY,
   RECORDING_IN_PROGRESS_STORAGE_KEY,
+  RECORDING_STARTED_AT_STORAGE_KEY,
 } from "@/lib/capture-context"
 
 export type PopupCaptureType = "video" | "screenshot"
@@ -132,6 +133,7 @@ export function usePopupCapture(): UsePopupCaptureReturn {
       chrome.storage.local.remove([
         RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY,
         RECORDER_TAB_ID_STORAGE_KEY,
+        RECORDING_STARTED_AT_STORAGE_KEY,
       ])
       setIsCapturing(false)
     } finally {
