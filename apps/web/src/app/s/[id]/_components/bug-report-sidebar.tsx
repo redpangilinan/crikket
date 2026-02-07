@@ -3,8 +3,10 @@ import { cn } from "@crikket/ui/lib/utils"
 import { Globe, Info, MousePointerClick, Terminal } from "lucide-react"
 import type { ReactNode } from "react"
 
+import { NetworkRequestsPanel } from "./network-requests-panel"
 import { TimelineList } from "./timeline-list"
 import type {
+  DebuggerNetworkRequest,
   DebuggerTimelineEntry,
   DeviceInfo,
   SharedBugReport,
@@ -19,6 +21,7 @@ interface BugReportSidebarProps {
   actionEntries: DebuggerTimelineEntry[]
   logEntries: DebuggerTimelineEntry[]
   networkEntries: DebuggerTimelineEntry[]
+  networkRequests: DebuggerNetworkRequest[]
   activeEntryId: string | null
   onEntrySelect: (entry: DebuggerTimelineEntry) => void
 }
@@ -30,13 +33,14 @@ export function BugReportSidebar({
   actionEntries,
   logEntries,
   networkEntries,
+  networkRequests,
   activeEntryId,
   onEntrySelect,
 }: BugReportSidebarProps) {
   const deviceInfo = data.deviceInfo as DeviceInfo | null
 
   return (
-    <div className="z-20 flex h-full w-full max-w-[400px] flex-col border-l bg-background shadow-xl md:relative md:top-0 md:shadow-none">
+    <div className="z-20 flex h-full w-full flex-col border-l bg-background shadow-xl md:relative md:top-0 md:shadow-none">
       {/* Tabs Navigation */}
       <div className="flex items-center border-b px-1 py-1">
         <TabButton
@@ -126,12 +130,11 @@ export function BugReportSidebar({
         )}
 
         {activeTab === "network" && (
-          <TimelineList
-            activeId={activeEntryId}
-            emptyMessage="No network requests captured."
+          <NetworkRequestsPanel
+            activeEntryId={activeEntryId}
             entries={networkEntries}
-            icon={<Globe className="h-3 w-3" />}
-            onSelect={onEntrySelect}
+            onEntrySelect={onEntrySelect}
+            requests={networkRequests}
           />
         )}
       </div>

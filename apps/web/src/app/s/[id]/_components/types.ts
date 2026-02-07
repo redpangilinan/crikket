@@ -4,6 +4,8 @@ export type SharedBugReport = Awaited<
 >
 
 export type SharedBugReportDebugger = NonNullable<SharedBugReport["debugger"]>
+export type DebuggerNetworkRequest =
+  SharedBugReportDebugger["networkRequests"][number]
 
 export type DebuggerTimelineKind = "action" | "log" | "network"
 

@@ -1,6 +1,11 @@
 "use client"
 
 import { Button } from "@crikket/ui/components/ui/button"
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@crikket/ui/components/ui/resizable"
 import { useQuery } from "@tanstack/react-query"
 import { AlertCircle, Loader2 } from "lucide-react"
 import Link from "next/link"
@@ -22,6 +27,11 @@ import {
 interface BugReportViewProps {
   id: string
 }
+
+const CANVAS_MIN_WIDTH = "720px"
+const SIDEBAR_DEFAULT_WIDTH = "420px"
+const SIDEBAR_MIN_WIDTH = "360px"
+const SIDEBAR_MAX_WIDTH = "1080px"
 
 export function BugReportView({ id }: BugReportViewProps) {
   const { data, isLoading, error } = useQuery(
@@ -122,22 +132,36 @@ export function BugReportView({ id }: BugReportViewProps) {
       <BugReportHeader data={data} />
 
       <div className="flex flex-1 overflow-hidden">
-        <BugReportCanvas
-          data={data}
-          onTimeUpdate={setPlaybackOffsetMs}
-          ref={videoRef}
-        />
+        <ResizablePanelGroup className="h-full w-full" orientation="horizontal">
+          <ResizablePanel minSize={CANVAS_MIN_WIDTH}>
+            <div className="flex h-full">
+              <BugReportCanvas
+                data={data}
+                onTimeUpdate={setPlaybackOffsetMs}
+                ref={videoRef}
+              />
+            </div>
+          </ResizablePanel>
+          <ResizableHandle withHandle />
 
-        <BugReportSidebar
-          actionEntries={actionEntries}
-          activeEntryId={activeEntryId}
-          activeTab={activeTab}
-          data={data}
-          logEntries={logEntries}
-          networkEntries={networkEntries}
-          onEntrySelect={handleEntrySelect}
-          onTabChange={setActiveTab}
-        />
+          <ResizablePanel
+            defaultSize={SIDEBAR_DEFAULT_WIDTH}
+            maxSize={SIDEBAR_MAX_WIDTH}
+            minSize={SIDEBAR_MIN_WIDTH}
+          >
+            <BugReportSidebar
+              actionEntries={actionEntries}
+              activeEntryId={activeEntryId}
+              activeTab={activeTab}
+              data={data}
+              logEntries={logEntries}
+              networkEntries={networkEntries}
+              networkRequests={debuggerData.networkRequests}
+              onEntrySelect={handleEntrySelect}
+              onTabChange={setActiveTab}
+            />
+          </ResizablePanel>
+        </ResizablePanelGroup>
       </div>
     </div>
   )
