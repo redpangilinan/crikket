@@ -135,6 +135,7 @@ export function BugReportView({ id }: BugReportViewProps) {
           data={data}
           logEntries={logEntries}
           networkEntries={networkEntries}
+          networkRequests={debuggerData.networkRequests}
           onEntrySelect={handleEntrySelect}
           onTabChange={setActiveTab}
         />
