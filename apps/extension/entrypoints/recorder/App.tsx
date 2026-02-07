@@ -17,7 +17,7 @@ import { type CaptureType, useRecorderInit } from "@/hooks/use-recorder-init"
 import { useScreenCapture } from "@/hooks/use-screen-capture"
 import { useTimer } from "@/hooks/use-timer"
 import { client } from "@/lib/orpc"
-import { getDeviceInfo } from "@/lib/utils"
+import { formatDuration, getDeviceInfo } from "@/lib/utils"
 
 type State = "idle" | "recording" | "stopped" | "submitting" | "success"
 
@@ -28,6 +28,7 @@ function App() {
 
   const [resultUrl, setResultUrl] = useState("")
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [tabInfo, setTabInfo] = useState<{ title?: string; url?: string }>({})
 
   const {
     startRecording: startCapture,
@@ -63,6 +64,26 @@ function App() {
     }
   }, [state, recordedBlob])
 
+  useEffect(() => {
+    const readTabInfo = async () => {
+      try {
+        const tabs = await chrome.tabs.query({
+          active: true,
+          currentWindow: true,
+        })
+        const activeTab = tabs[0]
+        setTabInfo({
+          title: activeTab?.title ?? undefined,
+          url: activeTab?.url ?? undefined,
+        })
+      } catch {
+        setTabInfo({})
+      }
+    }
+
+    readTabInfo()
+  }, [])
+
   useRecorderInit({
     onCaptureTypeChange: setCaptureType,
     onScreenshotLoaded: (blob) => {
@@ -87,6 +108,7 @@ function App() {
   }
 
   const handleSubmit = async (values: {
+    title: string
     description: string
     priority: Priority
   }) => {
@@ -97,23 +119,21 @@ function App() {
     setSubmitError(null)
 
     try {
-      let currentUrl: string | undefined
-      try {
-        const tabs = await chrome.tabs.query({
-          active: true,
-          currentWindow: true,
-        })
-        currentUrl = tabs[0]?.url
-      } catch {
-        // Ignore
-      }
+      const durationMs =
+        captureType === "video" && startTime ? Date.now() - startTime : 0
 
       const result = await client.bugReport.create({
         attachment: blob,
         attachmentType: captureType,
+        title: values.title || undefined,
         priority: values.priority,
         description: values.description || undefined,
-        url: currentUrl,
+        url: tabInfo.url,
+        metadata: {
+          duration: formatDuration(durationMs),
+          durationMs,
+          pageTitle: tabInfo.title,
+        },
         deviceInfo: getDeviceInfo(),
       })
 
@@ -128,6 +148,9 @@ function App() {
   }
 
   const activeBlob = captureType === "video" ? recordedBlob : screenshotBlob
+  const suggestedTitle =
+    tabInfo.title?.trim() ||
+    (captureType === "video" ? "Video bug report" : "Screenshot bug report")
   const previewUrl = useMemo(() => {
     if (!activeBlob) return null
     return URL.createObjectURL(activeBlob)
@@ -174,6 +197,7 @@ function App() {
           {(state === "stopped" || state === "submitting") && (
             <FormStep
               captureType={captureType}
+              initialTitle={suggestedTitle}
               isSubmitting={state === "submitting"}
               onCancel={handleReset}
               onSubmit={handleSubmit}

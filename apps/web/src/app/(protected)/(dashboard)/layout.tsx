@@ -44,7 +44,7 @@ export default async function ProtectedLayout({
   )
 
   return (
-    <SidebarProvider className="h-svh items-stretch overflow-hidden">
+    <SidebarProvider className="min-h-svh items-stretch">
       <AppSidebar
         activeOrganization={activeOrganization}
         organizations={organizations ?? []}
