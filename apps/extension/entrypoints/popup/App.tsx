@@ -8,6 +8,10 @@ import {
 } from "@crikket/ui/components/ui/card"
 import { Camera, Video } from "lucide-react"
 import { useState } from "react"
+import {
+  CAPTURE_CONTEXT_STORAGE_KEY,
+  getActiveTabContext,
+} from "@/lib/capture-context"
 
 type CaptureType = "video" | "screenshot"
 
@@ -20,6 +24,8 @@ function App() {
     setError(null)
 
     try {
+      const captureContext = await getActiveTabContext()
+
       if (captureType === "screenshot") {
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: { displaySurface: "browser" },
@@ -34,23 +40,35 @@ function App() {
         const reader = new FileReader()
         reader.onloadend = () => {
           const base64data = reader.result as string
-          chrome.storage.local.set({ pendingScreenshot: base64data }, () => {
-            chrome.tabs.create({
-              url: chrome.runtime.getURL(
-                "/recorder.html?captureType=screenshot"
-              ),
-            })
-            window.close()
-          })
+          chrome.storage.local.set(
+            {
+              [CAPTURE_CONTEXT_STORAGE_KEY]: captureContext,
+              pendingScreenshot: base64data,
+            },
+            () => {
+              chrome.tabs.create({
+                url: chrome.runtime.getURL(
+                  "/recorder.html?captureType=screenshot"
+                ),
+              })
+              window.close()
+            }
+          )
         }
         reader.readAsDataURL(blob)
       } else {
-        chrome.storage.local.set({ startRecordingImmediately: true }, () => {
-          chrome.tabs.create({
-            url: chrome.runtime.getURL("/recorder.html?captureType=video"),
-          })
-          window.close()
-        })
+        chrome.storage.local.set(
+          {
+            [CAPTURE_CONTEXT_STORAGE_KEY]: captureContext,
+            startRecordingImmediately: true,
+          },
+          () => {
+            chrome.tabs.create({
+              url: chrome.runtime.getURL("/recorder.html?captureType=video"),
+            })
+            window.close()
+          }
+        )
       }
     } catch (err) {
       console.error(err)

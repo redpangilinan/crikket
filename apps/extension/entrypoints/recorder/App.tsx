@@ -13,6 +13,7 @@ import { FormStep } from "@/components/form-step"
 import { IdleStep } from "@/components/idle-step"
 import { RecordingStep } from "@/components/recording-step"
 import { SuccessStep } from "@/components/success-step"
+import { useCaptureContext } from "@/hooks/use-capture-context"
 import { type CaptureType, useRecorderInit } from "@/hooks/use-recorder-init"
 import { useScreenCapture } from "@/hooks/use-screen-capture"
 import { useTimer } from "@/hooks/use-timer"
@@ -28,7 +29,7 @@ function App() {
 
   const [resultUrl, setResultUrl] = useState("")
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [tabInfo, setTabInfo] = useState<{ title?: string; url?: string }>({})
+  const captureContext = useCaptureContext()
 
   const {
     startRecording: startCapture,
@@ -63,26 +64,6 @@ function App() {
       setState("stopped")
     }
   }, [state, recordedBlob])
-
-  useEffect(() => {
-    const readTabInfo = async () => {
-      try {
-        const tabs = await chrome.tabs.query({
-          active: true,
-          currentWindow: true,
-        })
-        const activeTab = tabs[0]
-        setTabInfo({
-          title: activeTab?.title ?? undefined,
-          url: activeTab?.url ?? undefined,
-        })
-      } catch {
-        setTabInfo({})
-      }
-    }
-
-    readTabInfo()
-  }, [])
 
   useRecorderInit({
     onCaptureTypeChange: setCaptureType,
@@ -128,11 +109,11 @@ function App() {
         title: values.title || undefined,
         priority: values.priority,
         description: values.description || undefined,
-        url: tabInfo.url,
+        url: captureContext.url,
         metadata: {
           duration: formatDuration(durationMs),
           durationMs,
-          pageTitle: tabInfo.title,
+          pageTitle: captureContext.title,
         },
         deviceInfo: getDeviceInfo(),
       })
@@ -149,7 +130,7 @@ function App() {
 
   const activeBlob = captureType === "video" ? recordedBlob : screenshotBlob
   const suggestedTitle =
-    tabInfo.title?.trim() ||
+    captureContext.title?.trim() ||
     (captureType === "video" ? "Video bug report" : "Screenshot bug report")
   const previewUrl = useMemo(() => {
     if (!activeBlob) return null
