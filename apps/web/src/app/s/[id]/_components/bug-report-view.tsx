@@ -1,13 +1,20 @@
 "use client"
 
-import { Button } from "@crikket/ui/components/ui/button"
+import { Button, buttonVariants } from "@crikket/ui/components/ui/button"
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@crikket/ui/components/ui/resizable"
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@crikket/ui/components/ui/sheet"
+import { cn } from "@crikket/ui/lib/utils"
 import { useQuery } from "@tanstack/react-query"
-import { AlertCircle, Loader2 } from "lucide-react"
+import { AlertCircle, Loader2, Menu } from "lucide-react"
 import Link from "next/link"
 import { useMemo, useRef, useState } from "react"
 import { orpc } from "@/utils/orpc"
@@ -128,41 +135,85 @@ export function BugReportView({ id }: BugReportViewProps) {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background">
-      <BugReportHeader data={data} />
+    <Sheet>
+      <div className="flex h-screen flex-col overflow-hidden bg-background">
+        <BugReportHeader
+          data={data}
+          sidebarTrigger={
+            <SheetTrigger
+              className={cn(
+                buttonVariants({ variant: "ghost", size: "icon" }),
+                "-ml-2 h-8 w-8"
+              )}
+            >
+              <Menu className="h-4 w-4" />
+            </SheetTrigger>
+          }
+        />
 
-      <div className="flex flex-1 overflow-hidden">
-        <ResizablePanelGroup className="h-full w-full" orientation="horizontal">
-          <ResizablePanel minSize={CANVAS_MIN_WIDTH}>
-            <div className="flex h-full">
-              <BugReportCanvas
-                data={data}
-                onTimeUpdate={setPlaybackOffsetMs}
-                ref={videoRef}
-              />
-            </div>
-          </ResizablePanel>
-          <ResizableHandle withHandle />
+        <div className="flex flex-1 overflow-hidden">
+          {/* Desktop View */}
+          <div className="hidden h-full w-full md:block">
+            <ResizablePanelGroup
+              className="h-full w-full"
+              orientation="horizontal"
+            >
+              <ResizablePanel minSize={CANVAS_MIN_WIDTH}>
+                <div className="flex h-full">
+                  <BugReportCanvas
+                    data={data}
+                    onTimeUpdate={setPlaybackOffsetMs}
+                    ref={videoRef}
+                  />
+                </div>
+              </ResizablePanel>
+              <ResizableHandle withHandle />
 
-          <ResizablePanel
-            defaultSize={SIDEBAR_DEFAULT_WIDTH}
-            maxSize={SIDEBAR_MAX_WIDTH}
-            minSize={SIDEBAR_MIN_WIDTH}
-          >
-            <BugReportSidebar
-              actionEntries={actionEntries}
-              activeEntryId={activeEntryId}
-              activeTab={activeTab}
+              <ResizablePanel
+                defaultSize={SIDEBAR_DEFAULT_WIDTH}
+                maxSize={SIDEBAR_MAX_WIDTH}
+                minSize={SIDEBAR_MIN_WIDTH}
+              >
+                <BugReportSidebar
+                  actionEntries={actionEntries}
+                  activeEntryId={activeEntryId}
+                  activeTab={activeTab}
+                  data={data}
+                  logEntries={logEntries}
+                  networkEntries={networkEntries}
+                  networkRequests={debuggerData.networkRequests}
+                  onEntrySelect={handleEntrySelect}
+                  onTabChange={setActiveTab}
+                />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </div>
+
+          {/* Mobile View */}
+          <div className="flex h-full w-full flex-col md:hidden">
+            <BugReportCanvas
               data={data}
-              logEntries={logEntries}
-              networkEntries={networkEntries}
-              networkRequests={debuggerData.networkRequests}
-              onEntrySelect={handleEntrySelect}
-              onTabChange={setActiveTab}
+              onTimeUpdate={setPlaybackOffsetMs}
+              ref={videoRef}
             />
-          </ResizablePanel>
-        </ResizablePanelGroup>
+          </div>
+        </div>
       </div>
-    </div>
+
+      <SheetContent className="w-[90%] p-0 sm:max-w-md" side="left">
+        <SheetTitle className="sr-only">Bug Report Details</SheetTitle>
+        <BugReportSidebar
+          actionEntries={actionEntries}
+          activeEntryId={activeEntryId}
+          activeTab={activeTab}
+          data={data}
+          logEntries={logEntries}
+          networkEntries={networkEntries}
+          networkRequests={debuggerData.networkRequests}
+          onEntrySelect={handleEntrySelect}
+          onTabChange={setActiveTab}
+        />
+      </SheetContent>
+    </Sheet>
   )
 }
