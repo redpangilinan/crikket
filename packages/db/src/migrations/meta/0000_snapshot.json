@@ -1,5 +1,5 @@
 {
-  "id": "c3ab88b8-a4e3-4f3b-a739-e28d279f5daf",
+  "id": "29f9eab9-5ff4-41a4-977c-6bcadc8a9125",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -727,11 +727,24 @@
           "primaryKey": false,
           "notNull": false
         },
+        "attachment_key": {
+          "name": "attachment_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
         "attachment_type": {
           "name": "attachment_type",
           "type": "text",
           "primaryKey": false,
           "notNull": false
+        },
+        "visibility": {
+          "name": "visibility",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'private'"
         },
         "metadata": {
           "name": "metadata",

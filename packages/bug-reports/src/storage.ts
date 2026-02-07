@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises"
+import { mkdir, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { env } from "@crikket/env/server"
 import { S3Client } from "bun"
@@ -9,6 +9,7 @@ import { S3Client } from "bun"
 export interface StorageProvider {
   save(filename: string, data: Buffer | Blob): Promise<string>
   getUrl(filename: string): string
+  remove(filename: string): Promise<void>
 }
 
 interface LocalStorageOptions {
@@ -62,6 +63,14 @@ export function createLocalStorageProvider(
       return getUrl(filename)
     },
     getUrl,
+    async remove(filename: string): Promise<void> {
+      const filePath = path.join(basePath, filename)
+      try {
+        await rm(filePath, { force: true })
+      } catch {
+        // no-op: deleting a report should still succeed even if file is already missing
+      }
+    },
   }
 }
 
@@ -114,6 +123,13 @@ export function createS3StorageProvider(
       return getUrl(filename)
     },
     getUrl,
+    async remove(filename: string): Promise<void> {
+      try {
+        await client.delete(filename)
+      } catch {
+        // no-op: keep report deletion resilient if object is missing or already removed
+      }
+    },
   }
 }
 
@@ -157,6 +173,30 @@ export function generateFilename(
   const random = Math.random().toString(36).substring(2, 8)
   const ext = type === "video" ? "webm" : "png"
   return `${type}_${timestamp}_${random}.${ext}`
+}
+
+export function extractStorageKeyFromUrl(
+  url: string,
+  provider: StorageProvider
+): string | null {
+  const marker = "/"
+  try {
+    const target = provider.getUrl(marker)
+    const normalizedUrl = normalizeParsedUrl(url)
+    const normalizedTarget = normalizeParsedUrl(target)
+
+    if (
+      normalizedUrl.origin !== normalizedTarget.origin ||
+      !normalizedUrl.pathname.startsWith(normalizedTarget.pathname)
+    ) {
+      return null
+    }
+
+    const key = normalizedUrl.pathname.slice(normalizedTarget.pathname.length)
+    return key.length > 0 ? decodeURIComponent(key) : null
+  } catch {
+    return null
+  }
 }
 
 function getCloudStorageConfig(provider: "s3" | "r2"): {
@@ -234,4 +274,12 @@ function getMimeTypeFromFilename(filename: string): string | null {
   if (filename.endsWith(".webm")) return "video/webm"
   if (filename.endsWith(".png")) return "image/png"
   return null
+}
+
+function normalizeParsedUrl(value: string): URL {
+  const parsed = new URL(value)
+  if (!parsed.pathname.endsWith("/")) {
+    parsed.pathname = `${parsed.pathname}/`
+  }
+  return parsed
 }

@@ -8,11 +8,15 @@ import {
   paginationParamsSchema,
 } from "@crikket/shared/lib/server/pagination"
 import { ORPCError, os } from "@orpc/server"
-import { count, desc, eq } from "drizzle-orm"
+import { and, count, desc, eq, inArray } from "drizzle-orm"
 import { nanoid } from "nanoid"
 import { z } from "zod"
 
-import { generateFilename, getStorageProvider } from "./storage"
+import {
+  extractStorageKeyFromUrl,
+  generateFilename,
+  getStorageProvider,
+} from "./storage"
 
 type SessionContext = typeof auth.$Infer.Session
 
@@ -42,10 +46,12 @@ export interface BugReportListItem {
     name: string
     avatar: string | undefined
   }
+  visibility: "public" | "private"
   createdAt: string
 }
 
 const attachmentTypes = ["video", "screenshot"] as const
+const visibilityValues = ["public", "private"] as const
 
 function isAttachmentType(
   value: unknown
@@ -53,6 +59,15 @@ function isAttachmentType(
   return (
     typeof value === "string" &&
     (attachmentTypes as readonly string[]).includes(value)
+  )
+}
+
+function isVisibility(
+  value: unknown
+): value is (typeof visibilityValues)[number] {
+  return (
+    typeof value === "string" &&
+    (visibilityValues as readonly string[]).includes(value)
   )
 }
 
@@ -118,6 +133,7 @@ export const listBugReports = protectedProcedure
         const attachmentType = isAttachmentType(r.attachmentType)
           ? r.attachmentType
           : undefined
+        const visibility = isVisibility(r.visibility) ? r.visibility : "private"
         const durationMs = metadata?.durationMs
         const normalizedDurationMs =
           typeof durationMs === "number" && Number.isFinite(durationMs)
@@ -139,6 +155,7 @@ export const listBugReports = protectedProcedure
               : undefined),
           attachmentUrl: r.attachmentUrl ?? undefined,
           attachmentType,
+          visibility,
           uploader: {
             name: r.reporter?.name || "Unknown User",
             avatar: r.reporter?.image ?? undefined,
@@ -165,6 +182,7 @@ export const createBugReport = protectedProcedure
       priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
       url: z.string().url().optional(),
       attachmentType: z.enum(["video", "screenshot"]),
+      visibility: z.enum(visibilityValues).default("private"),
       attachment: z.instanceof(Blob),
       metadata: metadataInputSchema,
       deviceInfo: z
@@ -226,7 +244,9 @@ export const createBugReport = protectedProcedure
       priority: input.priority,
       url: input.url,
       attachmentUrl,
+      attachmentKey: filename,
       attachmentType: input.attachmentType,
+      visibility: input.visibility,
       deviceInfo: input.deviceInfo,
       status: "open",
       metadata: normalizedMetadata,
@@ -259,7 +279,7 @@ function formatDurationMs(durationMs: number): string {
  */
 export const getBugReportById = o
   .input(z.object({ id: z.string() }))
-  .handler(async ({ input }) => {
+  .handler(async ({ context, input }) => {
     const report = await db.query.bugReport.findFirst({
       where: eq(bugReport.id, input.id),
       with: {
@@ -272,6 +292,19 @@ export const getBugReportById = o
       throw new ORPCError("NOT_FOUND", { message: "Bug report not found" })
     }
 
+    const visibility = isVisibility(report.visibility)
+      ? report.visibility
+      : "private"
+    const activeOrgId = context.session?.session.activeOrganizationId
+    const canAccessPrivate =
+      Boolean(context.session?.user) &&
+      Boolean(activeOrgId) &&
+      activeOrgId === report.organizationId
+
+    if (visibility !== "public" && !canAccessPrivate) {
+      throw new ORPCError("NOT_FOUND", { message: "Bug report not found" })
+    }
+
     return {
       id: report.id,
       title: report.title,
@@ -281,6 +314,7 @@ export const getBugReportById = o
       url: report.url,
       attachmentUrl: report.attachmentUrl,
       attachmentType: report.attachmentType,
+      visibility,
       deviceInfo: report.deviceInfo,
       metadata: report.metadata,
       createdAt: report.createdAt.toISOString(),
@@ -295,5 +329,140 @@ export const getBugReportById = o
         name: report.organization.name,
         logo: report.organization.logo,
       },
+    }
+  })
+
+export const deleteBugReport = protectedProcedure
+  .input(z.object({ id: z.string().min(1) }))
+  .handler(async ({ context, input }) => {
+    const activeOrgId = context.session.session.activeOrganizationId
+    if (!activeOrgId) {
+      throw new ORPCError("BAD_REQUEST", { message: "No active organization" })
+    }
+
+    const report = await db.query.bugReport.findFirst({
+      where: and(
+        eq(bugReport.id, input.id),
+        eq(bugReport.organizationId, activeOrgId)
+      ),
+    })
+
+    if (!report) {
+      throw new ORPCError("NOT_FOUND", { message: "Bug report not found" })
+    }
+
+    const storage = getStorageProvider()
+    const attachmentKey =
+      report.attachmentKey ??
+      (report.attachmentUrl
+        ? extractStorageKeyFromUrl(report.attachmentUrl, storage)
+        : null)
+
+    if (attachmentKey) {
+      await storage.remove(attachmentKey)
+    }
+
+    await db
+      .delete(bugReport)
+      .where(
+        and(
+          eq(bugReport.id, input.id),
+          eq(bugReport.organizationId, activeOrgId)
+        )
+      )
+
+    return { id: input.id }
+  })
+
+export const deleteBugReportsBulk = protectedProcedure
+  .input(
+    z.object({
+      ids: z.array(z.string().min(1)).min(1).max(200),
+    })
+  )
+  .handler(async ({ context, input }) => {
+    const activeOrgId = context.session.session.activeOrganizationId
+    if (!activeOrgId) {
+      throw new ORPCError("BAD_REQUEST", { message: "No active organization" })
+    }
+
+    const uniqueIds = Array.from(new Set(input.ids))
+    const reports = await db.query.bugReport.findMany({
+      where: and(
+        eq(bugReport.organizationId, activeOrgId),
+        inArray(bugReport.id, uniqueIds)
+      ),
+      columns: {
+        id: true,
+        attachmentKey: true,
+        attachmentUrl: true,
+      },
+    })
+
+    if (reports.length === 0) {
+      return { deletedCount: 0 }
+    }
+
+    const storage = getStorageProvider()
+
+    for (const report of reports) {
+      const attachmentKey =
+        report.attachmentKey ??
+        (report.attachmentUrl
+          ? extractStorageKeyFromUrl(report.attachmentUrl, storage)
+          : null)
+
+      if (attachmentKey) {
+        await storage.remove(attachmentKey)
+      }
+    }
+
+    await db.delete(bugReport).where(
+      and(
+        eq(bugReport.organizationId, activeOrgId),
+        inArray(
+          bugReport.id,
+          reports.map((report) => report.id)
+        )
+      )
+    )
+
+    return { deletedCount: reports.length }
+  })
+
+export const updateBugReportVisibility = protectedProcedure
+  .input(
+    z.object({
+      id: z.string().min(1),
+      visibility: z.enum(visibilityValues),
+    })
+  )
+  .handler(async ({ context, input }) => {
+    const activeOrgId = context.session.session.activeOrganizationId
+    if (!activeOrgId) {
+      throw new ORPCError("BAD_REQUEST", { message: "No active organization" })
+    }
+
+    const updated = await db
+      .update(bugReport)
+      .set({ visibility: input.visibility })
+      .where(
+        and(
+          eq(bugReport.id, input.id),
+          eq(bugReport.organizationId, activeOrgId)
+        )
+      )
+      .returning({ id: bugReport.id, visibility: bugReport.visibility })
+
+    const report = updated[0]
+    if (!report) {
+      throw new ORPCError("NOT_FOUND", { message: "Bug report not found" })
+    }
+
+    return {
+      id: report.id,
+      visibility: isVisibility(report.visibility)
+        ? report.visibility
+        : "private",
     }
   })

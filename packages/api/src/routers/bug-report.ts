@@ -1,7 +1,10 @@
 import {
   createBugReport,
+  deleteBugReport,
+  deleteBugReportsBulk,
   getBugReportById,
   listBugReports,
+  updateBugReportVisibility,
 } from "@crikket/bug-reports"
 
 /**
@@ -12,4 +15,7 @@ export const bugReportRouter = {
   list: listBugReports,
   create: createBugReport,
   getById: getBugReportById,
+  delete: deleteBugReport,
+  deleteBulk: deleteBugReportsBulk,
+  updateVisibility: updateBugReportVisibility,
 }
