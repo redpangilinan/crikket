@@ -17,8 +17,8 @@ export function IdleStep({ captureType, onStartRecording }: IdleStepProps) {
         )}
       </div>
       <p className="max-w-sm text-center text-muted-foreground">
-        Click below to start capturing your {captureType}. You will be prompted
-        to select the screen or window.
+        Click below to start capturing your {captureType}. We only capture your
+        current browser tab.
       </p>
       <Button onClick={onStartRecording} size="lg">
         Start {captureType === "video" ? "Recording" : "Capture"}

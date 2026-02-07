@@ -8,13 +8,14 @@ import {
   CardTitle,
 } from "@crikket/ui/components/ui/card"
 import { AlertCircle } from "lucide-react"
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { FormStep } from "@/components/form-step"
 import { IdleStep } from "@/components/idle-step"
 import { RecordingStep } from "@/components/recording-step"
 import { SuccessStep } from "@/components/success-step"
 import { useCaptureContext } from "@/hooks/use-capture-context"
 import { type CaptureType, useRecorderInit } from "@/hooks/use-recorder-init"
+import { useRecorderRecordingSync } from "@/hooks/use-recorder-recording-sync"
 import { useScreenCapture } from "@/hooks/use-screen-capture"
 import { useTimer } from "@/hooks/use-timer"
 import { client } from "@/lib/orpc"
@@ -26,9 +27,9 @@ function App() {
   const [state, setState] = useState<State>("idle")
   const [captureType, setCaptureType] = useState<CaptureType>("video")
   const [startTime, setStartTime] = useState<number | null>(null)
-
   const [resultUrl, setResultUrl] = useState("")
   const [submitError, setSubmitError] = useState<string | null>(null)
+
   const captureContext = useCaptureContext()
 
   const {
@@ -44,20 +45,36 @@ function App() {
 
   const duration = useTimer(startTime, state === "recording")
 
-  const handleStartCapture = async () => {
+  const handleStopRecording = useCallback(async () => {
+    await stopCapture()
+    setState("stopped")
+  }, [stopCapture])
+
+  useRecorderRecordingSync({
+    captureType,
+    onStopFromPopup: handleStopRecording,
+    state,
+  })
+
+  const startVideoCapture = useCallback(async () => {
+    const success = await startCapture()
+    if (success) {
+      setStartTime(Date.now())
+      setState("recording")
+    }
+  }, [startCapture])
+
+  const handleStartCapture = useCallback(async () => {
     if (captureType === "screenshot") {
       const blob = await captureScreenshot()
       if (blob) {
         setState("stopped")
       }
-    } else {
-      const success = await startCapture()
-      if (success) {
-        setStartTime(Date.now())
-        setState("recording")
-      }
+      return
     }
-  }
+
+    await startVideoCapture()
+  }, [captureScreenshot, captureType, startVideoCapture])
 
   useEffect(() => {
     if (state === "recording" && recordedBlob) {
@@ -74,11 +91,6 @@ function App() {
     onStartRecording: handleStartCapture,
     onError: (err) => setSubmitError(err),
   })
-
-  const handleStopRecording = async () => {
-    await stopCapture()
-    setState("stopped")
-  }
 
   const handleReset = () => {
     resetCapture()
@@ -154,28 +166,28 @@ function App() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          {error && (
+          {error ? (
             <div className="flex items-center gap-2 rounded-md bg-destructive/15 p-4 text-destructive">
               <AlertCircle className="h-4 w-4" />
               <span className="font-medium text-sm">{error}</span>
             </div>
-          )}
+          ) : null}
 
-          {state === "idle" && (
+          {state === "idle" ? (
             <IdleStep
               captureType={captureType}
               onStartRecording={handleStartCapture}
             />
-          )}
+          ) : null}
 
-          {state === "recording" && (
+          {state === "recording" ? (
             <RecordingStep
               duration={duration}
               onStopRecording={handleStopRecording}
             />
-          )}
+          ) : null}
 
-          {(state === "stopped" || state === "submitting") && (
+          {state === "stopped" || state === "submitting" ? (
             <FormStep
               captureType={captureType}
               initialTitle={suggestedTitle}
@@ -185,15 +197,15 @@ function App() {
               previewUrl={previewUrl}
               submitError={submitError}
             />
-          )}
+          ) : null}
 
-          {state === "success" && (
+          {state === "success" ? (
             <SuccessStep
               onClose={handleReset}
               onCopyLink={() => navigator.clipboard.writeText(resultUrl)}
               onOpenRecording={() => window.open(resultUrl, "_blank")}
             />
-          )}
+          ) : null}
         </CardContent>
       </Card>
     </div>
