@@ -1,3 +1,4 @@
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import {
   DISCARD_SESSION_MESSAGE,
   GET_SESSION_SNAPSHOT_MESSAGE,
@@ -50,8 +51,8 @@ export async function sendDebuggerPageEvent(rawEvent: unknown): Promise<void> {
         event: rawEvent,
       },
     })
-  } catch {
-    // Ignore delivery failures to avoid breaking user pages.
+  } catch (error) {
+    reportNonFatalError("Failed to send debugger page event", error)
   }
 }
 

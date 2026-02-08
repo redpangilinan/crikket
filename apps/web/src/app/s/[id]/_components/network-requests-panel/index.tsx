@@ -1,5 +1,6 @@
 "use client"
 
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { Input } from "@crikket/ui/components/ui/input"
 import {
   ResizableHandle,
@@ -78,8 +79,11 @@ export function NetworkRequestsPanel({
     }
 
     setSearchParamValue(nextSearchParamValue, { history: "replace" }).catch(
-      () => {
-        // Keep search input interactive if query state sync fails.
+      (error: unknown) => {
+        reportNonFatalError(
+          "Failed to sync network search query state from panel input",
+          error
+        )
       }
     )
   }, [debouncedSearchValue, searchParamValue, setSearchParamValue])

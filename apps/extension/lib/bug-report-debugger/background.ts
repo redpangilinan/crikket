@@ -1,3 +1,4 @@
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import {
   BACKGROUND_LISTENER_FLAG,
   DEBUGGER_SESSIONS_STORAGE_KEY,
@@ -40,7 +41,9 @@ export function registerDebuggerBackgroundListeners(): void {
 
     persistTimer = setTimeout(() => {
       persistTimer = null
-      persistSessions().catch(() => undefined)
+      persistSessions().catch((error: unknown) => {
+        reportNonFatalError("Failed to persist debugger sessions", error)
+      })
     }, 250)
   }
 
@@ -269,7 +272,10 @@ async function injectDebuggerScriptIntoTab(tabId: number): Promise<void> {
       world: "MAIN",
       func: injectedDebuggerScript,
     })
-  } catch {
-    // Continue without blocking recording if script injection fails.
+  } catch (error) {
+    reportNonFatalError(
+      `Failed to inject debugger instrumentation script into tab ${tabId}`,
+      error
+    )
   }
 }

@@ -1,3 +1,4 @@
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { useCallback, useEffect, useState } from "react"
 import {
   RECORDER_TAB_ID_STORAGE_KEY,
@@ -99,8 +100,11 @@ export function usePopupRecordingStatus(): UsePopupRecordingStatusReturn {
         try {
           await chrome.tabs.get(storedTabId)
           return storedTabId
-        } catch {
-          // Fallback to query-based lookup below.
+        } catch (error) {
+          reportNonFatalError(
+            `Failed to resolve stored recorder tab ${storedTabId}, falling back to query lookup`,
+            error
+          )
         }
       }
 
@@ -171,13 +175,13 @@ export function usePopupRecordingStatus(): UsePopupRecordingStatusReturn {
       ) {
         return
       }
-      syncRecordingState().catch(() => {
-        // Keep popup usable even if sync fails.
+      syncRecordingState().catch((error: unknown) => {
+        reportNonFatalError("Failed to sync popup recording state", error)
       })
     }
 
-    syncRecordingState().catch(() => {
-      // Keep popup usable even if initial sync fails.
+    syncRecordingState().catch((error: unknown) => {
+      reportNonFatalError("Failed to initialize popup recording state", error)
     })
     chrome.storage.onChanged.addListener(handleStorageChange)
 
@@ -214,8 +218,11 @@ export function usePopupRecordingStatus(): UsePopupRecordingStatusReturn {
     try {
       try {
         await chrome.runtime.sendMessage({ type: "STOP_RECORDING_FROM_POPUP" })
-      } catch {
-        // No active recorder listener, continue with tab-based resolution.
+      } catch (error) {
+        reportNonFatalError(
+          "Failed to send STOP_RECORDING_FROM_POPUP message, continuing with tab-based resolution",
+          error
+        )
       }
 
       let targetRecorderTabId: number | null = recorderTabId

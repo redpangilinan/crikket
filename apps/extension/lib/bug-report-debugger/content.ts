@@ -1,3 +1,4 @@
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import {
   isDebuggerContentBridgePayload,
   sendDebuggerPageEvent,
@@ -12,7 +13,9 @@ export function setupDebuggerContentBridge(): void {
     if (event.source !== window) return
     if (!isDebuggerContentBridgePayload(event.data)) return
 
-    sendDebuggerPageEvent(event.data.event).catch(() => undefined)
+    sendDebuggerPageEvent(event.data.event).catch((error: unknown) => {
+      reportNonFatalError("Failed to forward debugger page event", error)
+    })
   }
 
   window.addEventListener("message", onWindowMessage)

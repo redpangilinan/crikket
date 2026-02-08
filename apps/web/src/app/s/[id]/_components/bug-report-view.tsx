@@ -1,5 +1,6 @@
 "use client"
 
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { Button, buttonVariants } from "@crikket/ui/components/ui/button"
 import {
   ResizableHandle,
@@ -159,8 +160,11 @@ export function BugReportView({ id }: BugReportViewProps) {
     videoRef.current.currentTime = entry.offset / 1000
     setPlaybackOffsetMs(entry.offset)
 
-    videoRef.current.play().catch(() => {
-      // Keep the seek interaction resilient if autoplay is blocked.
+    videoRef.current.play().catch((error: unknown) => {
+      reportNonFatalError(
+        "Failed to resume playback after timeline seek interaction",
+        error
+      )
     })
   }
 
@@ -169,9 +173,11 @@ export function BugReportView({ id }: BugReportViewProps) {
       return
     }
 
-    networkRequestsQuery.fetchNextPage({ cancelRefetch: false }).catch(() => {
-      // Query errors are surfaced through the global query error handler.
-    })
+    networkRequestsQuery
+      .fetchNextPage({ cancelRefetch: false })
+      .catch((error: unknown) => {
+        reportNonFatalError("Failed to fetch next network requests page", error)
+      })
   }, [
     networkRequestsQuery.fetchNextPage,
     networkRequestsQuery.hasNextPage,

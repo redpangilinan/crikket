@@ -1,3 +1,4 @@
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import type {
   DebuggerAction,
   DebuggerLog,
@@ -110,7 +111,14 @@ export function formatOffset(offsetMs: number): string {
 function safeParseUrl(value: string): URL | null {
   try {
     return new URL(value)
-  } catch {
+  } catch (error) {
+    reportNonFatalError(
+      "Failed to parse debugger network URL",
+      { error, value },
+      {
+        once: true,
+      }
+    )
     return null
   }
 }

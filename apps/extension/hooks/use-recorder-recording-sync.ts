@@ -1,3 +1,4 @@
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { useEffect } from "react"
 import type { CaptureType } from "@/hooks/use-recorder-init"
 import {
@@ -69,8 +70,8 @@ export function useRecorderRecordingSync({
       await clearRecordingFlags()
     }
 
-    syncRecordingState().catch(() => {
-      // Ignore storage sync failures; capture flow still works locally.
+    syncRecordingState().catch((error: unknown) => {
+      reportNonFatalError("Failed to sync recorder recording state", error)
     })
   }, [captureType, state])
 
@@ -78,8 +79,11 @@ export function useRecorderRecordingSync({
     const handleMessage = (message: { type?: string }) => {
       if (message.type !== "STOP_RECORDING_FROM_POPUP") return
       if (state !== "recording") return
-      onStopFromPopup().catch(() => {
-        // Keep recorder usable even if popup-triggered stop fails.
+      onStopFromPopup().catch((error: unknown) => {
+        reportNonFatalError(
+          "Failed to stop recording from popup trigger",
+          error
+        )
       })
     }
 

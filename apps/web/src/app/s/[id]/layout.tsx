@@ -1,5 +1,6 @@
 import type { AppRouterClient } from "@crikket/api/routers/index"
 import { env } from "@crikket/env/web"
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { createORPCClient } from "@orpc/client"
 import { RPCLink } from "@orpc/client/fetch"
 import type { Metadata } from "next"
@@ -44,7 +45,11 @@ export async function generateMetadata({
     return {
       title: report.title?.trim() || `Bug Report ${id}`,
     }
-  } catch {
+  } catch (error) {
+    reportNonFatalError(
+      `Failed to generate metadata for bug report ${id}`,
+      error
+    )
     return { title: "Bug Report" }
   }
 }

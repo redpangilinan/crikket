@@ -1,3 +1,4 @@
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import type { BodyPreview, DetailSection, KeyValueItem } from "./types"
 
 const FORM_DATA_PATTERN = /^[^=&?#]+=[^=&]*(&[^=&?#]+=[^=&]*)*$/
@@ -15,7 +16,14 @@ export function safeParseUrl(value: string | undefined): URL | null {
 
   try {
     return new URL(value)
-  } catch {
+  } catch (error) {
+    reportNonFatalError(
+      "Failed to parse network request URL",
+      { error, value },
+      {
+        once: true,
+      }
+    )
     return null
   }
 }
@@ -110,7 +118,10 @@ export function formatBody(value: string | null): BodyPreview | null {
       raw,
       formatted: JSON.stringify(parsed, null, 2),
     }
-  } catch {
+  } catch (error) {
+    reportNonFatalError("Failed to format request payload as JSON", error, {
+      once: true,
+    })
     return { raw, formatted: raw }
   }
 }
@@ -129,7 +140,10 @@ function parseJsonParams(value: string): KeyValueItem[] {
         value: stringifyScalar(entryValue),
       }
     })
-  } catch {
+  } catch (error) {
+    reportNonFatalError("Failed to parse request body params as JSON", error, {
+      once: true,
+    })
     return []
   }
 }
@@ -167,7 +181,12 @@ function stringifyScalar(value: unknown): string {
 
   try {
     return JSON.stringify(value)
-  } catch {
+  } catch (error) {
+    reportNonFatalError(
+      "Failed to stringify non-scalar request body param value",
+      error,
+      { once: true }
+    )
     return "[unserializable]"
   }
 }

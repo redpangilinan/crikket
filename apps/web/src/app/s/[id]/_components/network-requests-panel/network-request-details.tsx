@@ -1,3 +1,4 @@
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { cn } from "@crikket/ui/lib/utils"
 import { useQuery } from "@tanstack/react-query"
 import { parseAsStringLiteral, useQueryState } from "nuqs"
@@ -73,8 +74,11 @@ export function NetworkRequestDetails({
       window.setTimeout(() => {
         setCopiedKey((current) => (current === key ? null : current))
       }, 1400)
-    } catch {
-      // Ignore clipboard errors to keep the inspector interactive.
+    } catch (error) {
+      reportNonFatalError(
+        "Failed to copy network request details value to clipboard",
+        error
+      )
     }
   }
 

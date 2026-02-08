@@ -1,3 +1,4 @@
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { useEffect, useState } from "react"
 import {
   type CaptureContext,
@@ -20,7 +21,8 @@ export function useCaptureContext(): CaptureContext {
 
         const activeTabContext = await getActiveTabContext()
         setCaptureContext(activeTabContext)
-      } catch {
+      } catch (error) {
+        reportNonFatalError("Failed to load capture context", error)
         setCaptureContext({})
       }
     }
