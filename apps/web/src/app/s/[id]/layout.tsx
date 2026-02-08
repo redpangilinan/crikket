@@ -3,24 +3,13 @@ import { env } from "@crikket/env/web"
 import { createORPCClient } from "@orpc/client"
 import { RPCLink } from "@orpc/client/fetch"
 import type { Metadata } from "next"
+import { headers } from "next/headers"
 import type { ReactNode } from "react"
 
 interface BugReportLayoutProps {
   children: ReactNode
   params: Promise<{ id: string }>
 }
-
-const link = new RPCLink({
-  url: `${env.NEXT_PUBLIC_SERVER_URL}/rpc`,
-  fetch(url, options) {
-    return fetch(url, {
-      ...options,
-      credentials: "include",
-    })
-  },
-})
-
-const client: AppRouterClient = createORPCClient(link)
 
 export async function generateMetadata({
   params,
@@ -32,6 +21,20 @@ export async function generateMetadata({
   }
 
   try {
+    const link = new RPCLink({
+      url: `${env.NEXT_PUBLIC_SERVER_URL}/rpc`,
+      fetch(url, options) {
+        return fetch(url, {
+          ...options,
+          credentials: "include",
+        })
+      },
+      headers: async () => {
+        const requestHeaders = await headers()
+        return Object.fromEntries(requestHeaders)
+      },
+    })
+    const client: AppRouterClient = createORPCClient(link)
     const report = await client.bugReport.getById({ id })
 
     if (!report) {
