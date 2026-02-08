@@ -1,5 +1,6 @@
 "use client"
 
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { Button, buttonVariants } from "@crikket/ui/components/ui/button"
 import {
   ResizableHandle,
@@ -13,10 +14,11 @@ import {
   SheetTrigger,
 } from "@crikket/ui/components/ui/sheet"
 import { cn } from "@crikket/ui/lib/utils"
-import { useQuery } from "@tanstack/react-query"
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query"
 import { AlertCircle, Loader2, Menu } from "lucide-react"
 import Link from "next/link"
-import { useMemo, useRef, useState } from "react"
+import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { orpc } from "@/utils/orpc"
 
 import { BugReportCanvas } from "./bug-report-canvas"
@@ -28,7 +30,6 @@ import {
   buildLogEntry,
   buildNetworkEntry,
   getPlaybackEntryId,
-  normalizeDebuggerData,
 } from "./utils"
 
 interface BugReportViewProps {
@@ -39,6 +40,13 @@ const CANVAS_MIN_WIDTH = "720px"
 const SIDEBAR_DEFAULT_WIDTH = "420px"
 const SIDEBAR_MIN_WIDTH = "360px"
 const SIDEBAR_MAX_WIDTH = "1080px"
+const NETWORK_REQUESTS_PAGE_SIZE = 10
+const SIDEBAR_TABS = [
+  "details",
+  "actions",
+  "console",
+  "network",
+] as const satisfies readonly SidebarTab[]
 
 export function BugReportView({ id }: BugReportViewProps) {
   const { data, isLoading, error } = useQuery(
@@ -48,27 +56,77 @@ export function BugReportView({ id }: BugReportViewProps) {
     })
   )
 
+  const [activeTab, setActiveTab] = useQueryState(
+    "tab",
+    parseAsStringLiteral(SIDEBAR_TABS).withDefault("details")
+  )
+  const [networkSearch] = useQueryState("networkSearch", parseAsString)
+  const [hasOpenedDebuggerTimelineTab, setHasOpenedDebuggerTimelineTab] =
+    useState(false)
+  const [hasOpenedNetworkTab, setHasOpenedNetworkTab] = useState(false)
+
+  useEffect(() => {
+    if (activeTab === "actions" || activeTab === "console") {
+      setHasOpenedDebuggerTimelineTab(true)
+    }
+
+    if (activeTab === "network") {
+      setHasOpenedNetworkTab(true)
+    }
+  }, [activeTab])
+
+  const debuggerEventsQuery = useQuery(
+    orpc.bugReport.getDebuggerEvents.queryOptions({
+      input: { id },
+      enabled: Boolean(id) && hasOpenedDebuggerTimelineTab,
+    })
+  )
+
+  const networkRequestsQuery = useInfiniteQuery(
+    orpc.bugReport.getNetworkRequests.infiniteOptions({
+      initialPageParam: 1,
+      input: (pageParam) => ({
+        id,
+        page: pageParam,
+        perPage: NETWORK_REQUESTS_PAGE_SIZE,
+        search: networkSearch ?? undefined,
+      }),
+      queryKey: ["networkRequests", id, networkSearch ?? ""],
+      getNextPageParam: (lastPage) =>
+        lastPage.pagination.hasNextPage
+          ? lastPage.pagination.page + 1
+          : undefined,
+      enabled: Boolean(id) && hasOpenedNetworkTab,
+    })
+  )
+
+  const debuggerEvents = debuggerEventsQuery.data ?? {
+    actions: [],
+    logs: [],
+  }
+
+  const networkRequests = useMemo(() => {
+    return networkRequestsQuery.data?.pages.flatMap((page) => page.items) ?? []
+  }, [networkRequestsQuery.data])
+
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const [playbackOffsetMs, setPlaybackOffsetMs] = useState(0)
   const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<SidebarTab>("details")
 
   const showVideo =
     data?.attachmentType === "video" && Boolean(data.attachmentUrl)
 
-  const debuggerData = normalizeDebuggerData(data?.debugger)
-
   const actionEntries = useMemo(
-    () => debuggerData.actions.map(buildActionEntry),
-    [debuggerData.actions]
+    () => debuggerEvents.actions.map(buildActionEntry),
+    [debuggerEvents.actions]
   )
   const logEntries = useMemo(
-    () => debuggerData.logs.map(buildLogEntry),
-    [debuggerData.logs]
+    () => debuggerEvents.logs.map(buildLogEntry),
+    [debuggerEvents.logs]
   )
   const networkEntries = useMemo(
-    () => debuggerData.networkRequests.map(buildNetworkEntry),
-    [debuggerData.networkRequests]
+    () => networkRequests.map(buildNetworkEntry),
+    [networkRequests]
   )
 
   const allEntries = useMemo(
@@ -102,9 +160,32 @@ export function BugReportView({ id }: BugReportViewProps) {
     videoRef.current.currentTime = entry.offset / 1000
     setPlaybackOffsetMs(entry.offset)
 
-    videoRef.current.play().catch(() => {
-      // Keep the seek interaction resilient if autoplay is blocked.
+    videoRef.current.play().catch((error: unknown) => {
+      reportNonFatalError(
+        "Failed to resume playback after timeline seek interaction",
+        error
+      )
     })
+  }
+
+  const handleLoadMoreNetworkRequests = useCallback(() => {
+    if (!networkRequestsQuery.hasNextPage || networkRequestsQuery.isFetching) {
+      return
+    }
+
+    networkRequestsQuery
+      .fetchNextPage({ cancelRefetch: false })
+      .catch((error: unknown) => {
+        reportNonFatalError("Failed to fetch next network requests page", error)
+      })
+  }, [
+    networkRequestsQuery.fetchNextPage,
+    networkRequestsQuery.hasNextPage,
+    networkRequestsQuery.isFetching,
+  ])
+
+  const handleTabChange = (tab: SidebarTab) => {
+    setActiveTab(tab)
   }
 
   if (isLoading) {
@@ -178,12 +259,21 @@ export function BugReportView({ id }: BugReportViewProps) {
                   actionEntries={actionEntries}
                   activeEntryId={activeEntryId}
                   activeTab={activeTab}
+                  bugReportId={data.id}
                   data={data}
+                  hasMoreNetworkRequests={Boolean(
+                    networkRequestsQuery.hasNextPage
+                  )}
+                  isFetchingMoreNetworkRequests={
+                    networkRequestsQuery.isFetchingNextPage
+                  }
+                  isNetworkRequestsLoading={networkRequestsQuery.isLoading}
                   logEntries={logEntries}
                   networkEntries={networkEntries}
-                  networkRequests={debuggerData.networkRequests}
+                  networkRequests={networkRequests}
                   onEntrySelect={handleEntrySelect}
-                  onTabChange={setActiveTab}
+                  onLoadMoreNetworkRequests={handleLoadMoreNetworkRequests}
+                  onTabChange={handleTabChange}
                 />
               </ResizablePanel>
             </ResizablePanelGroup>
@@ -206,12 +296,19 @@ export function BugReportView({ id }: BugReportViewProps) {
           actionEntries={actionEntries}
           activeEntryId={activeEntryId}
           activeTab={activeTab}
+          bugReportId={data.id}
           data={data}
+          hasMoreNetworkRequests={Boolean(networkRequestsQuery.hasNextPage)}
+          isFetchingMoreNetworkRequests={
+            networkRequestsQuery.isFetchingNextPage
+          }
+          isNetworkRequestsLoading={networkRequestsQuery.isLoading}
           logEntries={logEntries}
           networkEntries={networkEntries}
-          networkRequests={debuggerData.networkRequests}
+          networkRequests={networkRequests}
           onEntrySelect={handleEntrySelect}
-          onTabChange={setActiveTab}
+          onLoadMoreNetworkRequests={handleLoadMoreNetworkRequests}
+          onTabChange={handleTabChange}
         />
       </SheetContent>
     </Sheet>

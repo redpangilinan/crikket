@@ -1,3 +1,4 @@
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { useState } from "react"
 import {
   discardDebuggerSession,
@@ -130,8 +131,11 @@ async function initializeDebuggerSession(
 ): Promise<string> {
   const existingSessionId = await readStoredDebuggerSessionId()
   if (existingSessionId) {
-    await discardDebuggerSession(existingSessionId).catch(() => {
-      // Keep capture flow resilient even if stale debugger cleanup fails.
+    await discardDebuggerSession(existingSessionId).catch((error: unknown) => {
+      reportNonFatalError(
+        `Failed to discard stale debugger session ${existingSessionId}`,
+        error
+      )
     })
   }
 
@@ -229,9 +233,14 @@ async function handleCaptureFailure(input: {
   setRecordingCountdown: (value: number | null) => void
 }): Promise<void> {
   if (input.debuggerSessionId) {
-    await discardDebuggerSession(input.debuggerSessionId).catch(() => {
-      // Ignore debugger cleanup errors during failure handling.
-    })
+    await discardDebuggerSession(input.debuggerSessionId).catch(
+      (error: unknown) => {
+        reportNonFatalError(
+          `Failed to discard debugger session ${input.debuggerSessionId} during capture failure cleanup`,
+          error
+        )
+      }
+    )
   }
 
   await storeDebuggerSessionId(null)

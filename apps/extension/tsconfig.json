@@ -1,8 +1,12 @@
 {
   "extends": "./.wxt/tsconfig.json",
   "compilerOptions": {
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "module": "esnext",
+    "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
+    "noEmit": true,
     "paths": {
       "@/*": ["./*"]
     }

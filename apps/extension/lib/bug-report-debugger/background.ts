@@ -1,3 +1,4 @@
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import {
   BACKGROUND_LISTENER_FLAG,
   DEBUGGER_SESSIONS_STORAGE_KEY,
@@ -40,7 +41,9 @@ export function registerDebuggerBackgroundListeners(): void {
 
     persistTimer = setTimeout(() => {
       persistTimer = null
-      persistSessions().catch(() => undefined)
+      persistSessions().catch((error: unknown) => {
+        reportNonFatalError("Failed to persist debugger sessions", error)
+      })
     }, 250)
   }
 
@@ -189,6 +192,28 @@ export function registerDebuggerBackgroundListeners(): void {
     schedulePersist()
   }
 
+  const reinjectDebuggerScriptIfSessionExists = async (tabId: number) => {
+    await ensureLoaded()
+
+    if (!tabToSession.has(tabId)) {
+      return
+    }
+
+    await injectDebuggerScriptIntoTab(tabId)
+  }
+
+  const discardSessionByTabId = async (tabId: number) => {
+    await ensureLoaded()
+
+    const sessionId = tabToSession.get(tabId)
+    if (!sessionId) {
+      return
+    }
+
+    removeSession(sessionId)
+    schedulePersist()
+  }
+
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!isDebuggerRuntimeMessage(message)) {
       return
@@ -242,6 +267,31 @@ export function registerDebuggerBackgroundListeners(): void {
     handler().catch(onError)
     return true
   })
+
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    const didTabNavigate =
+      changeInfo.status === "loading" || typeof changeInfo.url === "string"
+
+    if (!didTabNavigate) {
+      return
+    }
+
+    reinjectDebuggerScriptIfSessionExists(tabId).catch((error: unknown) => {
+      reportNonFatalError(
+        `Failed to reinject debugger instrumentation after tab update for tab ${tabId}`,
+        error
+      )
+    })
+  })
+
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    discardSessionByTabId(tabId).catch((error: unknown) => {
+      reportNonFatalError(
+        `Failed to discard debugger session for removed tab ${tabId}`,
+        error
+      )
+    })
+  })
 }
 
 function createSessionId(): string {
@@ -269,7 +319,10 @@ async function injectDebuggerScriptIntoTab(tabId: number): Promise<void> {
       world: "MAIN",
       func: injectedDebuggerScript,
     })
-  } catch {
-    // Continue without blocking recording if script injection fails.
+  } catch (error) {
+    reportNonFatalError(
+      `Failed to inject debugger instrumentation script into tab ${tabId}`,
+      error
+    )
   }
 }

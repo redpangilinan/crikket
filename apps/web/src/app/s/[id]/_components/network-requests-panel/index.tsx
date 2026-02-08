@@ -1,14 +1,17 @@
 "use client"
 
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { Input } from "@crikket/ui/components/ui/input"
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@crikket/ui/components/ui/resizable"
+import { useDebounce } from "@crikket/ui/hooks/use-debounce"
 import { cn } from "@crikket/ui/lib/utils"
 import { Search } from "lucide-react"
-import { useMemo, useState } from "react"
+import { parseAsString, useQueryState } from "nuqs"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import { formatOffset } from "../utils"
 import { NetworkRequestDetails } from "./network-request-details"
@@ -21,12 +24,26 @@ const REQUEST_LIST_MIN_HEIGHT = "190px"
 const DETAILS_MIN_HEIGHT = "220px"
 
 export function NetworkRequestsPanel({
+  bugReportId,
   entries,
   requests,
   activeEntryId,
+  isLoading,
+  isFetchingNextPage,
+  hasNextPage,
+  onLoadMore,
   onEntrySelect,
 }: NetworkRequestsPanelProps) {
-  const [searchValue, setSearchValue] = useState("")
+  const [searchParamValue, setSearchParamValue] = useQueryState(
+    "networkSearch",
+    parseAsString
+  )
+  const [searchInputValue, setSearchInputValue] = useState(
+    searchParamValue ?? ""
+  )
+  const debouncedSearchValue = useDebounce(searchInputValue)
+  const listContainerRef = useRef<HTMLDivElement | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
   const requestsById = useMemo(
     () =>
@@ -38,42 +55,87 @@ export function NetworkRequestsPanel({
     [requests]
   )
 
-  const normalizedQuery = searchValue.trim().toLowerCase()
+  const normalizedQuery = (searchParamValue ?? "").trim().toLowerCase()
 
-  const filteredEntries = useMemo(() => {
-    if (!normalizedQuery) {
-      return entries
+  useEffect(() => {
+    const nextInputValue = searchParamValue ?? ""
+    setSearchInputValue((current) =>
+      current === nextInputValue ? current : nextInputValue
+    )
+  }, [searchParamValue])
+
+  useEffect(() => {
+    const normalizedDebouncedValue = debouncedSearchValue.trim()
+    const nextSearchParamValue =
+      normalizedDebouncedValue.length > 0 ? normalizedDebouncedValue : null
+    const normalizedCurrentSearchParam = (searchParamValue ?? "").trim()
+    const currentSearchParamValue =
+      normalizedCurrentSearchParam.length > 0
+        ? normalizedCurrentSearchParam
+        : null
+
+    if (currentSearchParamValue === nextSearchParamValue) {
+      return
     }
 
-    return entries.filter((entry) => {
-      const request = requestsById.get(entry.id)
-      const methodMatches = request?.method
-        .toLowerCase()
-        .includes(normalizedQuery)
-      const urlMatches = request?.url.toLowerCase().includes(normalizedQuery)
-      const statusMatches = String(request?.status ?? "").includes(
-        normalizedQuery
-      )
-      return methodMatches || urlMatches || statusMatches
-    })
-  }, [entries, normalizedQuery, requestsById])
+    setSearchParamValue(nextSearchParamValue, { history: "replace" }).catch(
+      (error: unknown) => {
+        reportNonFatalError(
+          "Failed to sync network search query state from panel input",
+          error
+        )
+      }
+    )
+  }, [debouncedSearchValue, searchParamValue, setSearchParamValue])
 
   const selectedEntry = useMemo(() => {
     if (activeEntryId) {
-      const activeMatch = filteredEntries.find(
-        (entry) => entry.id === activeEntryId
-      )
+      const activeMatch = entries.find((entry) => entry.id === activeEntryId)
       if (activeMatch) {
         return activeMatch
       }
     }
 
-    return filteredEntries[0] ?? null
-  }, [activeEntryId, filteredEntries])
+    return entries[0] ?? null
+  }, [activeEntryId, entries])
 
   const selectedRequest = selectedEntry
     ? requestsById.get(selectedEntry.id)
     : null
+  let emptyStateMessage = "No network requests captured."
+  if (isLoading) {
+    emptyStateMessage = "Loading network requests..."
+  } else if (normalizedQuery) {
+    emptyStateMessage = "No requests matched your search."
+  }
+
+  useEffect(() => {
+    const sentinel = loadMoreRef.current
+    const listContainer = listContainerRef.current
+
+    if (!(sentinel && listContainer && hasNextPage) || isFetchingNextPage) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries
+        if (entry?.isIntersecting) {
+          onLoadMore()
+        }
+      },
+      {
+        root: listContainer,
+        rootMargin: "120px 0px",
+      }
+    )
+
+    observer.observe(sentinel)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [hasNextPage, isFetchingNextPage, onLoadMore])
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -90,9 +152,11 @@ export function NetworkRequestsPanel({
           <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="h-8 pl-7 text-xs"
-            onChange={(event) => setSearchValue(event.target.value)}
+            onChange={(event) => {
+              setSearchInputValue(event.target.value)
+            }}
             placeholder="Filter by method, URL, or status..."
-            value={searchValue}
+            value={searchInputValue}
           />
         </div>
       </div>
@@ -102,18 +166,15 @@ export function NetworkRequestsPanel({
           defaultSize={REQUEST_LIST_DEFAULT_HEIGHT}
           minSize={REQUEST_LIST_MIN_HEIGHT}
         >
-          <div className="h-full overflow-y-auto border-b bg-background">
-            {filteredEntries.length === 0 ? (
-              <EmptyState
-                message={
-                  normalizedQuery
-                    ? "No requests matched your search."
-                    : "No network requests captured."
-                }
-              />
+          <div
+            className="h-full overflow-y-auto border-b bg-background"
+            ref={listContainerRef}
+          >
+            {entries.length === 0 ? (
+              <EmptyState message={emptyStateMessage} />
             ) : (
               <div className="divide-y">
-                {filteredEntries.map((entry) => {
+                {entries.map((entry) => {
                   const request = requestsById.get(entry.id)
                   const status = request?.status ?? null
                   const duration = request?.duration ?? null
@@ -167,6 +228,18 @@ export function NetworkRequestsPanel({
                     </button>
                   )
                 })}
+                {(hasNextPage || isFetchingNextPage) && (
+                  <div className="flex justify-center border-t p-3">
+                    <div className="w-full">
+                      <div className="h-2 w-full" ref={loadMoreRef} />
+                      <p className="text-center font-mono text-[10px] text-muted-foreground">
+                        {isFetchingNextPage
+                          ? "Loading more requests..."
+                          : "Scroll for more requests"}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -176,6 +249,7 @@ export function NetworkRequestsPanel({
         <ResizablePanel minSize={DETAILS_MIN_HEIGHT}>
           <div className="h-full overflow-y-auto bg-muted/20 p-3">
             <NetworkRequestDetails
+              bugReportId={bugReportId}
               key={selectedEntry?.id ?? "empty"}
               request={selectedRequest ?? null}
             />

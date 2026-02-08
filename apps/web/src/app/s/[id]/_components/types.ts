@@ -3,9 +3,16 @@ export type SharedBugReport = Awaited<
   ReturnType<OrpcClient["bugReport"]["getById"]>
 >
 
-export type SharedBugReportDebugger = NonNullable<SharedBugReport["debugger"]>
-export type DebuggerNetworkRequest =
-  SharedBugReportDebugger["networkRequests"][number]
+export type SharedBugReportDebuggerEvents = Awaited<
+  ReturnType<OrpcClient["bugReport"]["getDebuggerEvents"]>
+>
+export type DebuggerAction = SharedBugReportDebuggerEvents["actions"][number]
+export type DebuggerLog = SharedBugReportDebuggerEvents["logs"][number]
+
+export type SharedNetworkRequestsPage = Awaited<
+  ReturnType<OrpcClient["bugReport"]["getNetworkRequests"]>
+>
+export type DebuggerNetworkRequest = SharedNetworkRequestsPage["items"][number]
 
 export type DebuggerTimelineKind = "action" | "log" | "network"
 

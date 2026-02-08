@@ -1,5 +1,6 @@
 "use client"
 
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { ConfirmationDialog } from "@crikket/ui/components/dialogs/confirmation-dialog"
 import {
   Avatar,
@@ -32,7 +33,6 @@ import Image from "next/image"
 import Link from "next/link"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { toast } from "sonner"
-
 import { SelectionActionBar } from "@/components/selection-action-bar"
 import { client, orpc } from "@/utils/orpc"
 
@@ -165,7 +165,8 @@ export function BugReportsList() {
     try {
       await navigator.clipboard.writeText(shareUrl)
       toast.success("Share link copied")
-    } catch {
+    } catch (error) {
+      reportNonFatalError("Failed to copy bug report share link", error)
       toast.error("Failed to copy link")
     }
   }

@@ -7,6 +7,9 @@ export {
   deleteBugReport,
   deleteBugReportsBulk,
   getBugReportById,
+  getBugReportDebuggerEvents,
+  getBugReportNetworkRequestPayload,
+  getBugReportNetworkRequests,
   listBugReports,
   updateBugReportVisibility,
 } from "./procedures"

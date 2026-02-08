@@ -1,8 +1,12 @@
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { cn } from "@crikket/ui/lib/utils"
+import { useQuery } from "@tanstack/react-query"
+import { parseAsStringLiteral, useQueryState } from "nuqs"
 import { useState } from "react"
+import { orpc } from "@/utils/orpc"
 
 import { EmptyState, KeyValueSection, PayloadSection } from "./panel-sections"
-import type { DetailSection, NetworkRequestDetailsProps } from "./types"
+import type { NetworkRequestDetailsProps } from "./types"
 import {
   asKeyValueItems,
   DETAIL_SECTIONS,
@@ -13,9 +17,31 @@ import {
   statusTone,
 } from "./utils"
 
-export function NetworkRequestDetails({ request }: NetworkRequestDetailsProps) {
-  const [activeSection, setActiveSection] = useState<DetailSection>("overview")
+const DETAIL_SECTION_VALUES = ["overview", "request", "response"] as const
+
+export function NetworkRequestDetails({
+  bugReportId,
+  request,
+}: NetworkRequestDetailsProps) {
+  const [activeSection, setActiveSection] = useQueryState(
+    "networkSection",
+    parseAsStringLiteral(DETAIL_SECTION_VALUES).withDefault("overview")
+  )
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const shouldLoadPayload =
+    Boolean(request) &&
+    (activeSection === "request" || activeSection === "response")
+
+  const payloadQuery = useQuery(
+    orpc.bugReport.getNetworkRequestPayload.queryOptions({
+      input: {
+        id: bugReportId,
+        requestId: request?.id ?? "__pending_request__",
+      },
+      enabled: shouldLoadPayload,
+      staleTime: Number.POSITIVE_INFINITY,
+    })
+  )
 
   if (!request) {
     return (
@@ -23,13 +49,15 @@ export function NetworkRequestDetails({ request }: NetworkRequestDetailsProps) {
     )
   }
 
+  const requestBodyValue = payloadQuery.data?.requestBody ?? null
+  const responseBodyValue = payloadQuery.data?.responseBody ?? null
   const parsedUrl = safeParseUrl(request.url)
   const queryParams = getQueryParams(request.url)
   const requestHeaders = asKeyValueItems(request.requestHeaders)
   const responseHeaders = asKeyValueItems(request.responseHeaders)
-  const requestBodyPreview = formatBody(request.requestBody)
-  const responseBodyPreview = formatBody(request.responseBody)
-  const bodyParams = getBodyParams(request.requestBody)
+  const requestBodyPreview = formatBody(requestBodyValue)
+  const responseBodyPreview = formatBody(responseBodyValue)
+  const bodyParams = getBodyParams(requestBodyValue)
   const pathLabel = parsedUrl
     ? `${parsedUrl.pathname}${parsedUrl.search}`
     : request.url
@@ -46,8 +74,11 @@ export function NetworkRequestDetails({ request }: NetworkRequestDetailsProps) {
       window.setTimeout(() => {
         setCopiedKey((current) => (current === key ? null : current))
       }, 1400)
-    } catch {
-      // Ignore clipboard errors to keep the inspector interactive.
+    } catch (error) {
+      reportNonFatalError(
+        "Failed to copy network request details value to clipboard",
+        error
+      )
     }
   }
 
@@ -96,7 +127,9 @@ export function NetworkRequestDetails({ request }: NetworkRequestDetailsProps) {
                 : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
             )}
             key={section.id}
-            onClick={() => setActiveSection(section.id)}
+            onClick={() => {
+              setActiveSection(section.id)
+            }}
             type="button"
           >
             {section.label}
@@ -127,12 +160,22 @@ export function NetworkRequestDetails({ request }: NetworkRequestDetailsProps) {
       {activeSection === "request" && (
         <div className="space-y-3">
           <KeyValueSection
-            emptyMessage="No structured params detected in request body."
+            emptyMessage={
+              payloadQuery.isLoading
+                ? "Loading request body..."
+                : "No structured params detected in request body."
+            }
             items={bodyParams}
             title="Body Params"
           />
           <PayloadSection
             copied={copiedKey === "request-body"}
+            emptyMessage={
+              payloadQuery.isError
+                ? "Could not load request body."
+                : "No payload captured."
+            }
+            isLoading={payloadQuery.isLoading}
             onCopy={() => onCopy("request-body", requestBodyPreview?.raw)}
             payload={requestBodyPreview}
             title="Request Body"
@@ -149,6 +192,12 @@ export function NetworkRequestDetails({ request }: NetworkRequestDetailsProps) {
         <div className="space-y-3">
           <PayloadSection
             copied={copiedKey === "response-body"}
+            emptyMessage={
+              payloadQuery.isError
+                ? "Could not load response body."
+                : "No payload captured."
+            }
+            isLoading={payloadQuery.isLoading}
             onCopy={() => onCopy("response-body", responseBodyPreview?.raw)}
             payload={responseBodyPreview}
             title="Response Body"

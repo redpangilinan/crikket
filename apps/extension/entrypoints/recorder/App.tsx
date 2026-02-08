@@ -1,5 +1,6 @@
 import { env } from "@crikket/env/extension"
 import type { Priority } from "@crikket/shared/constants/priorities"
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import {
   Card,
   CardContent,
@@ -57,8 +58,11 @@ function App() {
   const clearDebuggerState = useCallback(async () => {
     const sessionId = await readStoredDebuggerSessionId()
     if (sessionId) {
-      await discardDebuggerSession(sessionId).catch(() => {
-        // Keep reset flow resilient even if debugger cleanup fails.
+      await discardDebuggerSession(sessionId).catch((error: unknown) => {
+        reportNonFatalError(
+          "Failed to discard debugger session during reset",
+          error
+        )
       })
     }
 
@@ -75,7 +79,13 @@ function App() {
     }
 
     const snapshot = await getDebuggerSessionSnapshot(sessionId).catch(
-      () => null
+      (error: unknown) => {
+        reportNonFatalError(
+          `Failed to load debugger snapshot for session ${sessionId}`,
+          error
+        )
+        return null
+      }
     )
     if (!snapshot) {
       return {
@@ -111,8 +121,11 @@ function App() {
         await markDebuggerRecordingStarted({
           sessionId,
           recordingStartedAt: startedAt,
-        }).catch(() => {
-          // Continue recording even if debugger anchor sync fails.
+        }).catch((error: unknown) => {
+          reportNonFatalError(
+            `Failed to mark debugger recording start for session ${sessionId}`,
+            error
+          )
         })
       }
 
@@ -155,7 +168,9 @@ function App() {
     setResultUrl("")
     setSubmitError(null)
     setStartTime(null)
-    clearDebuggerState().catch(() => undefined)
+    clearDebuggerState().catch((error: unknown) => {
+      reportNonFatalError("Failed to clear debugger state after reset", error)
+    })
   }
 
   const handleSubmit = async (values: {
@@ -191,9 +206,14 @@ function App() {
       })
 
       if (debuggerSubmission.sessionId) {
-        await discardDebuggerSession(debuggerSubmission.sessionId).catch(() => {
-          // Ignore cleanup failure after successful submission.
-        })
+        await discardDebuggerSession(debuggerSubmission.sessionId).catch(
+          (error: unknown) => {
+            reportNonFatalError(
+              `Failed to discard debugger session ${debuggerSubmission.sessionId} after submission`,
+              error
+            )
+          }
+        )
       }
       await storeDebuggerSessionId(null)
 

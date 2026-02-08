@@ -3,6 +3,8 @@ export function injectedDebuggerScript() {
   const INSTALL_FLAG = "__crikketDebuggerPageScriptInstalled"
   const MAX_TEXT_LENGTH = 2000
   const MAX_BODY_LENGTH = 4000
+  const originalConsoleWarn = console.warn.bind(console)
+  const reportedContexts = new Set<string>()
 
   const scope = window as Window & {
     [INSTALL_FLAG]?: boolean
@@ -13,6 +15,15 @@ export function injectedDebuggerScript() {
   }
 
   scope[INSTALL_FLAG] = true
+
+  const reportNonFatalError = (context: string, error: unknown) => {
+    if (reportedContexts.has(context)) {
+      return
+    }
+
+    reportedContexts.add(context)
+    originalConsoleWarn(`[Non-fatal] ${context}`, error)
+  }
 
   const toRecord = (
     input: Headers | null | undefined
@@ -54,7 +65,11 @@ export function injectedDebuggerScript() {
 
     try {
       return truncate(JSON.stringify(value))
-    } catch {
+    } catch (error) {
+      reportNonFatalError(
+        "Failed to stringify console value in debugger instrumentation",
+        error
+      )
       return truncate(Object.prototype.toString.call(value))
     }
   }
@@ -168,7 +183,14 @@ export function injectedDebuggerScript() {
   const toAbsoluteUrl = (value: string): string | null => {
     try {
       return new URL(value, location.href).toString()
-    } catch {
+    } catch (error) {
+      reportNonFatalError(
+        "Failed to normalize network URL in debugger instrumentation",
+        {
+          error,
+          value,
+        }
+      )
       return null
     }
   }
@@ -285,8 +307,11 @@ export function injectedDebuggerScript() {
     console[level] = (...args: unknown[]) => {
       try {
         postConsole(level, args)
-      } catch {
-        // Keep console behavior stable.
+      } catch (error) {
+        reportNonFatalError(
+          "Failed to post console event in debugger instrumentation",
+          error
+        )
       }
 
       original(...args)
@@ -340,7 +365,11 @@ export function injectedDebuggerScript() {
             MAX_BODY_LENGTH
           )
         }
-      } catch {
+      } catch (error) {
+        reportNonFatalError(
+          "Failed to capture fetch response body in debugger instrumentation",
+          error
+        )
         responseBody = undefined
       }
 
@@ -481,7 +510,11 @@ export function injectedDebuggerScript() {
           if (this.responseType === "" || this.responseType === "text") {
             responseBody = truncate(this.responseText || "", MAX_BODY_LENGTH)
           }
-        } catch {
+        } catch (error) {
+          reportNonFatalError(
+            "Failed to capture XHR response body in debugger instrumentation",
+            error
+          )
           responseBody = undefined
         }
 

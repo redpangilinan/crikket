@@ -15,6 +15,8 @@ interface PayloadSectionProps {
   payload: BodyPreview | null
   onCopy: () => void
   copied: boolean
+  emptyMessage?: string
+  isLoading?: boolean
 }
 
 export function KeyValueSection({
@@ -61,6 +63,8 @@ export function PayloadSection({
   payload,
   onCopy,
   copied,
+  emptyMessage = "No payload captured.",
+  isLoading = false,
 }: PayloadSectionProps) {
   return (
     <section className="space-y-1.5 rounded-lg border bg-background p-2">
@@ -82,13 +86,17 @@ export function PayloadSection({
         </Button>
       </div>
       <Separator />
-      {payload ? (
+      {isLoading ? (
+        <p className="py-3 text-center font-mono text-[11px] text-muted-foreground">
+          Loading payload...
+        </p>
+      ) : payload ? (
         <pre className="max-h-64 overflow-auto rounded border bg-muted/30 p-2 font-mono text-[11px] text-foreground leading-relaxed">
           {payload.formatted}
         </pre>
       ) : (
         <p className="py-3 text-center font-mono text-[11px] text-muted-foreground">
-          No payload captured.
+          {emptyMessage}
         </p>
       )}
     </section>

@@ -1,6 +1,10 @@
 import { mkdir, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { env } from "@crikket/env/server"
+import {
+  isErrorWithCode,
+  reportNonFatalError,
+} from "@crikket/shared/lib/errors"
 import { S3Client } from "bun"
 
 /**
@@ -67,8 +71,15 @@ export function createLocalStorageProvider(
       const filePath = path.join(basePath, filename)
       try {
         await rm(filePath, { force: true })
-      } catch {
-        // no-op: deleting a report should still succeed even if file is already missing
+      } catch (error) {
+        if (isErrorWithCode(error, "ENOENT")) {
+          return
+        }
+
+        reportNonFatalError(
+          `Failed to remove local bug report attachment at ${filePath}`,
+          error
+        )
       }
     },
   }
@@ -126,8 +137,11 @@ export function createS3StorageProvider(
     async remove(filename: string): Promise<void> {
       try {
         await client.delete(filename)
-      } catch {
-        // no-op: keep report deletion resilient if object is missing or already removed
+      } catch (error) {
+        reportNonFatalError(
+          `Failed to delete cloud attachment ${filename} from bucket ${options.bucket}`,
+          error
+        )
       }
     },
   }
@@ -194,7 +208,12 @@ export function extractStorageKeyFromUrl(
 
     const key = normalizedUrl.pathname.slice(normalizedTarget.pathname.length)
     return key.length > 0 ? decodeURIComponent(key) : null
-  } catch {
+  } catch (error) {
+    reportNonFatalError(
+      "Failed to extract storage key from attachment URL",
+      { error, url },
+      { once: true }
+    )
     return null
   }
 }
