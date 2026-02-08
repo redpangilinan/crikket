@@ -192,6 +192,28 @@ export function registerDebuggerBackgroundListeners(): void {
     schedulePersist()
   }
 
+  const reinjectDebuggerScriptIfSessionExists = async (tabId: number) => {
+    await ensureLoaded()
+
+    if (!tabToSession.has(tabId)) {
+      return
+    }
+
+    await injectDebuggerScriptIntoTab(tabId)
+  }
+
+  const discardSessionByTabId = async (tabId: number) => {
+    await ensureLoaded()
+
+    const sessionId = tabToSession.get(tabId)
+    if (!sessionId) {
+      return
+    }
+
+    removeSession(sessionId)
+    schedulePersist()
+  }
+
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (!isDebuggerRuntimeMessage(message)) {
       return
@@ -244,6 +266,31 @@ export function registerDebuggerBackgroundListeners(): void {
 
     handler().catch(onError)
     return true
+  })
+
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+    const didTabNavigate =
+      changeInfo.status === "loading" || typeof changeInfo.url === "string"
+
+    if (!didTabNavigate) {
+      return
+    }
+
+    reinjectDebuggerScriptIfSessionExists(tabId).catch((error: unknown) => {
+      reportNonFatalError(
+        `Failed to reinject debugger instrumentation after tab update for tab ${tabId}`,
+        error
+      )
+    })
+  })
+
+  chrome.tabs.onRemoved.addListener((tabId) => {
+    discardSessionByTabId(tabId).catch((error: unknown) => {
+      reportNonFatalError(
+        `Failed to discard debugger session for removed tab ${tabId}`,
+        error
+      )
+    })
   })
 }
 
