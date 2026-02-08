@@ -4,7 +4,7 @@ import {
   bugReportLog,
   bugReportNetworkRequest,
 } from "@crikket/db/schema/bug-report"
-import { asc, eq } from "drizzle-orm"
+import { and, asc, count, eq } from "drizzle-orm"
 import { nanoid } from "nanoid"
 import { z } from "zod"
 
@@ -82,7 +82,7 @@ export type BugReportDebuggerInput = z.infer<
   typeof bugReportDebuggerInputSchema
 >
 
-export interface BugReportDebuggerData {
+export interface BugReportDebuggerEventsData {
   actions: Array<{
     id: string
     type: string
@@ -99,19 +99,113 @@ export interface BugReportDebuggerData {
     offset: number | null
     metadata: Record<string, unknown> | null
   }>
-  networkRequests: Array<{
-    id: string
-    method: string
-    url: string
-    status: number | null
-    duration: number | null
-    requestHeaders: Record<string, string> | null
-    responseHeaders: Record<string, string> | null
-    requestBody: string | null
-    responseBody: string | null
-    timestamp: string
-    offset: number | null
-  }>
+}
+
+export interface BugReportNetworkRequestListItem {
+  id: string
+  method: string
+  url: string
+  status: number | null
+  duration: number | null
+  requestHeaders: Record<string, string> | null
+  responseHeaders: Record<string, string> | null
+  timestamp: string
+  offset: number | null
+}
+
+export interface BugReportNetworkRequestPayload {
+  requestBody: string | null
+  responseBody: string | null
+}
+
+export interface BugReportNetworkRequestsPageInput {
+  bugReportId: string
+  limit: number
+  offset: number
+}
+
+export interface BugReportNetworkRequestPayloadInput {
+  bugReportId: string
+  requestId: string
+}
+
+export async function countBugReportNetworkRequests(
+  bugReportId: string
+): Promise<number> {
+  const result = await db
+    .select({ value: count() })
+    .from(bugReportNetworkRequest)
+    .where(eq(bugReportNetworkRequest.bugReportId, bugReportId))
+
+  return result[0]?.value ?? 0
+}
+
+export async function getBugReportNetworkRequestsPage({
+  bugReportId,
+  limit,
+  offset,
+}: BugReportNetworkRequestsPageInput): Promise<
+  BugReportNetworkRequestListItem[]
+> {
+  const networkRequests = await db
+    .select({
+      id: bugReportNetworkRequest.id,
+      method: bugReportNetworkRequest.method,
+      url: bugReportNetworkRequest.url,
+      status: bugReportNetworkRequest.status,
+      duration: bugReportNetworkRequest.duration,
+      requestHeaders: bugReportNetworkRequest.requestHeaders,
+      responseHeaders: bugReportNetworkRequest.responseHeaders,
+      timestamp: bugReportNetworkRequest.timestamp,
+      offset: bugReportNetworkRequest.offset,
+    })
+    .from(bugReportNetworkRequest)
+    .where(eq(bugReportNetworkRequest.bugReportId, bugReportId))
+    .orderBy(asc(bugReportNetworkRequest.timestamp))
+    .limit(limit)
+    .offset(offset)
+
+  return networkRequests.map((request): BugReportNetworkRequestListItem => {
+    return {
+      id: request.id,
+      method: request.method,
+      url: request.url,
+      status: request.status,
+      duration: request.duration,
+      requestHeaders: asStringRecord(request.requestHeaders),
+      responseHeaders: asStringRecord(request.responseHeaders),
+      timestamp: request.timestamp.toISOString(),
+      offset: request.offset,
+    }
+  })
+}
+
+export async function getBugReportNetworkRequestPayload({
+  bugReportId,
+  requestId,
+}: BugReportNetworkRequestPayloadInput): Promise<BugReportNetworkRequestPayload | null> {
+  const [request] = await db
+    .select({
+      requestBody: bugReportNetworkRequest.requestBody,
+      responseBody: bugReportNetworkRequest.responseBody,
+    })
+    .from(bugReportNetworkRequest)
+    .where(
+      and(
+        eq(bugReportNetworkRequest.bugReportId, bugReportId),
+        eq(bugReportNetworkRequest.id, requestId)
+      )
+    )
+    .limit(1)
+
+  if (!request) {
+    return null
+  }
+
+  return {
+    requestBody: request.requestBody,
+    responseBody: request.responseBody,
+  }
 }
 
 export async function persistBugReportDebuggerData(
@@ -177,10 +271,10 @@ export async function persistBugReportDebuggerData(
   }
 }
 
-export async function getBugReportDebuggerData(
+export async function getBugReportDebuggerEventsData(
   bugReportId: string
-): Promise<BugReportDebuggerData> {
-  const [actions, logs, networkRequests] = await Promise.all([
+): Promise<BugReportDebuggerEventsData> {
+  const [actions, logs] = await Promise.all([
     db
       .select({
         id: bugReportAction.id,
@@ -205,23 +299,6 @@ export async function getBugReportDebuggerData(
       .from(bugReportLog)
       .where(eq(bugReportLog.bugReportId, bugReportId))
       .orderBy(asc(bugReportLog.timestamp)),
-    db
-      .select({
-        id: bugReportNetworkRequest.id,
-        method: bugReportNetworkRequest.method,
-        url: bugReportNetworkRequest.url,
-        status: bugReportNetworkRequest.status,
-        duration: bugReportNetworkRequest.duration,
-        requestHeaders: bugReportNetworkRequest.requestHeaders,
-        responseHeaders: bugReportNetworkRequest.responseHeaders,
-        requestBody: bugReportNetworkRequest.requestBody,
-        responseBody: bugReportNetworkRequest.responseBody,
-        timestamp: bugReportNetworkRequest.timestamp,
-        offset: bugReportNetworkRequest.offset,
-      })
-      .from(bugReportNetworkRequest)
-      .where(eq(bugReportNetworkRequest.bugReportId, bugReportId))
-      .orderBy(asc(bugReportNetworkRequest.timestamp)),
   ])
 
   return {
@@ -240,19 +317,6 @@ export async function getBugReportDebuggerData(
       timestamp: log.timestamp.toISOString(),
       offset: log.offset,
       metadata: asUnknownRecord(log.metadata),
-    })),
-    networkRequests: networkRequests.map((request) => ({
-      id: request.id,
-      method: request.method,
-      url: request.url,
-      status: request.status,
-      duration: request.duration,
-      requestHeaders: asStringRecord(request.requestHeaders),
-      responseHeaders: asStringRecord(request.responseHeaders),
-      requestBody: request.requestBody,
-      responseBody: request.responseBody,
-      timestamp: request.timestamp.toISOString(),
-      offset: request.offset,
     })),
   }
 }

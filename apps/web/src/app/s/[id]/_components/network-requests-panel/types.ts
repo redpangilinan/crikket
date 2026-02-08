@@ -14,12 +14,18 @@ export interface KeyValueItem {
 }
 
 export interface NetworkRequestsPanelProps {
+  bugReportId: string
   entries: DebuggerTimelineEntry[]
   requests: DebuggerNetworkRequest[]
   activeEntryId: string | null
+  isLoading: boolean
+  isFetchingNextPage: boolean
+  hasNextPage: boolean
+  onLoadMore: () => void
   onEntrySelect: (entry: DebuggerTimelineEntry) => void
 }
 
 export interface NetworkRequestDetailsProps {
+  bugReportId: string
   request: DebuggerNetworkRequest | null
 }

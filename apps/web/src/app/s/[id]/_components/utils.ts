@@ -1,31 +1,12 @@
-import type { DebuggerTimelineEntry, SharedBugReportDebugger } from "./types"
-
-const EMPTY_DEBUGGER_DATA: SharedBugReportDebugger = {
-  actions: [],
-  logs: [],
-  networkRequests: [],
-}
-
-export function normalizeDebuggerData(value: unknown): SharedBugReportDebugger {
-  if (!isRecord(value)) {
-    return EMPTY_DEBUGGER_DATA
-  }
-
-  return {
-    actions: Array.isArray(value.actions)
-      ? value.actions.map(normalizeAction).filter(isDefined)
-      : [],
-    logs: Array.isArray(value.logs)
-      ? value.logs.map(normalizeLog).filter(isDefined)
-      : [],
-    networkRequests: Array.isArray(value.networkRequests)
-      ? value.networkRequests.map(normalizeNetworkRequest).filter(isDefined)
-      : [],
-  }
-}
+import type {
+  DebuggerAction,
+  DebuggerLog,
+  DebuggerNetworkRequest,
+  DebuggerTimelineEntry,
+} from "./types"
 
 export function buildActionEntry(
-  action: SharedBugReportDebugger["actions"][number]
+  action: DebuggerAction
 ): DebuggerTimelineEntry {
   const detailBits = [
     action.target ?? "unknown target",
@@ -42,9 +23,7 @@ export function buildActionEntry(
   }
 }
 
-export function buildLogEntry(
-  log: SharedBugReportDebugger["logs"][number]
-): DebuggerTimelineEntry {
+export function buildLogEntry(log: DebuggerLog): DebuggerTimelineEntry {
   return {
     id: log.id,
     kind: "log",
@@ -56,7 +35,7 @@ export function buildLogEntry(
 }
 
 export function buildNetworkEntry(
-  request: SharedBugReportDebugger["networkRequests"][number]
+  request: DebuggerNetworkRequest
 ): DebuggerTimelineEntry {
   const parsedUrl = safeParseUrl(request.url)
   const path = parsedUrl
@@ -118,82 +97,6 @@ export function formatEventTimeLabel(entry: DebuggerTimelineEntry): string {
   return `${offsetLabel} • ${absoluteTime}`
 }
 
-function normalizeAction(
-  value: unknown
-): SharedBugReportDebugger["actions"][number] | null {
-  if (!isRecord(value)) return null
-
-  const id = asString(value.id)
-  const type = asString(value.type)
-  const timestamp = asString(value.timestamp)
-
-  if (!(id && type && timestamp)) {
-    return null
-  }
-
-  return {
-    id,
-    type,
-    target: asNullableString(value.target),
-    timestamp,
-    offset: asNullableNumber(value.offset),
-    metadata: asUnknownRecord(value.metadata),
-  }
-}
-
-function normalizeLog(
-  value: unknown
-): SharedBugReportDebugger["logs"][number] | null {
-  if (!isRecord(value)) return null
-
-  const id = asString(value.id)
-  const level = asString(value.level)
-  const message = asString(value.message)
-  const timestamp = asString(value.timestamp)
-
-  if (!(id && level && message && timestamp)) {
-    return null
-  }
-
-  return {
-    id,
-    level,
-    message,
-    timestamp,
-    offset: asNullableNumber(value.offset),
-    metadata: asUnknownRecord(value.metadata),
-  }
-}
-
-function normalizeNetworkRequest(
-  value: unknown
-): SharedBugReportDebugger["networkRequests"][number] | null {
-  if (!isRecord(value)) return null
-
-  const id = asString(value.id)
-  const method = asString(value.method)
-  const url = asString(value.url)
-  const timestamp = asString(value.timestamp)
-
-  if (!(id && method && url && timestamp)) {
-    return null
-  }
-
-  return {
-    id,
-    method,
-    url,
-    status: asNullableNumber(value.status),
-    duration: asNullableNumber(value.duration),
-    requestHeaders: asStringRecord(value.requestHeaders),
-    responseHeaders: asStringRecord(value.responseHeaders),
-    requestBody: asNullableString(value.requestBody),
-    responseBody: asNullableString(value.responseBody),
-    timestamp,
-    offset: asNullableNumber(value.offset),
-  }
-}
-
 export function formatOffset(offsetMs: number): string {
   const safeOffset = Math.max(0, Math.floor(offsetMs))
   const totalSeconds = Math.floor(safeOffset / 1000)
@@ -214,44 +117,4 @@ function safeParseUrl(value: string): URL | null {
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null
-}
-
-function asNullableString(value: unknown): string | null {
-  return typeof value === "string" ? value : null
-}
-
-function asNullableNumber(value: unknown): number | null {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return null
-  }
-
-  return Math.floor(value)
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value)
-}
-
-function asUnknownRecord(value: unknown): Record<string, unknown> | null {
-  return isRecord(value) ? value : null
-}
-
-function asStringRecord(value: unknown): Record<string, string> | null {
-  if (!isRecord(value)) {
-    return null
-  }
-
-  const result: Record<string, string> = {}
-
-  for (const [key, entryValue] of Object.entries(value)) {
-    if (typeof entryValue === "string") {
-      result[key] = entryValue
-    }
-  }
-
-  return Object.keys(result).length > 0 ? result : null
-}
-
-function isDefined<TValue>(value: TValue | null): value is TValue {
-  return value !== null
 }

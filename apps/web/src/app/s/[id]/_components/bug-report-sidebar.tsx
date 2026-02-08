@@ -15,6 +15,7 @@ import type {
 export type SidebarTab = "details" | "console" | "network" | "actions"
 
 interface BugReportSidebarProps {
+  bugReportId: string
   data: SharedBugReport
   activeTab: SidebarTab
   onTabChange: (tab: SidebarTab) => void
@@ -22,11 +23,16 @@ interface BugReportSidebarProps {
   logEntries: DebuggerTimelineEntry[]
   networkEntries: DebuggerTimelineEntry[]
   networkRequests: DebuggerNetworkRequest[]
+  isNetworkRequestsLoading: boolean
+  isFetchingMoreNetworkRequests: boolean
+  hasMoreNetworkRequests: boolean
+  onLoadMoreNetworkRequests: () => void
   activeEntryId: string | null
   onEntrySelect: (entry: DebuggerTimelineEntry) => void
 }
 
 export function BugReportSidebar({
+  bugReportId,
   data,
   activeTab,
   onTabChange,
@@ -34,6 +40,10 @@ export function BugReportSidebar({
   logEntries,
   networkEntries,
   networkRequests,
+  isNetworkRequestsLoading,
+  isFetchingMoreNetworkRequests,
+  hasMoreNetworkRequests,
+  onLoadMoreNetworkRequests,
   activeEntryId,
   onEntrySelect,
 }: BugReportSidebarProps) {
@@ -132,8 +142,13 @@ export function BugReportSidebar({
         {activeTab === "network" && (
           <NetworkRequestsPanel
             activeEntryId={activeEntryId}
+            bugReportId={bugReportId}
             entries={networkEntries}
+            hasNextPage={hasMoreNetworkRequests}
+            isFetchingNextPage={isFetchingMoreNetworkRequests}
+            isLoading={isNetworkRequestsLoading}
             onEntrySelect={onEntrySelect}
+            onLoadMore={onLoadMoreNetworkRequests}
             requests={networkRequests}
           />
         )}

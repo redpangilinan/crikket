@@ -1,4 +1,3 @@
-import type { auth } from "@crikket/auth"
 import { db } from "@crikket/db"
 import { bugReport } from "@crikket/db/schema/bug-report"
 import {
@@ -14,7 +13,10 @@ import { z } from "zod"
 
 import {
   bugReportDebuggerInputSchema,
-  getBugReportDebuggerData,
+  countBugReportNetworkRequests,
+  getBugReportDebuggerEventsData,
+  getBugReportNetworkRequestPayload as getBugReportNetworkRequestPayloadData,
+  getBugReportNetworkRequestsPage,
   persistBugReportDebuggerData,
 } from "./debugger"
 import {
@@ -22,8 +24,22 @@ import {
   generateFilename,
   getStorageProvider,
 } from "./storage"
-
-type SessionContext = typeof auth.$Infer.Session
+import {
+  assertBugReportAccessById,
+  assertVisibilityAccess,
+  bugReportIdInputSchema,
+  buildFallbackTitle,
+  debuggerNetworkRequestPayloadInputSchema,
+  debuggerNetworkRequestsInputSchema,
+  formatDurationMs,
+  isAttachmentType,
+  isVisibility,
+  metadataInputSchema,
+  normalizeDebuggerNetworkRequestPagination,
+  optionalText,
+  type SessionContext,
+  visibilityValues,
+} from "./utils"
 
 const o = os.$context<{ session?: SessionContext }>()
 
@@ -54,49 +70,6 @@ export interface BugReportListItem {
   visibility: "public" | "private"
   createdAt: string
 }
-
-const attachmentTypes = ["video", "screenshot"] as const
-const visibilityValues = ["public", "private"] as const
-
-function isAttachmentType(
-  value: unknown
-): value is (typeof attachmentTypes)[number] {
-  return (
-    typeof value === "string" &&
-    (attachmentTypes as readonly string[]).includes(value)
-  )
-}
-
-function isVisibility(
-  value: unknown
-): value is (typeof visibilityValues)[number] {
-  return (
-    typeof value === "string" &&
-    (visibilityValues as readonly string[]).includes(value)
-  )
-}
-
-const optionalText = (max: number) =>
-  z
-    .string()
-    .max(max)
-    .transform((value) => value.trim())
-    .optional()
-    .transform((value) => (value && value.length > 0 ? value : undefined))
-
-const metadataInputSchema = z
-  .object({
-    duration: z.string().max(20).optional(),
-    durationMs: z
-      .number()
-      .int()
-      .nonnegative()
-      .max(24 * 60 * 60 * 1000)
-      .optional(),
-    thumbnailUrl: z.string().url().optional(),
-    pageTitle: z.string().max(300).optional(),
-  })
-  .optional()
 
 /**
  * List bug reports for the current organization (paginated)
@@ -266,27 +239,11 @@ export const createBugReport = protectedProcedure
     }
   })
 
-function buildFallbackTitle(attachmentType: "video" | "screenshot"): string {
-  const now = new Date()
-  const label =
-    attachmentType === "video" ? "Video Bug Report" : "Screenshot Bug Report"
-  const timestamp = now.toISOString().replace("T", " ").slice(0, 16)
-  return `${label} - ${timestamp}`
-}
-
-function formatDurationMs(durationMs: number): string {
-  const safeDurationMs = Math.max(0, Math.floor(durationMs))
-  const totalSeconds = Math.floor(safeDurationMs / 1000)
-  const minutes = Math.floor(totalSeconds / 60)
-  const seconds = totalSeconds % 60
-  return `${minutes}:${seconds.toString().padStart(2, "0")}`
-}
-
 /**
  * Get a bug report by ID (public access for shared links)
  */
 export const getBugReportById = o
-  .input(z.object({ id: z.string() }))
+  .input(bugReportIdInputSchema)
   .handler(async ({ context, input }) => {
     const report = await db.query.bugReport.findFirst({
       where: eq(bugReport.id, input.id),
@@ -300,20 +257,11 @@ export const getBugReportById = o
       throw new ORPCError("NOT_FOUND", { message: "Bug report not found" })
     }
 
-    const visibility = isVisibility(report.visibility)
-      ? report.visibility
-      : "private"
-    const activeOrgId = context.session?.session.activeOrganizationId
-    const canAccessPrivate =
-      Boolean(context.session?.user) &&
-      Boolean(activeOrgId) &&
-      activeOrgId === report.organizationId
-
-    if (visibility !== "public" && !canAccessPrivate) {
-      throw new ORPCError("NOT_FOUND", { message: "Bug report not found" })
-    }
-
-    const debuggerData = await getBugReportDebuggerData(report.id)
+    const visibility = assertVisibilityAccess({
+      organizationId: report.organizationId,
+      session: context.session,
+      visibility: report.visibility,
+    })
 
     return {
       id: report.id,
@@ -339,8 +287,76 @@ export const getBugReportById = o
         name: report.organization.name,
         logo: report.organization.logo,
       },
-      debugger: debuggerData,
     }
+  })
+
+/**
+ * Get debugger actions/logs separately from core report metadata.
+ */
+export const getBugReportDebuggerEvents = o
+  .input(bugReportIdInputSchema)
+  .handler(async ({ context, input }) => {
+    await assertBugReportAccessById({
+      id: input.id,
+      session: context.session,
+    })
+
+    return getBugReportDebuggerEventsData(input.id)
+  })
+
+/**
+ * Get paginated network request metadata (without request/response bodies).
+ */
+export const getBugReportNetworkRequests = o
+  .input(debuggerNetworkRequestsInputSchema)
+  .handler(async ({ context, input }) => {
+    await assertBugReportAccessById({
+      id: input.id,
+      session: context.session,
+    })
+
+    const { page, perPage, offset, limit } =
+      normalizeDebuggerNetworkRequestPagination({
+        page: input.page,
+        perPage: input.perPage,
+      })
+
+    const [totalCount, items] = await Promise.all([
+      countBugReportNetworkRequests(input.id),
+      getBugReportNetworkRequestsPage({
+        bugReportId: input.id,
+        limit,
+        offset,
+      }),
+    ])
+
+    return {
+      items,
+      pagination: buildPaginationMeta(totalCount, page, perPage),
+    }
+  })
+
+/**
+ * Get request/response payload bodies for a single network request on-demand.
+ */
+export const getBugReportNetworkRequestPayload = o
+  .input(debuggerNetworkRequestPayloadInputSchema)
+  .handler(async ({ context, input }) => {
+    await assertBugReportAccessById({
+      id: input.id,
+      session: context.session,
+    })
+
+    const payload = await getBugReportNetworkRequestPayloadData({
+      bugReportId: input.id,
+      requestId: input.requestId,
+    })
+
+    if (!payload) {
+      throw new ORPCError("NOT_FOUND", { message: "Network request not found" })
+    }
+
+    return payload
   })
 
 export const deleteBugReport = protectedProcedure

@@ -8,7 +8,7 @@ import {
 } from "@crikket/ui/components/ui/resizable"
 import { cn } from "@crikket/ui/lib/utils"
 import { Search } from "lucide-react"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 
 import { formatOffset } from "../utils"
 import { NetworkRequestDetails } from "./network-request-details"
@@ -21,12 +21,19 @@ const REQUEST_LIST_MIN_HEIGHT = "190px"
 const DETAILS_MIN_HEIGHT = "220px"
 
 export function NetworkRequestsPanel({
+  bugReportId,
   entries,
   requests,
   activeEntryId,
+  isLoading,
+  isFetchingNextPage,
+  hasNextPage,
+  onLoadMore,
   onEntrySelect,
 }: NetworkRequestsPanelProps) {
   const [searchValue, setSearchValue] = useState("")
+  const listContainerRef = useRef<HTMLDivElement | null>(null)
+  const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
   const requestsById = useMemo(
     () =>
@@ -74,6 +81,40 @@ export function NetworkRequestsPanel({
   const selectedRequest = selectedEntry
     ? requestsById.get(selectedEntry.id)
     : null
+  let emptyStateMessage = "No network requests captured."
+  if (isLoading) {
+    emptyStateMessage = "Loading network requests..."
+  } else if (normalizedQuery) {
+    emptyStateMessage = "No requests matched your search."
+  }
+
+  useEffect(() => {
+    const sentinel = loadMoreRef.current
+    const listContainer = listContainerRef.current
+
+    if (!(sentinel && listContainer && hasNextPage) || isFetchingNextPage) {
+      return
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const [entry] = entries
+        if (entry?.isIntersecting) {
+          onLoadMore()
+        }
+      },
+      {
+        root: listContainer,
+        rootMargin: "120px 0px",
+      }
+    )
+
+    observer.observe(sentinel)
+
+    return () => {
+      observer.disconnect()
+    }
+  }, [hasNextPage, isFetchingNextPage, onLoadMore])
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -102,15 +143,12 @@ export function NetworkRequestsPanel({
           defaultSize={REQUEST_LIST_DEFAULT_HEIGHT}
           minSize={REQUEST_LIST_MIN_HEIGHT}
         >
-          <div className="h-full overflow-y-auto border-b bg-background">
+          <div
+            className="h-full overflow-y-auto border-b bg-background"
+            ref={listContainerRef}
+          >
             {filteredEntries.length === 0 ? (
-              <EmptyState
-                message={
-                  normalizedQuery
-                    ? "No requests matched your search."
-                    : "No network requests captured."
-                }
-              />
+              <EmptyState message={emptyStateMessage} />
             ) : (
               <div className="divide-y">
                 {filteredEntries.map((entry) => {
@@ -167,6 +205,18 @@ export function NetworkRequestsPanel({
                     </button>
                   )
                 })}
+                {(hasNextPage || isFetchingNextPage) && (
+                  <div className="flex justify-center border-t p-3">
+                    <div className="w-full">
+                      <div className="h-2 w-full" ref={loadMoreRef} />
+                      <p className="text-center font-mono text-[10px] text-muted-foreground">
+                        {isFetchingNextPage
+                          ? "Loading more requests..."
+                          : "Scroll for more requests"}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -176,6 +226,7 @@ export function NetworkRequestsPanel({
         <ResizablePanel minSize={DETAILS_MIN_HEIGHT}>
           <div className="h-full overflow-y-auto bg-muted/20 p-3">
             <NetworkRequestDetails
+              bugReportId={bugReportId}
               key={selectedEntry?.id ?? "empty"}
               request={selectedRequest ?? null}
             />

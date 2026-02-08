@@ -1,5 +1,7 @@
 import { cn } from "@crikket/ui/lib/utils"
+import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
+import { orpc } from "@/utils/orpc"
 
 import { EmptyState, KeyValueSection, PayloadSection } from "./panel-sections"
 import type { DetailSection, NetworkRequestDetailsProps } from "./types"
@@ -13,9 +15,25 @@ import {
   statusTone,
 } from "./utils"
 
-export function NetworkRequestDetails({ request }: NetworkRequestDetailsProps) {
+export function NetworkRequestDetails({
+  bugReportId,
+  request,
+}: NetworkRequestDetailsProps) {
   const [activeSection, setActiveSection] = useState<DetailSection>("overview")
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
+  const shouldLoadPayload =
+    Boolean(request) &&
+    (activeSection === "request" || activeSection === "response")
+
+  const payloadQuery = useQuery(
+    orpc.bugReport.getNetworkRequestPayload.queryOptions({
+      input: {
+        id: bugReportId,
+        requestId: request?.id ?? "__pending_request__",
+      },
+      enabled: shouldLoadPayload,
+    })
+  )
 
   if (!request) {
     return (
@@ -23,13 +41,15 @@ export function NetworkRequestDetails({ request }: NetworkRequestDetailsProps) {
     )
   }
 
+  const requestBodyValue = payloadQuery.data?.requestBody ?? null
+  const responseBodyValue = payloadQuery.data?.responseBody ?? null
   const parsedUrl = safeParseUrl(request.url)
   const queryParams = getQueryParams(request.url)
   const requestHeaders = asKeyValueItems(request.requestHeaders)
   const responseHeaders = asKeyValueItems(request.responseHeaders)
-  const requestBodyPreview = formatBody(request.requestBody)
-  const responseBodyPreview = formatBody(request.responseBody)
-  const bodyParams = getBodyParams(request.requestBody)
+  const requestBodyPreview = formatBody(requestBodyValue)
+  const responseBodyPreview = formatBody(responseBodyValue)
+  const bodyParams = getBodyParams(requestBodyValue)
   const pathLabel = parsedUrl
     ? `${parsedUrl.pathname}${parsedUrl.search}`
     : request.url
@@ -127,12 +147,22 @@ export function NetworkRequestDetails({ request }: NetworkRequestDetailsProps) {
       {activeSection === "request" && (
         <div className="space-y-3">
           <KeyValueSection
-            emptyMessage="No structured params detected in request body."
+            emptyMessage={
+              payloadQuery.isLoading
+                ? "Loading request body..."
+                : "No structured params detected in request body."
+            }
             items={bodyParams}
             title="Body Params"
           />
           <PayloadSection
             copied={copiedKey === "request-body"}
+            emptyMessage={
+              payloadQuery.isError
+                ? "Could not load request body."
+                : "No payload captured."
+            }
+            isLoading={payloadQuery.isLoading}
             onCopy={() => onCopy("request-body", requestBodyPreview?.raw)}
             payload={requestBodyPreview}
             title="Request Body"
@@ -149,6 +179,12 @@ export function NetworkRequestDetails({ request }: NetworkRequestDetailsProps) {
         <div className="space-y-3">
           <PayloadSection
             copied={copiedKey === "response-body"}
+            emptyMessage={
+              payloadQuery.isError
+                ? "Could not load response body."
+                : "No payload captured."
+            }
+            isLoading={payloadQuery.isLoading}
             onCopy={() => onCopy("response-body", responseBodyPreview?.raw)}
             payload={responseBodyPreview}
             title="Response Body"
