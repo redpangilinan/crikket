@@ -13,10 +13,15 @@ import { isDebuggerRuntimeMessage } from "./messaging"
 import { normalizeDebuggerEvent, normalizeStoredSession } from "./normalize"
 import { injectedDebuggerScript } from "./page-script"
 import type {
+  DebuggerEvent,
   DebuggerRuntimeResponse,
   DebuggerSessionSnapshot,
   StoredDebuggerSession,
 } from "./types"
+
+const MAX_ACTION_EVENT_COUNT = 400
+const MAX_CONSOLE_EVENT_COUNT = 800
+const MAX_NETWORK_EVENT_COUNT = 1200
 
 export function registerDebuggerBackgroundListeners(): void {
   const scope = globalThis as typeof globalThis & {
@@ -146,11 +151,7 @@ export function registerDebuggerBackgroundListeners(): void {
     const event = normalizeDebuggerEvent(rawEvent)
     if (!event) return
 
-    session.events.push(event)
-
-    if (session.events.length > MAX_EVENT_COUNT) {
-      session.events.splice(0, session.events.length - MAX_EVENT_COUNT)
-    }
+    appendEventWithRetentionPolicy(session.events, event)
 
     schedulePersist()
   }
@@ -325,4 +326,83 @@ async function injectDebuggerScriptIntoTab(tabId: number): Promise<void> {
       error
     )
   }
+}
+
+function appendEventWithRetentionPolicy(
+  events: DebuggerEvent[],
+  event: DebuggerEvent
+): void {
+  events.push(event)
+
+  enforceKindCap(events, event.kind)
+
+  while (events.length > MAX_EVENT_COUNT) {
+    const dropIndex = findOldestEventIndexByPriority(events, [
+      "console",
+      "action",
+      "network",
+    ])
+
+    events.splice(dropIndex, 1)
+  }
+}
+
+function enforceKindCap(
+  events: DebuggerEvent[],
+  kind: DebuggerEvent["kind"]
+): void {
+  const maxPerKind = getMaxPerKind(kind)
+  let count = 0
+
+  for (const event of events) {
+    if (event.kind === kind) {
+      count += 1
+    }
+  }
+
+  const overflowCount = count - maxPerKind
+  if (overflowCount <= 0) {
+    return
+  }
+
+  let removed = 0
+  for (
+    let index = 0;
+    index < events.length && removed < overflowCount;
+    index++
+  ) {
+    if (events[index]?.kind !== kind) {
+      continue
+    }
+
+    events.splice(index, 1)
+    index -= 1
+    removed += 1
+  }
+}
+
+function getMaxPerKind(kind: DebuggerEvent["kind"]): number {
+  if (kind === "action") {
+    return MAX_ACTION_EVENT_COUNT
+  }
+
+  if (kind === "console") {
+    return MAX_CONSOLE_EVENT_COUNT
+  }
+
+  return MAX_NETWORK_EVENT_COUNT
+}
+
+function findOldestEventIndexByPriority(
+  events: DebuggerEvent[],
+  priority: DebuggerEvent["kind"][]
+): number {
+  for (const kind of priority) {
+    const index = events.findIndex((event) => event.kind === kind)
+    if (index >= 0) {
+      return index
+    }
+  }
+
+  return 0
 }
