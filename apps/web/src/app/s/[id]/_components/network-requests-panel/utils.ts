@@ -112,21 +112,26 @@ export function formatBody(value: string | null): BodyPreview | null {
     return null
   }
 
+  if (!looksLikeJson(raw)) {
+    return { raw, formatted: raw }
+  }
+
   try {
     const parsed = JSON.parse(raw)
     return {
       raw,
       formatted: JSON.stringify(parsed, null, 2),
     }
-  } catch (error) {
-    reportNonFatalError("Failed to format request payload as JSON", error, {
-      once: true,
-    })
+  } catch {
     return { raw, formatted: raw }
   }
 }
 
 function parseJsonParams(value: string): KeyValueItem[] {
+  if (!looksLikeJsonObject(value)) {
+    return []
+  }
+
   try {
     const parsed = JSON.parse(value)
     if (!isRecord(parsed)) {
@@ -140,10 +145,7 @@ function parseJsonParams(value: string): KeyValueItem[] {
         value: stringifyScalar(entryValue),
       }
     })
-  } catch (error) {
-    reportNonFatalError("Failed to parse request body params as JSON", error, {
-      once: true,
-    })
+  } catch {
     return []
   }
 }
@@ -193,4 +195,22 @@ function stringifyScalar(value: unknown): string {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
+}
+
+function looksLikeJson(value: string): boolean {
+  const firstChar = value[0]
+  return (
+    firstChar === "{" ||
+    firstChar === "[" ||
+    firstChar === '"' ||
+    firstChar === "-" ||
+    (firstChar >= "0" && firstChar <= "9") ||
+    value.startsWith("true") ||
+    value.startsWith("false") ||
+    value.startsWith("null")
+  )
+}
+
+function looksLikeJsonObject(value: string): boolean {
+  return value.startsWith("{")
 }
