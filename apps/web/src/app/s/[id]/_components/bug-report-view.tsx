@@ -16,6 +16,7 @@ import { cn } from "@crikket/ui/lib/utils"
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query"
 import { AlertCircle, Loader2, Menu } from "lucide-react"
 import Link from "next/link"
+import { parseAsStringLiteral, useQueryState } from "nuqs"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { orpc } from "@/utils/orpc"
 
@@ -39,6 +40,12 @@ const SIDEBAR_DEFAULT_WIDTH = "420px"
 const SIDEBAR_MIN_WIDTH = "360px"
 const SIDEBAR_MAX_WIDTH = "1080px"
 const NETWORK_REQUESTS_PAGE_SIZE = 10
+const SIDEBAR_TABS = [
+  "details",
+  "actions",
+  "console",
+  "network",
+] as const satisfies readonly SidebarTab[]
 
 export function BugReportView({ id }: BugReportViewProps) {
   const { data, isLoading, error } = useQuery(
@@ -48,7 +55,10 @@ export function BugReportView({ id }: BugReportViewProps) {
     })
   )
 
-  const [activeTab, setActiveTab] = useState<SidebarTab>("details")
+  const [activeTab, setActiveTab] = useQueryState(
+    "tab",
+    parseAsStringLiteral(SIDEBAR_TABS).withDefault("details")
+  )
   const [hasOpenedDebuggerTimelineTab, setHasOpenedDebuggerTimelineTab] =
     useState(false)
   const [hasOpenedNetworkTab, setHasOpenedNetworkTab] = useState(false)
@@ -157,6 +167,10 @@ export function BugReportView({ id }: BugReportViewProps) {
     })
   }
 
+  const handleTabChange = (tab: SidebarTab) => {
+    setActiveTab(tab)
+  }
+
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -242,7 +256,7 @@ export function BugReportView({ id }: BugReportViewProps) {
                   networkRequests={networkRequests}
                   onEntrySelect={handleEntrySelect}
                   onLoadMoreNetworkRequests={handleLoadMoreNetworkRequests}
-                  onTabChange={setActiveTab}
+                  onTabChange={handleTabChange}
                 />
               </ResizablePanel>
             </ResizablePanelGroup>
@@ -277,7 +291,7 @@ export function BugReportView({ id }: BugReportViewProps) {
           networkRequests={networkRequests}
           onEntrySelect={handleEntrySelect}
           onLoadMoreNetworkRequests={handleLoadMoreNetworkRequests}
-          onTabChange={setActiveTab}
+          onTabChange={handleTabChange}
         />
       </SheetContent>
     </Sheet>

@@ -1,10 +1,11 @@
 import { cn } from "@crikket/ui/lib/utils"
 import { useQuery } from "@tanstack/react-query"
+import { parseAsStringLiteral, useQueryState } from "nuqs"
 import { useState } from "react"
 import { orpc } from "@/utils/orpc"
 
 import { EmptyState, KeyValueSection, PayloadSection } from "./panel-sections"
-import type { DetailSection, NetworkRequestDetailsProps } from "./types"
+import type { NetworkRequestDetailsProps } from "./types"
 import {
   asKeyValueItems,
   DETAIL_SECTIONS,
@@ -15,11 +16,16 @@ import {
   statusTone,
 } from "./utils"
 
+const DETAIL_SECTION_VALUES = ["overview", "request", "response"] as const
+
 export function NetworkRequestDetails({
   bugReportId,
   request,
 }: NetworkRequestDetailsProps) {
-  const [activeSection, setActiveSection] = useState<DetailSection>("overview")
+  const [activeSection, setActiveSection] = useQueryState(
+    "networkSection",
+    parseAsStringLiteral(DETAIL_SECTION_VALUES).withDefault("overview")
+  )
   const [copiedKey, setCopiedKey] = useState<string | null>(null)
   const shouldLoadPayload =
     Boolean(request) &&
@@ -32,6 +38,7 @@ export function NetworkRequestDetails({
         requestId: request?.id ?? "__pending_request__",
       },
       enabled: shouldLoadPayload,
+      staleTime: Number.POSITIVE_INFINITY,
     })
   )
 
@@ -116,7 +123,9 @@ export function NetworkRequestDetails({
                 : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
             )}
             key={section.id}
-            onClick={() => setActiveSection(section.id)}
+            onClick={() => {
+              setActiveSection(section.id)
+            }}
             type="button"
           >
             {section.label}

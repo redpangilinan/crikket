@@ -27,7 +27,8 @@
     "react": "catalog:",
     "react-dom": "catalog:",
     "zod": "catalog:",
-    "sonner": "catalog:"
+    "sonner": "catalog:",
+    "nuqs": "catalog:"
   },
   "devDependencies": {
     "@crikket/config": "workspace:*",
