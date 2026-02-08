@@ -322,11 +322,15 @@ export const getBugReportNetworkRequests = o
       })
 
     const [totalCount, items] = await Promise.all([
-      countBugReportNetworkRequests(input.id),
+      countBugReportNetworkRequests({
+        bugReportId: input.id,
+        search: input.search,
+      }),
       getBugReportNetworkRequestsPage({
         bugReportId: input.id,
         limit,
         offset,
+        search: input.search,
       }),
     ])
 

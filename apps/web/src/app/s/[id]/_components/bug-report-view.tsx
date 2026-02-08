@@ -16,8 +16,8 @@ import { cn } from "@crikket/ui/lib/utils"
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query"
 import { AlertCircle, Loader2, Menu } from "lucide-react"
 import Link from "next/link"
-import { parseAsStringLiteral, useQueryState } from "nuqs"
-import { useEffect, useMemo, useRef, useState } from "react"
+import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs"
+import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { orpc } from "@/utils/orpc"
 
 import { BugReportCanvas } from "./bug-report-canvas"
@@ -59,6 +59,7 @@ export function BugReportView({ id }: BugReportViewProps) {
     "tab",
     parseAsStringLiteral(SIDEBAR_TABS).withDefault("details")
   )
+  const [networkSearch] = useQueryState("networkSearch", parseAsString)
   const [hasOpenedDebuggerTimelineTab, setHasOpenedDebuggerTimelineTab] =
     useState(false)
   const [hasOpenedNetworkTab, setHasOpenedNetworkTab] = useState(false)
@@ -87,7 +88,9 @@ export function BugReportView({ id }: BugReportViewProps) {
         id,
         page: pageParam,
         perPage: NETWORK_REQUESTS_PAGE_SIZE,
+        search: networkSearch ?? undefined,
       }),
+      queryKey: ["networkRequests", id, networkSearch ?? ""],
       getNextPageParam: (lastPage) =>
         lastPage.pagination.hasNextPage
           ? lastPage.pagination.page + 1
@@ -161,11 +164,19 @@ export function BugReportView({ id }: BugReportViewProps) {
     })
   }
 
-  const handleLoadMoreNetworkRequests = () => {
-    networkRequestsQuery.fetchNextPage().catch(() => {
+  const handleLoadMoreNetworkRequests = useCallback(() => {
+    if (!networkRequestsQuery.hasNextPage || networkRequestsQuery.isFetching) {
+      return
+    }
+
+    networkRequestsQuery.fetchNextPage({ cancelRefetch: false }).catch(() => {
       // Query errors are surfaced through the global query error handler.
     })
-  }
+  }, [
+    networkRequestsQuery.fetchNextPage,
+    networkRequestsQuery.hasNextPage,
+    networkRequestsQuery.isFetching,
+  ])
 
   const handleTabChange = (tab: SidebarTab) => {
     setActiveTab(tab)

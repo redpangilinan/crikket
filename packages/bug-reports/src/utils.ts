@@ -20,6 +20,12 @@ export const debuggerNetworkRequestsInputSchema = z.object({
   id: z.string().min(1),
   page: z.number().int().positive().optional(),
   perPage: z.number().int().positive().optional(),
+  search: z
+    .string()
+    .max(200)
+    .transform((value) => value.trim())
+    .optional()
+    .transform((value) => (value && value.length > 0 ? value : undefined)),
 })
 
 export const debuggerNetworkRequestPayloadInputSchema = z.object({

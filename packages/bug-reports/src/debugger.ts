@@ -4,7 +4,7 @@ import {
   bugReportLog,
   bugReportNetworkRequest,
 } from "@crikket/db/schema/bug-report"
-import { and, asc, count, eq } from "drizzle-orm"
+import { and, asc, count, eq, ilike, or, sql } from "drizzle-orm"
 import { nanoid } from "nanoid"
 import { z } from "zod"
 
@@ -122,6 +122,7 @@ export interface BugReportNetworkRequestsPageInput {
   bugReportId: string
   limit: number
   offset: number
+  search?: string
 }
 
 export interface BugReportNetworkRequestPayloadInput {
@@ -129,13 +130,14 @@ export interface BugReportNetworkRequestPayloadInput {
   requestId: string
 }
 
-export async function countBugReportNetworkRequests(
+export async function countBugReportNetworkRequests(input: {
   bugReportId: string
-): Promise<number> {
+  search?: string
+}): Promise<number> {
   const result = await db
     .select({ value: count() })
     .from(bugReportNetworkRequest)
-    .where(eq(bugReportNetworkRequest.bugReportId, bugReportId))
+    .where(buildNetworkRequestsWhere(input))
 
   return result[0]?.value ?? 0
 }
@@ -144,6 +146,7 @@ export async function getBugReportNetworkRequestsPage({
   bugReportId,
   limit,
   offset,
+  search,
 }: BugReportNetworkRequestsPageInput): Promise<
   BugReportNetworkRequestListItem[]
 > {
@@ -160,7 +163,7 @@ export async function getBugReportNetworkRequestsPage({
       offset: bugReportNetworkRequest.offset,
     })
     .from(bugReportNetworkRequest)
-    .where(eq(bugReportNetworkRequest.bugReportId, bugReportId))
+    .where(buildNetworkRequestsWhere({ bugReportId, search }))
     .orderBy(asc(bugReportNetworkRequest.timestamp))
     .limit(limit)
     .offset(offset)
@@ -206,6 +209,36 @@ export async function getBugReportNetworkRequestPayload({
     requestBody: request.requestBody,
     responseBody: request.responseBody,
   }
+}
+
+function buildNetworkRequestsWhere(input: {
+  bugReportId: string
+  search?: string
+}) {
+  const bugReportCondition = eq(
+    bugReportNetworkRequest.bugReportId,
+    input.bugReportId
+  )
+
+  if (!input.search) {
+    return bugReportCondition
+  }
+
+  const searchPattern = `%${input.search}%`
+  const searchCondition = or(
+    ilike(bugReportNetworkRequest.method, searchPattern),
+    ilike(bugReportNetworkRequest.url, searchPattern),
+    ilike(
+      sql<string>`coalesce(cast(${bugReportNetworkRequest.status} as text), '')`,
+      searchPattern
+    )
+  )
+
+  if (!searchCondition) {
+    return bugReportCondition
+  }
+
+  return and(bugReportCondition, searchCondition) ?? bugReportCondition
 }
 
 export async function persistBugReportDebuggerData(

@@ -6,8 +6,10 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@crikket/ui/components/ui/resizable"
+import { useDebounce } from "@crikket/ui/hooks/use-debounce"
 import { cn } from "@crikket/ui/lib/utils"
 import { Search } from "lucide-react"
+import { parseAsString, useQueryState } from "nuqs"
 import { useEffect, useMemo, useRef, useState } from "react"
 
 import { formatOffset } from "../utils"
@@ -31,7 +33,14 @@ export function NetworkRequestsPanel({
   onLoadMore,
   onEntrySelect,
 }: NetworkRequestsPanelProps) {
-  const [searchValue, setSearchValue] = useState("")
+  const [searchParamValue, setSearchParamValue] = useQueryState(
+    "networkSearch",
+    parseAsString
+  )
+  const [searchInputValue, setSearchInputValue] = useState(
+    searchParamValue ?? ""
+  )
+  const debouncedSearchValue = useDebounce(searchInputValue)
   const listContainerRef = useRef<HTMLDivElement | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
@@ -45,38 +54,46 @@ export function NetworkRequestsPanel({
     [requests]
   )
 
-  const normalizedQuery = searchValue.trim().toLowerCase()
+  const normalizedQuery = (searchParamValue ?? "").trim().toLowerCase()
 
-  const filteredEntries = useMemo(() => {
-    if (!normalizedQuery) {
-      return entries
+  useEffect(() => {
+    const nextInputValue = searchParamValue ?? ""
+    setSearchInputValue((current) =>
+      current === nextInputValue ? current : nextInputValue
+    )
+  }, [searchParamValue])
+
+  useEffect(() => {
+    const normalizedDebouncedValue = debouncedSearchValue.trim()
+    const nextSearchParamValue =
+      normalizedDebouncedValue.length > 0 ? normalizedDebouncedValue : null
+    const normalizedCurrentSearchParam = (searchParamValue ?? "").trim()
+    const currentSearchParamValue =
+      normalizedCurrentSearchParam.length > 0
+        ? normalizedCurrentSearchParam
+        : null
+
+    if (currentSearchParamValue === nextSearchParamValue) {
+      return
     }
 
-    return entries.filter((entry) => {
-      const request = requestsById.get(entry.id)
-      const methodMatches = request?.method
-        .toLowerCase()
-        .includes(normalizedQuery)
-      const urlMatches = request?.url.toLowerCase().includes(normalizedQuery)
-      const statusMatches = String(request?.status ?? "").includes(
-        normalizedQuery
-      )
-      return methodMatches || urlMatches || statusMatches
-    })
-  }, [entries, normalizedQuery, requestsById])
+    setSearchParamValue(nextSearchParamValue, { history: "replace" }).catch(
+      () => {
+        // Keep search input interactive if query state sync fails.
+      }
+    )
+  }, [debouncedSearchValue, searchParamValue, setSearchParamValue])
 
   const selectedEntry = useMemo(() => {
     if (activeEntryId) {
-      const activeMatch = filteredEntries.find(
-        (entry) => entry.id === activeEntryId
-      )
+      const activeMatch = entries.find((entry) => entry.id === activeEntryId)
       if (activeMatch) {
         return activeMatch
       }
     }
 
-    return filteredEntries[0] ?? null
-  }, [activeEntryId, filteredEntries])
+    return entries[0] ?? null
+  }, [activeEntryId, entries])
 
   const selectedRequest = selectedEntry
     ? requestsById.get(selectedEntry.id)
@@ -131,9 +148,11 @@ export function NetworkRequestsPanel({
           <Search className="pointer-events-none absolute top-1/2 left-2.5 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
           <Input
             className="h-8 pl-7 text-xs"
-            onChange={(event) => setSearchValue(event.target.value)}
+            onChange={(event) => {
+              setSearchInputValue(event.target.value)
+            }}
             placeholder="Filter by method, URL, or status..."
-            value={searchValue}
+            value={searchInputValue}
           />
         </div>
       </div>
@@ -147,11 +166,11 @@ export function NetworkRequestsPanel({
             className="h-full overflow-y-auto border-b bg-background"
             ref={listContainerRef}
           >
-            {filteredEntries.length === 0 ? (
+            {entries.length === 0 ? (
               <EmptyState message={emptyStateMessage} />
             ) : (
               <div className="divide-y">
-                {filteredEntries.map((entry) => {
+                {entries.map((entry) => {
                   const request = requestsById.get(entry.id)
                   const status = request?.status ?? null
                   const duration = request?.duration ?? null
