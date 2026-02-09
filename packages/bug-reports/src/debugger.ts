@@ -5,7 +5,7 @@ import {
   bugReportNetworkRequest,
 } from "@crikket/db/schema/bug-report"
 import { reportNonFatalError } from "@crikket/shared/lib/errors"
-import { retryOnUniqueViolation } from "@crikket/shared/lib/retry-on-unique-violation"
+import { retryOnUniqueViolation } from "@crikket/shared/lib/server/retry-on-unique-violation"
 import { and, asc, count, eq, ilike, or, sql } from "drizzle-orm"
 import { nanoid } from "nanoid"
 import { z } from "zod"
