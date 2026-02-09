@@ -113,6 +113,7 @@ export interface DebuggerStartSessionMessage {
   payload: {
     captureTabId: number
     captureType: DebuggerCaptureType
+    instantReplayLookbackMs?: number
   }
 }
 

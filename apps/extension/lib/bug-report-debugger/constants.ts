@@ -8,6 +8,8 @@ export const BACKGROUND_LISTENER_FLAG =
   "__crikketDebuggerBackgroundListenerRegistered"
 
 export const DEBUGGER_SESSIONS_STORAGE_KEY = "crikketDebuggerSessions"
+export const DEBUGGER_REPLAY_BUFFERS_STORAGE_KEY =
+  "crikketDebuggerReplayBuffers"
 export const DEBUGGER_SESSION_ID_STORAGE_KEY = "debuggerSessionId"
 
 export const START_SESSION_MESSAGE = "CRIKKET_DEBUGGER_START_SESSION"

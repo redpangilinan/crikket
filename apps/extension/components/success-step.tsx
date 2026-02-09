@@ -6,12 +6,14 @@ interface SuccessStepProps {
   onOpenRecording: () => void
   onCopyLink: () => void
   onClose: () => void
+  warnings?: string[]
 }
 
 export function SuccessStep({
   onOpenRecording,
   onCopyLink,
   onClose,
+  warnings = [],
 }: SuccessStepProps) {
   const [isCopied, setIsCopied] = useState(false)
   return (
@@ -26,6 +28,19 @@ export function SuccessStep({
           Your bug report has been created successfully
         </p>
       </div>
+
+      {warnings.length > 0 ? (
+        <div className="w-full max-w-md rounded-md border border-amber-500/30 bg-amber-500/10 p-4 text-left">
+          <p className="font-medium text-amber-700 text-sm">
+            Submitted with warnings
+          </p>
+          <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-700 text-xs">
+            {warnings.map((warning) => (
+              <li key={warning}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
 
       <div className="flex w-full max-w-md flex-col gap-3">
         <Button className="w-full" onClick={onOpenRecording} size="lg">

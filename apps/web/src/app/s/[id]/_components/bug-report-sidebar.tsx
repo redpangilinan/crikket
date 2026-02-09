@@ -88,7 +88,7 @@ export function BugReportSidebar({
                 Isolate Context
               </h3>
               <div className="grid gap-3 text-sm">
-                <DetailRow label="URL" truncate value={data.url} />
+                <DetailRow className="break-all" label="URL" value={data.url} />
                 <DetailRow label="Browser" value={deviceInfo?.browser} />
                 <DetailRow label="OS" value={deviceInfo?.os} />
                 <DetailRow label="Viewport" value={deviceInfo?.viewport} />
@@ -100,7 +100,11 @@ export function BugReportSidebar({
                 Ticket Info
               </h3>
               <div className="grid gap-3 text-sm">
-                <DetailRow label="Priority" value={data.priority} />
+                <DetailRow
+                  className="capitalize"
+                  label="Priority"
+                  value={data.priority}
+                />
                 <DetailRow
                   label="Reporter"
                   value={data.reporter?.name ?? "Unknown"}
@@ -189,10 +193,12 @@ function DetailRow({
   label,
   value,
   truncate,
+  className,
 }: {
   label: string
   value?: string | null
   truncate?: boolean
+  className?: string
 }) {
   if (!value) return null
   return (
@@ -201,7 +207,8 @@ function DetailRow({
       <span
         className={cn(
           "break-words text-foreground text-sm",
-          truncate && "truncate"
+          truncate && "truncate",
+          className
         )}
         title={value}
       >

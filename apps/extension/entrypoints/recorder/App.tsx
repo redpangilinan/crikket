@@ -8,6 +8,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@crikket/ui/components/ui/card"
+import { ORPCError } from "@orpc/client"
 import { AlertCircle } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { FormStep } from "@/components/form-step"
@@ -20,6 +21,7 @@ import { useRecorderRecordingSync } from "@/hooks/use-recorder-recording-sync"
 import { useScreenCapture } from "@/hooks/use-screen-capture"
 import { useTimer } from "@/hooks/use-timer"
 import {
+  type BugReportDebuggerPayload,
   buildDebuggerSubmissionPayload,
   discardDebuggerSession,
   getDebuggerSessionSnapshot,
@@ -33,12 +35,37 @@ import { formatDuration, getDeviceInfo } from "@/lib/utils"
 
 type State = "idle" | "recording" | "stopped" | "submitting" | "success"
 
+interface DebuggerCaptureSummary {
+  actions: number
+  logs: number
+  networkRequests: number
+}
+
+interface DebuggerSubmissionInput {
+  sessionId: string | null
+  payload: BugReportDebuggerPayload | undefined
+  summary: DebuggerCaptureSummary
+  warnings: string[]
+}
+
+const EMPTY_DEBUGGER_SUMMARY: DebuggerCaptureSummary = {
+  actions: 0,
+  logs: 0,
+  networkRequests: 0,
+}
+
+const MAX_PAGE_TITLE_LENGTH = 300
+
 function App() {
   const [state, setState] = useState<State>("idle")
   const [captureType, setCaptureType] = useState<CaptureType>("video")
   const [startTime, setStartTime] = useState<number | null>(null)
   const [resultUrl, setResultUrl] = useState("")
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [submissionWarnings, setSubmissionWarnings] = useState<string[]>([])
+  const [preSubmitWarnings, setPreSubmitWarnings] = useState<string[]>([])
+  const [debuggerSummary, setDebuggerSummary] =
+    useState<DebuggerCaptureSummary>(EMPTY_DEBUGGER_SUMMARY)
 
   const captureContext = useCaptureContext()
 
@@ -70,12 +97,18 @@ function App() {
   }, [])
 
   const getDebuggerSubmissionInput = useCallback(async () => {
+    const warnings: string[] = []
     const sessionId = await readStoredDebuggerSessionId()
     if (!sessionId) {
+      warnings.push(
+        "Debugger session was not found. This report may be missing captured logs."
+      )
       return {
         sessionId: null,
         payload: undefined,
-      }
+        summary: EMPTY_DEBUGGER_SUMMARY,
+        warnings,
+      } satisfies DebuggerSubmissionInput
     }
 
     const snapshot = await getDebuggerSessionSnapshot(sessionId).catch(
@@ -87,18 +120,39 @@ function App() {
         return null
       }
     )
+
     if (!snapshot) {
+      warnings.push(
+        "Debugger snapshot could not be loaded. This report may be missing captured logs."
+      )
       return {
         sessionId,
         payload: undefined,
-      }
+        summary: EMPTY_DEBUGGER_SUMMARY,
+        warnings,
+      } satisfies DebuggerSubmissionInput
     }
 
     const payload = buildDebuggerSubmissionPayload(snapshot)
+    const summary = getDebuggerCaptureSummary(payload)
+    const hasPayloadData = hasDebuggerPayloadData(payload)
+
+    if (!hasPayloadData) {
+      warnings.push(
+        "No debugger events were captured yet. Reproduce the issue once before submitting if you need network/action logs."
+      )
+    } else if (summary.networkRequests === 0) {
+      warnings.push(
+        "No network requests were captured in this recording. API-level debugging data may be incomplete."
+      )
+    }
+
     return {
       sessionId,
-      payload: hasDebuggerPayloadData(payload) ? payload : undefined,
-    }
+      payload: hasPayloadData ? payload : undefined,
+      summary,
+      warnings,
+    } satisfies DebuggerSubmissionInput
   }, [])
 
   const handleStopRecording = useCallback(async () => {
@@ -152,6 +206,43 @@ function App() {
     }
   }, [state, recordedBlob])
 
+  useEffect(() => {
+    if (state !== "stopped") {
+      setPreSubmitWarnings([])
+      return
+    }
+
+    let isCancelled = false
+
+    getDebuggerSubmissionInput()
+      .then((debuggerInput) => {
+        if (isCancelled) {
+          return
+        }
+
+        setDebuggerSummary(debuggerInput.summary)
+        setPreSubmitWarnings(debuggerInput.warnings)
+      })
+      .catch((error: unknown) => {
+        reportNonFatalError(
+          "Failed to inspect debugger data before bug report submission",
+          error
+        )
+        if (isCancelled) {
+          return
+        }
+
+        setDebuggerSummary(EMPTY_DEBUGGER_SUMMARY)
+        setPreSubmitWarnings([
+          "Could not validate debugger data before submitting.",
+        ])
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [getDebuggerSubmissionInput, state])
+
   useRecorderInit({
     onCaptureTypeChange: setCaptureType,
     onScreenshotLoaded: (blob) => {
@@ -167,6 +258,9 @@ function App() {
     setState("idle")
     setResultUrl("")
     setSubmitError(null)
+    setSubmissionWarnings([])
+    setPreSubmitWarnings([])
+    setDebuggerSummary(EMPTY_DEBUGGER_SUMMARY)
     setStartTime(null)
     clearDebuggerState().catch((error: unknown) => {
       reportNonFatalError("Failed to clear debugger state after reset", error)
@@ -179,27 +273,51 @@ function App() {
     priority: Priority
   }) => {
     const blob = captureType === "video" ? recordedBlob : screenshotBlob
-    if (!blob) return
+    if (!blob || blob.size === 0) {
+      setSubmitError("Capture data is missing. Please capture again.")
+      setState("stopped")
+      return
+    }
 
     setState("submitting")
     setSubmitError(null)
+    setSubmissionWarnings([])
 
     try {
       const durationMs =
         captureType === "video" && startTime ? Date.now() - startTime : 0
       const debuggerSubmission = await getDebuggerSubmissionInput()
+      const warnings = [...debuggerSubmission.warnings]
+
+      const normalizedUrl = normalizeOptionalUrl(captureContext.url)
+      if (captureContext.url && !normalizedUrl) {
+        warnings.push(
+          "The captured page URL was invalid and was not attached to this report."
+        )
+      }
+
+      const normalizedPageTitle = normalizeOptionalText(
+        captureContext.title,
+        MAX_PAGE_TITLE_LENGTH
+      )
+      if (
+        typeof captureContext.title === "string" &&
+        captureContext.title.trim().length > MAX_PAGE_TITLE_LENGTH
+      ) {
+        warnings.push("The captured page title was shortened before upload.")
+      }
 
       const result = await client.bugReport.create({
         attachment: blob,
         attachmentType: captureType,
-        title: values.title || undefined,
+        title: normalizeOptionalText(values.title, 200),
         priority: values.priority,
-        description: values.description || undefined,
-        url: captureContext.url,
+        description: normalizeOptionalText(values.description, 3000),
+        url: normalizedUrl,
         metadata: {
           duration: formatDuration(durationMs),
           durationMs,
-          pageTitle: captureContext.title,
+          pageTitle: normalizedPageTitle,
         },
         deviceInfo: getDeviceInfo(),
         debugger: debuggerSubmission.payload,
@@ -218,11 +336,12 @@ function App() {
       await storeDebuggerSessionId(null)
 
       setResultUrl(`${env.VITE_APP_URL}${result.shareUrl}`)
+      setSubmissionWarnings(
+        dedupeMessages([...warnings, ...(result.warnings ?? [])])
+      )
       setState("success")
-    } catch (err) {
-      console.error(err)
-      const msg = err instanceof Error ? err.message : "Failed to submit"
-      setSubmitError(msg)
+    } catch (error) {
+      setSubmitError(getSubmissionErrorMessage(error))
       setState("stopped")
     }
   }
@@ -286,10 +405,12 @@ function App() {
           {state === "stopped" || state === "submitting" ? (
             <FormStep
               captureType={captureType}
+              debuggerSummary={debuggerSummary}
               initialTitle={suggestedTitle}
               isSubmitting={state === "submitting"}
               onCancel={handleReset}
               onSubmit={handleSubmit}
+              preSubmitWarnings={preSubmitWarnings}
               previewUrl={previewUrl}
               submitError={submitError}
             />
@@ -300,6 +421,7 @@ function App() {
               onClose={handleReset}
               onCopyLink={() => navigator.clipboard.writeText(resultUrl)}
               onOpenRecording={() => window.open(resultUrl, "_blank")}
+              warnings={submissionWarnings}
             />
           ) : null}
         </CardContent>
@@ -309,3 +431,126 @@ function App() {
 }
 
 export default App
+
+function normalizeOptionalText(
+  value: string | undefined,
+  maxLength: number
+): string | undefined {
+  if (typeof value !== "string") {
+    return undefined
+  }
+
+  const trimmed = value.trim()
+  if (!trimmed) {
+    return undefined
+  }
+
+  return trimmed.slice(0, maxLength)
+}
+
+function normalizeOptionalUrl(value: string | undefined): string | undefined {
+  const normalized = normalizeOptionalText(value, 4096)
+  if (!normalized) {
+    return undefined
+  }
+
+  try {
+    return new URL(normalized).toString()
+  } catch {
+    return undefined
+  }
+}
+
+function getDebuggerCaptureSummary(
+  payload: BugReportDebuggerPayload
+): DebuggerCaptureSummary {
+  return {
+    actions: payload.actions.length,
+    logs: payload.logs.length,
+    networkRequests: payload.networkRequests.length,
+  }
+}
+
+function dedupeMessages(messages: string[]): string[] {
+  return [...new Set(messages.map((entry) => entry.trim()).filter(Boolean))]
+}
+
+function getSubmissionErrorMessage(error: unknown): string {
+  if (error instanceof ORPCError) {
+    const validationMessages = getValidationIssueMessages(error.data)
+    if (validationMessages.length > 0) {
+      return `Please fix the report input: ${validationMessages.slice(0, 3).join(" | ")}`
+    }
+
+    if (error.code === "UNAUTHORIZED") {
+      return "Your session has expired. Sign in again, then resubmit this report."
+    }
+
+    if (error.code === "PAYLOAD_TOO_LARGE") {
+      return "This report is too large to submit in one request. Retry with a shorter recording."
+    }
+
+    return error.message || "Failed to submit bug report."
+  }
+
+  if (error instanceof Error) {
+    if (error.message.includes("Failed to fetch")) {
+      return "Could not reach the server. Check your connection and sign-in state, then retry."
+    }
+
+    return error.message
+  }
+
+  return "Failed to submit bug report."
+}
+
+function getValidationIssueMessages(errorData: unknown): string[] {
+  if (!isRecord(errorData)) {
+    return []
+  }
+
+  const rawIssues = errorData.issues
+  if (!Array.isArray(rawIssues)) {
+    return []
+  }
+
+  const messages: string[] = []
+
+  for (const issue of rawIssues) {
+    if (!isRecord(issue)) {
+      continue
+    }
+
+    const message =
+      typeof issue.message === "string" && issue.message.length > 0
+        ? issue.message
+        : "Invalid value"
+
+    const path = formatIssuePath(issue.path)
+    messages.push(path ? `${path}: ${message}` : message)
+  }
+
+  return dedupeMessages(messages)
+}
+
+function formatIssuePath(path: unknown): string | null {
+  if (!Array.isArray(path) || path.length === 0) {
+    return null
+  }
+
+  const segments = path
+    .map((segment) => {
+      if (typeof segment === "string" || typeof segment === "number") {
+        return String(segment)
+      }
+
+      return null
+    })
+    .filter((segment): segment is string => Boolean(segment))
+
+  return segments.length > 0 ? segments.join(".") : null
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value)
+}

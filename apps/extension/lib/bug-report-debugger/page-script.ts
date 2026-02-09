@@ -319,6 +319,46 @@ export function injectedDebuggerScript() {
   }
 
   const originalFetch = window.fetch
+  const getFetchRequestBodyPreview = async (
+    input: RequestInfo | URL,
+    init: RequestInit | undefined
+  ): Promise<string | undefined> => {
+    const inlineBody = getRequestBodyPreview(init?.body)
+    if (inlineBody) {
+      return inlineBody
+    }
+
+    if (!(input instanceof Request)) {
+      return undefined
+    }
+
+    const method = (init?.method ?? input.method ?? "GET").toUpperCase()
+    if (method === "GET" || method === "HEAD" || input.bodyUsed) {
+      return undefined
+    }
+
+    try {
+      const contentType = input.headers.get("content-type") ?? ""
+      const shouldCaptureText =
+        contentType.includes("json") ||
+        contentType.includes("text") ||
+        contentType.includes("xml") ||
+        contentType.includes("x-www-form-urlencoded")
+
+      if (!shouldCaptureText) {
+        return undefined
+      }
+
+      return truncate(await input.clone().text(), MAX_BODY_LENGTH)
+    } catch (error) {
+      reportNonFatalError(
+        "Failed to capture fetch request body in debugger instrumentation",
+        error
+      )
+      return undefined
+    }
+  }
+
   // biome-ignore lint/complexity/noExcessiveCognitiveComplexity: instrumentation needs explicit branching for successful/error responses.
   const patchedFetch = (async (...args: Parameters<typeof window.fetch>) => {
     const startedAt = Date.now()
@@ -346,7 +386,7 @@ export function injectedDebuggerScript() {
       return originalFetch(...args)
     }
 
-    const requestBody = getRequestBodyPreview(init?.body)
+    const requestBody = await getFetchRequestBodyPreview(input, init)
 
     try {
       const response = await originalFetch(...args)

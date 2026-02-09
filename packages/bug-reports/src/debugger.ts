@@ -4,6 +4,7 @@ import {
   bugReportLog,
   bugReportNetworkRequest,
 } from "@crikket/db/schema/bug-report"
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { and, asc, count, eq, ilike, or, sql } from "drizzle-orm"
 import { nanoid } from "nanoid"
 import { z } from "zod"
@@ -13,6 +14,10 @@ const MAX_OFFSET_MS = 24 * 60 * 60 * 1000
 
 const debuggerMetadataSchema = z.record(z.string(), z.unknown()).optional()
 const debuggerHeadersSchema = z.record(z.string(), z.string()).optional()
+const debuggerUnknownArraySchema = z
+  .array(z.unknown())
+  .max(MAX_DEBUGGER_ITEMS_PER_KIND)
+  .default([])
 
 const debuggerActionSchema = z.object({
   type: z.string().min(1).max(80),
@@ -63,24 +68,28 @@ const debuggerNetworkRequestSchema = z.object({
 
 export const bugReportDebuggerInputSchema = z
   .object({
-    actions: z
-      .array(debuggerActionSchema)
-      .max(MAX_DEBUGGER_ITEMS_PER_KIND)
-      .default([]),
-    logs: z
-      .array(debuggerLogSchema)
-      .max(MAX_DEBUGGER_ITEMS_PER_KIND)
-      .default([]),
-    networkRequests: z
-      .array(debuggerNetworkRequestSchema)
-      .max(MAX_DEBUGGER_ITEMS_PER_KIND)
-      .default([]),
+    actions: debuggerUnknownArraySchema,
+    logs: debuggerUnknownArraySchema,
+    networkRequests: debuggerUnknownArraySchema,
   })
   .optional()
 
 export type BugReportDebuggerInput = z.infer<
   typeof bugReportDebuggerInputSchema
 >
+
+export interface DebuggerItemCounts {
+  actions: number
+  logs: number
+  networkRequests: number
+}
+
+export interface PersistBugReportDebuggerDataResult {
+  requested: DebuggerItemCounts
+  persisted: DebuggerItemCounts
+  dropped: DebuggerItemCounts
+  warnings: string[]
+}
 
 export interface BugReportDebuggerEventsData {
   actions: Array<{
@@ -244,63 +253,122 @@ function buildNetworkRequestsWhere(input: {
 export async function persistBugReportDebuggerData(
   bugReportId: string,
   debuggerData: BugReportDebuggerInput
-): Promise<void> {
+): Promise<PersistBugReportDebuggerDataResult> {
+  const requested = getDebuggerItemCounts(debuggerData)
+  const persisted: DebuggerItemCounts = {
+    actions: 0,
+    logs: 0,
+    networkRequests: 0,
+  }
+  const warnings: string[] = []
+
   if (!debuggerData) {
-    return
+    return {
+      requested,
+      persisted,
+      dropped: getDroppedDebuggerItemCounts(requested, persisted),
+      warnings,
+    }
   }
 
-  const normalized = bugReportDebuggerInputSchema.parse(debuggerData)
-  if (!normalized) {
-    return
-  }
-
-  const { actions, logs, networkRequests } = normalized
+  const actions = parseDebuggerItems(
+    debuggerData.actions,
+    debuggerActionSchema,
+    "action events",
+    warnings
+  )
+  const logs = parseDebuggerItems(
+    debuggerData.logs,
+    debuggerLogSchema,
+    "log events",
+    warnings
+  )
+  const networkRequests = parseDebuggerItems(
+    debuggerData.networkRequests,
+    debuggerNetworkRequestSchema,
+    "network requests",
+    warnings
+  )
 
   if (actions.length > 0) {
-    await db.insert(bugReportAction).values(
-      actions.map((action) => ({
-        id: nanoid(16),
-        bugReportId,
-        type: action.type,
-        target: action.target,
-        timestamp: new Date(action.timestamp),
-        offset: normalizeOffset(action.offset),
-        metadata: action.metadata,
-      }))
-    )
+    try {
+      await db.insert(bugReportAction).values(
+        actions.map((action) => ({
+          id: nanoid(16),
+          bugReportId,
+          type: action.type,
+          target: action.target,
+          timestamp: new Date(action.timestamp),
+          offset: normalizeOffset(action.offset),
+          metadata: action.metadata,
+        }))
+      )
+      persisted.actions = actions.length
+    } catch (error) {
+      warnings.push("Failed to store debugger action events.")
+      reportNonFatalError(
+        `Failed to persist debugger action events for bug report ${bugReportId}`,
+        error
+      )
+    }
   }
 
   if (logs.length > 0) {
-    await db.insert(bugReportLog).values(
-      logs.map((log) => ({
-        id: nanoid(16),
-        bugReportId,
-        level: log.level,
-        message: log.message,
-        timestamp: new Date(log.timestamp),
-        offset: normalizeOffset(log.offset),
-        metadata: log.metadata,
-      }))
-    )
+    try {
+      await db.insert(bugReportLog).values(
+        logs.map((log) => ({
+          id: nanoid(16),
+          bugReportId,
+          level: log.level,
+          message: log.message,
+          timestamp: new Date(log.timestamp),
+          offset: normalizeOffset(log.offset),
+          metadata: log.metadata,
+        }))
+      )
+      persisted.logs = logs.length
+    } catch (error) {
+      warnings.push("Failed to store debugger log events.")
+      reportNonFatalError(
+        `Failed to persist debugger log events for bug report ${bugReportId}`,
+        error
+      )
+    }
   }
 
   if (networkRequests.length > 0) {
-    await db.insert(bugReportNetworkRequest).values(
-      networkRequests.map((request) => ({
-        id: nanoid(16),
-        bugReportId,
-        method: request.method,
-        url: request.url,
-        status: request.status ?? null,
-        duration: request.duration ?? null,
-        requestHeaders: request.requestHeaders,
-        responseHeaders: request.responseHeaders,
-        requestBody: request.requestBody,
-        responseBody: request.responseBody,
-        timestamp: new Date(request.timestamp),
-        offset: normalizeOffset(request.offset),
-      }))
-    )
+    try {
+      await db.insert(bugReportNetworkRequest).values(
+        networkRequests.map((request) => ({
+          id: nanoid(16),
+          bugReportId,
+          method: request.method,
+          url: request.url,
+          status: request.status ?? null,
+          duration: request.duration ?? null,
+          requestHeaders: request.requestHeaders,
+          responseHeaders: request.responseHeaders,
+          requestBody: request.requestBody,
+          responseBody: request.responseBody,
+          timestamp: new Date(request.timestamp),
+          offset: normalizeOffset(request.offset),
+        }))
+      )
+      persisted.networkRequests = networkRequests.length
+    } catch (error) {
+      warnings.push("Failed to store debugger network requests.")
+      reportNonFatalError(
+        `Failed to persist debugger network requests for bug report ${bugReportId}`,
+        error
+      )
+    }
+  }
+
+  return {
+    requested,
+    persisted,
+    dropped: getDroppedDebuggerItemCounts(requested, persisted),
+    warnings,
   }
 }
 
@@ -390,4 +458,64 @@ function asStringRecord(value: unknown): Record<string, string> | null {
   }
 
   return Object.keys(result).length > 0 ? result : null
+}
+
+function parseDebuggerItems<TParsed>(
+  input: unknown[],
+  schema: z.ZodType<TParsed>,
+  label: string,
+  warnings: string[]
+): TParsed[] {
+  const parsedItems: TParsed[] = []
+  let droppedCount = 0
+
+  for (const candidate of input) {
+    const parsed = schema.safeParse(candidate)
+    if (!parsed.success) {
+      droppedCount += 1
+      continue
+    }
+
+    parsedItems.push(parsed.data)
+  }
+
+  if (droppedCount > 0) {
+    warnings.push(
+      `Skipped ${droppedCount} invalid debugger ${label} before saving.`
+    )
+  }
+
+  return parsedItems
+}
+
+function getDebuggerItemCounts(
+  debuggerData: BugReportDebuggerInput
+): DebuggerItemCounts {
+  if (!debuggerData) {
+    return {
+      actions: 0,
+      logs: 0,
+      networkRequests: 0,
+    }
+  }
+
+  return {
+    actions: debuggerData.actions.length,
+    logs: debuggerData.logs.length,
+    networkRequests: debuggerData.networkRequests.length,
+  }
+}
+
+function getDroppedDebuggerItemCounts(
+  requested: DebuggerItemCounts,
+  persisted: DebuggerItemCounts
+): DebuggerItemCounts {
+  return {
+    actions: Math.max(0, requested.actions - persisted.actions),
+    logs: Math.max(0, requested.logs - persisted.logs),
+    networkRequests: Math.max(
+      0,
+      requested.networkRequests - persisted.networkRequests
+    ),
+  }
 }

@@ -26,9 +26,15 @@ const formSchema = z.object({
   title: z.string().max(200, "Title must be at most 200 characters."),
   description: z
     .string()
-    .max(1000, "Description must be at most 1000 characters."),
+    .max(3000, "Description must be at most 3000 characters."),
   priority: z.enum(priorityValues),
 })
+
+interface DebuggerSummary {
+  actions: number
+  logs: number
+  networkRequests: number
+}
 
 interface FormStepProps {
   captureType: "video" | "screenshot"
@@ -36,6 +42,8 @@ interface FormStepProps {
   initialTitle: string
   isSubmitting: boolean
   submitError: string | null
+  preSubmitWarnings: string[]
+  debuggerSummary: DebuggerSummary
   onSubmit: (values: {
     title: string
     description: string
@@ -50,6 +58,8 @@ export function FormStep({
   initialTitle,
   isSubmitting,
   submitError,
+  preSubmitWarnings,
+  debuggerSummary,
   onSubmit,
   onCancel,
 }: FormStepProps) {
@@ -113,6 +123,29 @@ export function FormStep({
       >
         {/* Form */}
         <div className="space-y-4">
+          <div className="rounded-lg border bg-slate-50 p-4">
+            <p className="font-medium text-slate-700 text-sm">
+              Captured debugger data
+            </p>
+            <p className="mt-1 text-slate-600 text-xs">
+              Actions: {debuggerSummary.actions} | Logs: {debuggerSummary.logs}{" "}
+              | Requests: {debuggerSummary.networkRequests}
+            </p>
+          </div>
+
+          {preSubmitWarnings.length > 0 ? (
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+              <p className="font-medium text-amber-700 text-sm">
+                Please review before submitting
+              </p>
+              <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-700 text-xs">
+                {preSubmitWarnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+
           <form.Field name="title">
             {(field) => {
               const isInvalid =
