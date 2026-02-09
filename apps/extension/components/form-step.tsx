@@ -15,7 +15,7 @@ import {
 import { Textarea } from "@crikket/ui/components/ui/textarea"
 import { useForm } from "@tanstack/react-form"
 import { AlertTriangle } from "lucide-react"
-import { useEffect } from "react"
+import { type SyntheticEvent, useCallback, useEffect, useRef } from "react"
 import * as z from "zod"
 
 const priorityValues = Object.values(PRIORITY_OPTIONS) as [
@@ -40,6 +40,7 @@ interface DebuggerSummary {
 interface FormStepProps {
   captureType: "video" | "screenshot"
   previewUrl: string | null
+  videoDurationMs: number | null
   initialTitle: string
   isSubmitting: boolean
   submitError: string | null
@@ -62,6 +63,7 @@ interface FormValues {
 export function FormStep({
   captureType,
   previewUrl,
+  videoDurationMs,
   initialTitle,
   isSubmitting,
   submitError,
@@ -95,6 +97,7 @@ export function FormStep({
     debuggerSummary.actions +
     debuggerSummary.logs +
     debuggerSummary.networkRequests
+  const isPrimingVideoDurationRef = useRef(false)
 
   useEffect(() => {
     if (!form.state.values.title && initialTitle) {
@@ -102,18 +105,66 @@ export function FormStep({
     }
   }, [form, initialTitle])
 
+  const handleVideoLoadedMetadata = useCallback(
+    (event: SyntheticEvent<HTMLVideoElement>) => {
+      const player = event.currentTarget
+      if (isPrimingVideoDurationRef.current) {
+        return
+      }
+
+      if (!(typeof videoDurationMs === "number" && videoDurationMs > 0)) {
+        return
+      }
+
+      if (Number.isFinite(player.duration) && player.duration > 0) {
+        return
+      }
+
+      const durationSeconds = videoDurationMs / 1000
+      const safeSeekTargetSeconds = Math.max(0, durationSeconds - 0.001)
+      if (safeSeekTargetSeconds <= 0) {
+        return
+      }
+
+      isPrimingVideoDurationRef.current = true
+      const originalTime = player.currentTime
+
+      const restorePosition = () => {
+        const maxDurationSeconds =
+          Number.isFinite(player.duration) && player.duration > 0
+            ? player.duration
+            : durationSeconds
+        player.currentTime = Math.min(originalTime, maxDurationSeconds)
+        isPrimingVideoDurationRef.current = false
+      }
+
+      player.addEventListener("seeked", restorePosition, { once: true })
+
+      try {
+        player.currentTime = safeSeekTargetSeconds
+      } catch {
+        isPrimingVideoDurationRef.current = false
+      }
+    },
+    [videoDurationMs]
+  )
+
   return (
     <div className="space-y-6">
       {previewUrl && (
         <div className="overflow-hidden rounded-xl border bg-black shadow-sm">
           {captureType === "video" ? (
-            <video
-              className="max-h-[400px] w-full bg-black object-contain"
-              controls
-              src={previewUrl}
-            >
-              <track kind="captions" />
-            </video>
+            <div className="relative">
+              <video
+                className="max-h-[400px] w-full bg-black object-contain"
+                controls
+                onLoadedMetadata={handleVideoLoadedMetadata}
+                preload="metadata"
+                src={previewUrl}
+              >
+                <track kind="captions" />
+              </video>
+            </div>
           ) : (
             <img
               alt="Screenshot preview"

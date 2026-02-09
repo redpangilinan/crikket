@@ -59,6 +59,9 @@ function App() {
   const [state, setState] = useState<State>("idle")
   const [captureType, setCaptureType] = useState<CaptureType>("video")
   const [startTime, setStartTime] = useState<number | null>(null)
+  const [recordedDurationMs, setRecordedDurationMs] = useState<number | null>(
+    null
+  )
   const [resultUrl, setResultUrl] = useState("")
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [submissionWarnings, setSubmissionWarnings] = useState<string[]>([])
@@ -158,9 +161,13 @@ function App() {
   }, [debuggerSessionId])
 
   const handleStopRecording = useCallback(async () => {
+    const stoppedAt = Date.now()
     await stopCapture()
+    if (startTime) {
+      setRecordedDurationMs(Math.max(0, stoppedAt - startTime))
+    }
     setState("stopped")
-  }, [stopCapture])
+  }, [startTime, stopCapture])
 
   useRecorderRecordingSync({
     captureType,
@@ -186,6 +193,7 @@ function App() {
       }
 
       setStartTime(startedAt)
+      setRecordedDurationMs(null)
       setState("recording")
     }
   }, [debuggerSessionId, startCapture])
@@ -194,6 +202,7 @@ function App() {
     if (captureType === "screenshot") {
       const blob = await captureScreenshot()
       if (blob) {
+        setRecordedDurationMs(null)
         setState("stopped")
       }
       return
@@ -204,9 +213,12 @@ function App() {
 
   useEffect(() => {
     if (state === "recording" && recordedBlob) {
+      if (startTime) {
+        setRecordedDurationMs(Math.max(0, Date.now() - startTime))
+      }
       setState("stopped")
     }
-  }, [state, recordedBlob])
+  }, [recordedBlob, startTime, state])
 
   useEffect(() => {
     if (state !== "stopped") {
@@ -249,6 +261,7 @@ function App() {
     onCaptureTypeChange: setCaptureType,
     onScreenshotLoaded: (blob) => {
       setScreenshotBlob(blob)
+      setRecordedDurationMs(null)
       setState("stopped")
     },
     onStartRecording: handleStartCapture,
@@ -263,6 +276,7 @@ function App() {
     setSubmissionWarnings([])
     setPreSubmitWarnings([])
     setDebuggerSummary(EMPTY_DEBUGGER_SUMMARY)
+    setRecordedDurationMs(null)
     setStartTime(null)
     clearDebuggerState().catch((error: unknown) => {
       reportNonFatalError("Failed to clear debugger state after reset", error)
@@ -287,27 +301,19 @@ function App() {
 
     try {
       const durationMs =
-        captureType === "video" && startTime ? Date.now() - startTime : 0
+        captureType === "video"
+          ? Math.max(
+              0,
+              recordedDurationMs ?? (startTime ? Date.now() - startTime : 0)
+            )
+          : 0
       const debuggerSubmission = await getDebuggerSubmissionInput()
-      const warnings = [...debuggerSubmission.warnings]
-
-      const normalizedUrl = normalizeOptionalUrl(captureContext.url)
-      if (captureContext.url && !normalizedUrl) {
-        warnings.push(
-          "The captured page URL was invalid and was not attached to this report."
-        )
-      }
-
-      const normalizedPageTitle = normalizeOptionalText(
-        captureContext.title,
-        MAX_PAGE_TITLE_LENGTH
-      )
-      if (
-        typeof captureContext.title === "string" &&
-        captureContext.title.trim().length > MAX_PAGE_TITLE_LENGTH
-      ) {
-        warnings.push("The captured page title was shortened before upload.")
-      }
+      const captureContextSubmissionData =
+        buildCaptureContextSubmissionData(captureContext)
+      const warnings = [
+        ...debuggerSubmission.warnings,
+        ...captureContextSubmissionData.warnings,
+      ]
 
       const result = await client.bugReport.create({
         attachment: blob,
@@ -315,11 +321,11 @@ function App() {
         title: normalizeOptionalText(values.title, 200),
         priority: values.priority,
         description: normalizeOptionalText(values.description, 3000),
-        url: normalizedUrl,
+        url: captureContextSubmissionData.normalizedUrl,
         metadata: {
           duration: formatDuration(durationMs),
           durationMs,
-          pageTitle: normalizedPageTitle,
+          pageTitle: captureContextSubmissionData.normalizedPageTitle,
         },
         deviceInfo: getDeviceInfo(),
         debugger: debuggerSubmission.payload,
@@ -414,6 +420,11 @@ function App() {
               preSubmitWarnings={preSubmitWarnings}
               previewUrl={previewUrl}
               submitError={submitError}
+              videoDurationMs={
+                captureType === "video"
+                  ? (recordedDurationMs ?? (duration > 0 ? duration : null))
+                  : null
+              }
             />
           ) : null}
 
@@ -459,6 +470,40 @@ function normalizeOptionalUrl(value: string | undefined): string | undefined {
     return new URL(normalized).toString()
   } catch {
     return undefined
+  }
+}
+
+function buildCaptureContextSubmissionData(input: {
+  title: string | undefined
+  url: string | undefined
+}): {
+  normalizedPageTitle: string | undefined
+  normalizedUrl: string | undefined
+  warnings: string[]
+} {
+  const warnings: string[] = []
+  const normalizedUrl = normalizeOptionalUrl(input.url)
+  if (input.url && !normalizedUrl) {
+    warnings.push(
+      "The captured page URL was invalid and was not attached to this report."
+    )
+  }
+
+  const normalizedPageTitle = normalizeOptionalText(
+    input.title,
+    MAX_PAGE_TITLE_LENGTH
+  )
+  if (
+    typeof input.title === "string" &&
+    input.title.trim().length > MAX_PAGE_TITLE_LENGTH
+  ) {
+    warnings.push("The captured page title was shortened before upload.")
+  }
+
+  return {
+    normalizedPageTitle,
+    normalizedUrl,
+    warnings,
   }
 }
 
