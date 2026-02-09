@@ -6,14 +6,17 @@ import {
 } from "./messaging"
 
 export function setupDebuggerContentBridge(): void {
-  if (typeof window === "undefined" || window.top !== window) {
+  if (typeof window === "undefined") {
     return
   }
 
-  // Ask background to inject main-world runtime as early as possible on each load.
-  ensureDebuggerPageRuntime().catch((error: unknown) => {
-    reportNonFatalError("Failed to request debugger runtime injection", error)
-  })
+  const isTopWindow = window.top === window
+
+  if (isTopWindow) {
+    ensureDebuggerPageRuntime().catch((error: unknown) => {
+      reportNonFatalError("Failed to request debugger runtime injection", error)
+    })
+  }
 
   const queue: unknown[] = []
   let flushTimer: ReturnType<typeof setTimeout> | null = null

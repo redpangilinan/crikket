@@ -292,11 +292,6 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
   const startSession = async (payload: StartSessionPayload) => {
     await ensureLoaded()
 
-    const existingSessionId = tabToSession.get(payload.captureTabId)
-    if (existingSessionId) {
-      removeSession(existingSessionId)
-    }
-
     const startedAt = Date.now()
     const sessionId = createSessionId()
     const replayLookbackMs = normalizeInstantReplayLookbackMs(

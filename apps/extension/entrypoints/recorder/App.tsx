@@ -27,8 +27,7 @@ import {
   getDebuggerSessionSnapshot,
   hasDebuggerPayloadData,
   markDebuggerRecordingStarted,
-  readStoredDebuggerSessionId,
-  storeDebuggerSessionId,
+  readDebuggerSessionIdFromSearch,
 } from "@/lib/bug-report-debugger"
 import { client } from "@/lib/orpc"
 import { formatDuration, getDeviceInfo } from "@/lib/utils"
@@ -66,6 +65,10 @@ function App() {
   const [preSubmitWarnings, setPreSubmitWarnings] = useState<string[]>([])
   const [debuggerSummary, setDebuggerSummary] =
     useState<DebuggerCaptureSummary>(EMPTY_DEBUGGER_SUMMARY)
+  const debuggerSessionId = useMemo(
+    () => readDebuggerSessionIdFromSearch(window.location.search),
+    []
+  )
 
   const captureContext = useCaptureContext()
 
@@ -83,22 +86,21 @@ function App() {
   const duration = useTimer(startTime, state === "recording")
 
   const clearDebuggerState = useCallback(async () => {
-    const sessionId = await readStoredDebuggerSessionId()
-    if (sessionId) {
-      await discardDebuggerSession(sessionId).catch((error: unknown) => {
-        reportNonFatalError(
-          "Failed to discard debugger session during reset",
-          error
-        )
-      })
+    if (debuggerSessionId) {
+      await discardDebuggerSession(debuggerSessionId).catch(
+        (error: unknown) => {
+          reportNonFatalError(
+            "Failed to discard debugger session during reset",
+            error
+          )
+        }
+      )
     }
-
-    await storeDebuggerSessionId(null)
-  }, [])
+  }, [debuggerSessionId])
 
   const getDebuggerSubmissionInput = useCallback(async () => {
     const warnings: string[] = []
-    const sessionId = await readStoredDebuggerSessionId()
+    const sessionId = debuggerSessionId
     if (!sessionId) {
       warnings.push(
         "Debugger session was not found. This report may be missing captured logs."
@@ -153,7 +155,7 @@ function App() {
       summary,
       warnings,
     } satisfies DebuggerSubmissionInput
-  }, [])
+  }, [debuggerSessionId])
 
   const handleStopRecording = useCallback(async () => {
     await stopCapture()
@@ -170,7 +172,7 @@ function App() {
     const success = await startCapture()
     if (success) {
       const startedAt = Date.now()
-      const sessionId = await readStoredDebuggerSessionId()
+      const sessionId = debuggerSessionId
       if (sessionId) {
         await markDebuggerRecordingStarted({
           sessionId,
@@ -186,7 +188,7 @@ function App() {
       setStartTime(startedAt)
       setState("recording")
     }
-  }, [startCapture])
+  }, [debuggerSessionId, startCapture])
 
   const handleStartCapture = useCallback(async () => {
     if (captureType === "screenshot") {
@@ -333,7 +335,6 @@ function App() {
           }
         )
       }
-      await storeDebuggerSessionId(null)
 
       setResultUrl(`${env.VITE_APP_URL}${result.shareUrl}`)
       setSubmissionWarnings(

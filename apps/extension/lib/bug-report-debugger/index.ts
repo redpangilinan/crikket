@@ -15,6 +15,10 @@ export {
   hasDebuggerPayloadData,
 } from "./payload"
 export {
+  appendDebuggerSessionIdToUrl,
+  readDebuggerSessionIdFromSearch,
+} from "./recorder-session"
+export {
   readStoredDebuggerSessionId,
   storeDebuggerSessionId,
 } from "./storage"
