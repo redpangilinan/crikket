@@ -5,6 +5,12 @@ import {
 } from "./constants"
 import type { DebuggerEvent, StoredDebuggerSession } from "./types"
 
+export interface StoredReplayBuffer {
+  tabId: number
+  lastTouchedAt: number
+  events: DebuggerEvent[]
+}
+
 export function normalizeStoredSession(
   value: unknown
 ): StoredDebuggerSession | null {
@@ -201,4 +207,31 @@ function isDefined<TValue>(value: TValue | null | undefined): value is TValue {
 
 export function isRecordLike(value: unknown): value is Record<string, unknown> {
   return isRecord(value)
+}
+
+export function normalizeStoredReplayBuffer(
+  value: unknown
+): StoredReplayBuffer | null {
+  if (!isRecord(value)) return null
+
+  const tabId = asOptionalNumber(value.tabId)
+  const lastTouchedAt = asOptionalNumber(value.lastTouchedAt)
+  if (
+    tabId === undefined ||
+    tabId < 0 ||
+    lastTouchedAt === undefined ||
+    lastTouchedAt < 0
+  ) {
+    return null
+  }
+
+  const events = Array.isArray(value.events)
+    ? value.events.map(normalizeDebuggerEvent).filter(isDefined)
+    : []
+
+  return {
+    tabId,
+    lastTouchedAt,
+    events,
+  }
 }

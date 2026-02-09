@@ -1,5 +1,6 @@
 import { db } from "@crikket/db"
 import { bugReport } from "@crikket/db/schema/bug-report"
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import {
   buildPaginationMeta,
   normalizePaginationParams,
@@ -17,6 +18,7 @@ import {
   getBugReportDebuggerEventsData,
   getBugReportNetworkRequestPayload as getBugReportNetworkRequestPayloadData,
   getBugReportNetworkRequestsPage,
+  type PersistBugReportDebuggerDataResult,
   persistBugReportDebuggerData,
 } from "./debugger"
 import {
@@ -231,11 +233,42 @@ export const createBugReport = protectedProcedure
       metadata: normalizedMetadata,
     })
 
-    await persistBugReportDebuggerData(id, input.debugger)
+    let debuggerPersistence: PersistBugReportDebuggerDataResult
+    try {
+      debuggerPersistence = await persistBugReportDebuggerData(
+        id,
+        input.debugger
+      )
+    } catch (error) {
+      reportNonFatalError(
+        `Failed to persist debugger data for bug report ${id}`,
+        error
+      )
+      debuggerPersistence = {
+        requested: {
+          actions: input.debugger?.actions.length ?? 0,
+          logs: input.debugger?.logs.length ?? 0,
+          networkRequests: input.debugger?.networkRequests.length ?? 0,
+        },
+        persisted: {
+          actions: 0,
+          logs: 0,
+          networkRequests: 0,
+        },
+        dropped: {
+          actions: input.debugger?.actions.length ?? 0,
+          logs: input.debugger?.logs.length ?? 0,
+          networkRequests: input.debugger?.networkRequests.length ?? 0,
+        },
+        warnings: ["Failed to store debugger data for this report."],
+      }
+    }
 
     return {
       id,
       shareUrl: `/s/${id}`,
+      warnings: debuggerPersistence.warnings,
+      debugger: debuggerPersistence,
     }
   })
 

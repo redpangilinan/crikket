@@ -10,6 +10,7 @@ import type { DebuggerCaptureType, DebuggerSessionSnapshot } from "./types"
 export function startDebuggerSession(input: {
   captureTabId: number
   captureType: DebuggerCaptureType
+  instantReplayLookbackMs?: number
 }): Promise<{ sessionId: string; startedAt: number }> {
   return sendDebuggerMessage<{ sessionId: string; startedAt: number }>({
     type: START_SESSION_MESSAGE,
