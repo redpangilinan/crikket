@@ -59,6 +59,19 @@ const EMPTY_SELECTION: SelectedEntryIds = {
   network: null,
 }
 
+function getMetadataDurationMs(metadata: unknown): number | null {
+  if (!metadata || typeof metadata !== "object") {
+    return null
+  }
+
+  const durationMs = (metadata as { durationMs?: unknown }).durationMs
+  if (typeof durationMs !== "number" || !Number.isFinite(durationMs)) {
+    return null
+  }
+
+  return Math.max(0, Math.floor(durationMs))
+}
+
 export function BugReportView({ id }: BugReportViewProps) {
   const { data, isLoading, error } = useQuery(
     orpc.bugReport.getById.queryOptions({
@@ -128,6 +141,7 @@ export function BugReportView({ id }: BugReportViewProps) {
 
   const showVideo =
     data?.attachmentType === "video" && Boolean(data.attachmentUrl)
+  const metadataDurationMs = getMetadataDurationMs(data?.metadata)
 
   const actionEntries = useMemo(
     () => debuggerEvents.actions.map(buildActionEntry),
@@ -202,7 +216,13 @@ export function BugReportView({ id }: BugReportViewProps) {
       return
     }
 
-    const targetSeconds = entry.offset / 1000
+    const clampedOffsetMs =
+      typeof metadataDurationMs === "number"
+        ? Math.min(entry.offset, metadataDurationMs)
+        : entry.offset
+    const targetSeconds = clampedOffsetMs / 1000
+    const visiblePlayer = getVisibleVideoElement()
+    const shouldResumePlayback = Boolean(visiblePlayer && !visiblePlayer.paused)
     const knownPlayers = [desktopVideoRef.current, mobileVideoRef.current]
     for (const player of knownPlayers) {
       if (!player) {
@@ -211,16 +231,15 @@ export function BugReportView({ id }: BugReportViewProps) {
       player.currentTime = targetSeconds
     }
 
-    setPlaybackOffsetMs(entry.offset)
+    setPlaybackOffsetMs(clampedOffsetMs)
 
-    const visiblePlayer = getVisibleVideoElement()
-    if (!visiblePlayer) {
+    if (!(visiblePlayer && shouldResumePlayback)) {
       return
     }
 
     visiblePlayer.play().catch((error: unknown) => {
       reportNonFatalError(
-        "Failed to resume playback after timeline seek interaction",
+        "Failed to preserve playback after timeline seek interaction",
         error
       )
     })
