@@ -5,6 +5,7 @@ import {
   type Priority,
 } from "@crikket/shared/constants/priorities"
 import { reportNonFatalError } from "@crikket/shared/lib/errors"
+import { retryOnUniqueViolation } from "@crikket/shared/lib/retry-on-unique-violation"
 import {
   buildPaginationMeta,
   normalizePaginationParams,
@@ -190,10 +191,8 @@ export const createBugReport = protectedProcedure
       throw new ORPCError("BAD_REQUEST", { message: "No active organization" })
     }
 
-    const id = nanoid(12)
-
     const storage = getStorageProvider()
-    const filename = generateFilename(id, input.attachmentType)
+    const filename = generateFilename(input.attachmentType)
 
     let attachmentUrl: string
     try {
@@ -224,21 +223,27 @@ export const createBugReport = protectedProcedure
       input.metadata?.pageTitle?.trim() ??
       buildFallbackTitle(input.attachmentType)
 
-    await db.insert(bugReport).values({
-      id,
-      organizationId: activeOrgId,
-      reporterId: context.session.user.id,
-      title: inferredTitle,
-      description: input.description,
-      priority: input.priority,
-      url: input.url,
-      attachmentUrl,
-      attachmentKey: filename,
-      attachmentType: input.attachmentType,
-      visibility: input.visibility,
-      deviceInfo: input.deviceInfo,
-      status: "open",
-      metadata: normalizedMetadata,
+    const { id } = await retryOnUniqueViolation(async () => {
+      const generatedId = nanoid(12)
+
+      await db.insert(bugReport).values({
+        id: generatedId,
+        organizationId: activeOrgId,
+        reporterId: context.session.user.id,
+        title: inferredTitle,
+        description: input.description,
+        priority: input.priority,
+        url: input.url,
+        attachmentUrl,
+        attachmentKey: filename,
+        attachmentType: input.attachmentType,
+        visibility: input.visibility,
+        deviceInfo: input.deviceInfo,
+        status: "open",
+        metadata: normalizedMetadata,
+      })
+
+      return { id: generatedId }
     })
 
     let debuggerPersistence: PersistBugReportDebuggerDataResult

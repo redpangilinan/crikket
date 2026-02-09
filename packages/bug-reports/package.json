@@ -19,7 +19,7 @@
     "@orpc/zod": "catalog:",
     "drizzle-orm": "catalog:",
     "drizzle-zod": "^0.8.3",
-    "nanoid": "^5.1.5",
+    "nanoid": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
