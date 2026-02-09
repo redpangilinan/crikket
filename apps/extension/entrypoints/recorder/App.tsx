@@ -368,20 +368,20 @@ function App() {
   }, [duration, state])
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-8">
-      <Card className="w-full max-w-2xl shadow-lg">
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2 text-2xl">
-            🦗 Crikket Bug Report
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100/80 p-6 sm:p-8">
+      <Card className="w-full max-w-3xl border-border/80 shadow-lg shadow-slate-950/5">
+        <CardHeader className="gap-2 border-b bg-muted/20 text-left">
+          <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
+            Crikket Bug Report
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             {state === "idle" && "Ready to capture"}
             {state === "recording" && "Recording in progress..."}
             {state === "stopped" && "Review and submit"}
             {state === "success" && "Report submitted!"}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 px-6 py-6">
           {error ? (
             <div className="flex items-center gap-2 rounded-md bg-destructive/15 p-4 text-destructive">
               <AlertCircle className="h-4 w-4" />

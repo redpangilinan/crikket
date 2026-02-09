@@ -707,7 +707,7 @@
           "type": "text",
           "primaryKey": false,
           "notNull": true,
-          "default": "'medium'"
+          "default": "'none'"
         },
         "tags": {
           "name": "tags",

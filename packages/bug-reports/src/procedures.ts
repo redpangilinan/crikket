@@ -1,5 +1,9 @@
 import { db } from "@crikket/db"
 import { bugReport } from "@crikket/db/schema/bug-report"
+import {
+  PRIORITY_OPTIONS,
+  type Priority,
+} from "@crikket/shared/constants/priorities"
 import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import {
   buildPaginationMeta,
@@ -44,6 +48,10 @@ import {
 } from "./utils"
 
 const o = os.$context<{ session?: SessionContext }>()
+const priorityValues = Object.values(PRIORITY_OPTIONS) as [
+  Priority,
+  ...Priority[],
+]
 
 const requireAuth = o.middleware(({ context, next }) => {
   if (!context.session?.user) {
@@ -159,7 +167,7 @@ export const createBugReport = protectedProcedure
     z.object({
       title: optionalText(200),
       description: optionalText(3000),
-      priority: z.enum(["low", "medium", "high", "critical"]).default("medium"),
+      priority: z.enum(priorityValues).default(PRIORITY_OPTIONS.none),
       url: z.string().url().optional(),
       attachmentType: z.enum(["video", "screenshot"]),
       visibility: z.enum(visibilityValues).default("private"),

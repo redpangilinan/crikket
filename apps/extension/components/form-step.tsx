@@ -14,6 +14,7 @@ import {
 } from "@crikket/ui/components/ui/select"
 import { Textarea } from "@crikket/ui/components/ui/textarea"
 import { useForm } from "@tanstack/react-form"
+import { AlertTriangle } from "lucide-react"
 import { useEffect } from "react"
 import * as z from "zod"
 
@@ -52,6 +53,12 @@ interface FormStepProps {
   onCancel: () => void
 }
 
+interface FormValues {
+  title: string
+  description: string
+  priority: Priority
+}
+
 export function FormStep({
   captureType,
   previewUrl,
@@ -63,12 +70,14 @@ export function FormStep({
   onSubmit,
   onCancel,
 }: FormStepProps) {
+  const defaultValues: FormValues = {
+    title: initialTitle,
+    description: "",
+    priority: PRIORITY_OPTIONS.none,
+  }
+
   const form = useForm({
-    defaultValues: {
-      title: initialTitle,
-      description: "",
-      priority: "medium" as Priority,
-    },
+    defaultValues,
     validators: {
       onSubmit: formSchema,
     },
@@ -82,6 +91,10 @@ export function FormStep({
   })
 
   const isBusy = isSubmitting || form.state.isSubmitting
+  const totalCapturedEvents =
+    debuggerSummary.actions +
+    debuggerSummary.logs +
+    debuggerSummary.networkRequests
 
   useEffect(() => {
     if (!form.state.values.title && initialTitle) {
@@ -91,81 +104,119 @@ export function FormStep({
 
   return (
     <div className="space-y-6">
-      {/* Preview */}
       {previewUrl && (
-        <div className="overflow-hidden rounded-lg border bg-black">
+        <div className="overflow-hidden rounded-xl border bg-black shadow-sm">
           {captureType === "video" ? (
             <video
-              className="w-full"
+              className="max-h-[400px] w-full bg-black object-contain"
               controls
               src={previewUrl}
-              style={{ maxHeight: "400px" }}
             >
               <track kind="captions" />
             </video>
           ) : (
             <img
               alt="Screenshot preview"
-              className="w-full"
+              className="max-h-[400px] w-full bg-black object-contain"
               src={previewUrl}
-              style={{ maxHeight: "400px", objectFit: "contain" }}
             />
           )}
         </div>
       )}
 
       <form
+        className="space-y-6"
         onSubmit={(event) => {
           event.preventDefault()
           event.stopPropagation()
           form.handleSubmit()
         }}
       >
-        {/* Form */}
         <div className="space-y-4">
-          <div className="rounded-lg border bg-slate-50 p-4">
-            <p className="font-medium text-slate-700 text-sm">
-              Captured debugger data
+          <section className="space-y-2 rounded-xl border bg-muted/20 p-4">
+            <p className="font-medium text-sm">Captured debugger data</p>
+            <p className="text-muted-foreground text-xs">
+              {totalCapturedEvents} total events
             </p>
-            <p className="mt-1 text-slate-600 text-xs">
-              Actions: {debuggerSummary.actions} | Logs: {debuggerSummary.logs}{" "}
-              | Requests: {debuggerSummary.networkRequests}
-            </p>
-          </div>
-
-          {preSubmitWarnings.length > 0 ? (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
-              <p className="font-medium text-amber-700 text-sm">
-                Please review before submitting
-              </p>
-              <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-700 text-xs">
-                {preSubmitWarnings.map((warning) => (
-                  <li key={warning}>{warning}</li>
-                ))}
-              </ul>
+            <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
+              <span>Actions: {debuggerSummary.actions}</span>
+              <span aria-hidden="true">•</span>
+              <span>Logs: {debuggerSummary.logs}</span>
+              <span aria-hidden="true">•</span>
+              <span>Requests: {debuggerSummary.networkRequests}</span>
             </div>
-          ) : null}
+          </section>
 
-          <form.Field name="title">
-            {(field) => {
-              const isInvalid =
-                field.state.meta.isTouched && field.state.meta.errors.length > 0
-              return (
-                <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>Title (Optional)</FieldLabel>
-                  <Input
-                    aria-invalid={isInvalid}
-                    id={field.name}
-                    onBlur={field.handleBlur}
-                    onChange={(event) => field.handleChange(event.target.value)}
-                    placeholder="Give this report a quick title"
-                    value={field.state.value}
-                  />
-                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
-                </Field>
-              )
-            }}
-          </form.Field>
+          <div className="grid gap-4 sm:grid-cols-[minmax(0,1fr)_190px]">
+            <form.Field name="title">
+              {(field) => {
+                const isInvalid =
+                  field.state.meta.isTouched &&
+                  field.state.meta.errors.length > 0
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel htmlFor={field.name}>
+                      Title (Optional)
+                    </FieldLabel>
+                    <Input
+                      aria-invalid={isInvalid}
+                      id={field.name}
+                      onBlur={field.handleBlur}
+                      onChange={(event) =>
+                        field.handleChange(event.target.value)
+                      }
+                      placeholder="Give this report a quick title"
+                      value={field.state.value}
+                    />
+                    {isInvalid && (
+                      <FieldError errors={field.state.meta.errors} />
+                    )}
+                  </Field>
+                )
+              }}
+            </form.Field>
+
+            <form.Field name="priority">
+              {(field) => {
+                const isInvalid =
+                  field.state.meta.isTouched &&
+                  field.state.meta.errors.length > 0
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel htmlFor={field.name}>
+                      Priority (Optional)
+                    </FieldLabel>
+                    <Select
+                      onValueChange={(value) => {
+                        if (value) {
+                          field.handleChange(value as Priority)
+                        }
+                      }}
+                      value={field.state.value}
+                    >
+                      <SelectTrigger
+                        aria-invalid={isInvalid}
+                        className="w-full"
+                        id={field.name}
+                      >
+                        <SelectValue className="capitalize" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {priorityValues.map((priority) => (
+                          <SelectItem key={priority} value={priority}>
+                            {formatPriorityLabel(priority)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {isInvalid && (
+                      <FieldError errors={field.state.meta.errors} />
+                    )}
+                  </Field>
+                )
+              }}
+            </form.Field>
+          </div>
 
           <form.Field name="description">
             {(field) => {
@@ -191,52 +242,28 @@ export function FormStep({
               )
             }}
           </form.Field>
-
-          <form.Field name="priority">
-            {(field) => {
-              const isInvalid =
-                field.state.meta.isTouched && field.state.meta.errors.length > 0
-              return (
-                <Field data-invalid={isInvalid}>
-                  <FieldLabel htmlFor={field.name}>Priority</FieldLabel>
-                  <Select
-                    onValueChange={(value) => {
-                      if (value) {
-                        field.handleChange(value as Priority)
-                      }
-                    }}
-                    value={field.state.value}
-                  >
-                    <SelectTrigger aria-invalid={isInvalid} id={field.name}>
-                      <SelectValue className="capitalize" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {priorityValues.map((priority) => (
-                        <SelectItem
-                          className="capitalize"
-                          key={priority}
-                          value={priority}
-                        >
-                          {priority}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {isInvalid && <FieldError errors={field.state.meta.errors} />}
-                </Field>
-              )
-            }}
-          </form.Field>
         </div>
 
-        {/* Error */}
+        {preSubmitWarnings.length > 0 ? (
+          <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+            <p className="flex items-center gap-2 font-medium text-amber-800 text-sm">
+              <AlertTriangle className="h-4 w-4" />
+              Review before submitting
+            </p>
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-800 text-xs">
+              {preSubmitWarnings.map((warning) => (
+                <li key={warning}>{warning}</li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
+
         {submitError && (
           <div className="mt-6 rounded-lg border border-red-500/20 bg-red-500/10 p-4">
             <p className="text-red-400 text-sm">{submitError}</p>
           </div>
         )}
 
-        {/* Actions */}
         <div className="mt-6 flex gap-3">
           <Button
             className="flex-1"
@@ -257,4 +284,8 @@ export function FormStep({
       </form>
     </div>
   )
+}
+
+function formatPriorityLabel(priority: Priority): string {
+  return `${priority.charAt(0).toUpperCase()}${priority.slice(1)}`
 }
