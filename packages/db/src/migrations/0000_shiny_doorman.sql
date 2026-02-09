@@ -83,7 +83,7 @@ CREATE TABLE "bug_report" (
 	"title" text,
 	"description" text,
 	"status" text DEFAULT 'open' NOT NULL,
-	"priority" text DEFAULT 'medium' NOT NULL,
+	"priority" text DEFAULT 'none' NOT NULL,
 	"tags" text[],
 	"url" text,
 	"attachment_url" text,

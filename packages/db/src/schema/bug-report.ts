@@ -22,7 +22,7 @@ export const bugReport = pgTable(
     title: text("title"),
     description: text("description"),
     status: text("status").default("open").notNull(), // open, in_progress, resolved, closed
-    priority: text("priority").default("medium").notNull(), // low, medium, high, critical
+    priority: text("priority").default("none").notNull(), // none, low, medium, high, critical
     tags: text("tags").array(), // optional tags for categorization
     url: text("url"),
     attachmentUrl: text("attachment_url"), // video or screenshot URL

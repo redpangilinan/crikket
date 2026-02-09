@@ -120,10 +120,20 @@ function sanitizeHeaders(value: unknown): Record<string, string> | undefined {
 
   for (const [key, headerValue] of Object.entries(value)) {
     if (typeof headerValue !== "string") continue
-    result[key.slice(0, 120)] = headerValue.slice(0, 500)
+
+    const normalizedKey = key.trim().toLowerCase()
+    if (!normalizedKey || shouldHideHeader(normalizedKey)) {
+      continue
+    }
+
+    result[normalizedKey.slice(0, 120)] = headerValue.slice(0, 500)
   }
 
   return Object.keys(result).length > 0 ? result : undefined
+}
+
+function shouldHideHeader(headerName: string): boolean {
+  return headerName.includes("debugger")
 }
 
 function sanitizeRecord(value: unknown): Record<string, unknown> | undefined {

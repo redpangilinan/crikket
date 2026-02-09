@@ -1,10 +1,9 @@
 import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { useState } from "react"
 import {
+  appendDebuggerSessionIdToUrl,
   discardDebuggerSession,
-  readStoredDebuggerSessionId,
   startDebuggerSession,
-  storeDebuggerSessionId,
 } from "@/lib/bug-report-debugger"
 import {
   CAPTURE_CONTEXT_STORAGE_KEY,
@@ -73,11 +72,16 @@ export function usePopupCapture(): UsePopupCaptureReturn {
       )
 
       if (captureType === "screenshot") {
-        await startScreenshotCapture({ activeTab, captureContext })
+        await startScreenshotCapture({
+          activeTab,
+          captureContext,
+          debuggerSessionId,
+        })
       } else {
         await startVideoCapture({
           activeTab,
           captureContext,
+          debuggerSessionId,
           setRecordingCountdown,
         })
       }
@@ -130,23 +134,11 @@ async function initializeDebuggerSession(
   captureType: PopupCaptureType,
   captureTabId: number
 ): Promise<string> {
-  const existingSessionId = await readStoredDebuggerSessionId()
-  if (existingSessionId) {
-    await discardDebuggerSession(existingSessionId).catch((error: unknown) => {
-      reportNonFatalError(
-        `Failed to discard stale debugger session ${existingSessionId}`,
-        error
-      )
-    })
-  }
-
   const session = await startDebuggerSession({
     captureTabId,
     captureType,
     instantReplayLookbackMs: INSTANT_REPLAY_LOOKBACK_MS,
   })
-
-  await storeDebuggerSessionId(session.sessionId)
 
   return session.sessionId
 }
@@ -154,6 +146,7 @@ async function initializeDebuggerSession(
 async function startScreenshotCapture(input: {
   activeTab: ActiveCaptureTab
   captureContext: CaptureContext
+  debuggerSessionId: string
 }): Promise<void> {
   if (input.activeTab.windowId === null) {
     throw new Error(ACTIVE_TAB_ERROR_MESSAGE)
@@ -171,14 +164,20 @@ async function startScreenshotCapture(input: {
     pendingScreenshot: base64data,
   })
 
+  const recorderUrl = appendDebuggerSessionIdToUrl(
+    chrome.runtime.getURL("/recorder.html?captureType=screenshot"),
+    input.debuggerSessionId
+  )
+
   await chrome.tabs.create({
-    url: chrome.runtime.getURL("/recorder.html?captureType=screenshot"),
+    url: recorderUrl,
   })
 }
 
 async function startVideoCapture(input: {
   activeTab: ActiveCaptureTab
   captureContext: CaptureContext
+  debuggerSessionId: string
   setRecordingCountdown: (value: number | null) => void
 }): Promise<void> {
   const countdownEndsAt = Date.now() + RECORDING_COUNTDOWN_SECONDS * 1000
@@ -198,9 +197,14 @@ async function startVideoCapture(input: {
     startRecordingImmediately: true,
   })
 
+  const recorderUrl = appendDebuggerSessionIdToUrl(
+    chrome.runtime.getURL("/recorder.html?captureType=video"),
+    input.debuggerSessionId
+  )
+
   const recorderTab = await chrome.tabs.create({
     active: false,
-    url: chrome.runtime.getURL("/recorder.html?captureType=video"),
+    url: recorderUrl,
   })
 
   if (typeof recorderTab.id === "number") {
@@ -244,8 +248,6 @@ async function handleCaptureFailure(input: {
       }
     )
   }
-
-  await storeDebuggerSessionId(null)
 
   input.setCaptureError(
     input.error instanceof Error ? input.error.message : "Failed to capture"

@@ -27,8 +27,7 @@ import {
   getDebuggerSessionSnapshot,
   hasDebuggerPayloadData,
   markDebuggerRecordingStarted,
-  readStoredDebuggerSessionId,
-  storeDebuggerSessionId,
+  readDebuggerSessionIdFromSearch,
 } from "@/lib/bug-report-debugger"
 import { client } from "@/lib/orpc"
 import { formatDuration, getDeviceInfo } from "@/lib/utils"
@@ -66,6 +65,10 @@ function App() {
   const [preSubmitWarnings, setPreSubmitWarnings] = useState<string[]>([])
   const [debuggerSummary, setDebuggerSummary] =
     useState<DebuggerCaptureSummary>(EMPTY_DEBUGGER_SUMMARY)
+  const debuggerSessionId = useMemo(
+    () => readDebuggerSessionIdFromSearch(window.location.search),
+    []
+  )
 
   const captureContext = useCaptureContext()
 
@@ -83,22 +86,21 @@ function App() {
   const duration = useTimer(startTime, state === "recording")
 
   const clearDebuggerState = useCallback(async () => {
-    const sessionId = await readStoredDebuggerSessionId()
-    if (sessionId) {
-      await discardDebuggerSession(sessionId).catch((error: unknown) => {
-        reportNonFatalError(
-          "Failed to discard debugger session during reset",
-          error
-        )
-      })
+    if (debuggerSessionId) {
+      await discardDebuggerSession(debuggerSessionId).catch(
+        (error: unknown) => {
+          reportNonFatalError(
+            "Failed to discard debugger session during reset",
+            error
+          )
+        }
+      )
     }
-
-    await storeDebuggerSessionId(null)
-  }, [])
+  }, [debuggerSessionId])
 
   const getDebuggerSubmissionInput = useCallback(async () => {
     const warnings: string[] = []
-    const sessionId = await readStoredDebuggerSessionId()
+    const sessionId = debuggerSessionId
     if (!sessionId) {
       warnings.push(
         "Debugger session was not found. This report may be missing captured logs."
@@ -153,7 +155,7 @@ function App() {
       summary,
       warnings,
     } satisfies DebuggerSubmissionInput
-  }, [])
+  }, [debuggerSessionId])
 
   const handleStopRecording = useCallback(async () => {
     await stopCapture()
@@ -170,7 +172,7 @@ function App() {
     const success = await startCapture()
     if (success) {
       const startedAt = Date.now()
-      const sessionId = await readStoredDebuggerSessionId()
+      const sessionId = debuggerSessionId
       if (sessionId) {
         await markDebuggerRecordingStarted({
           sessionId,
@@ -186,7 +188,7 @@ function App() {
       setStartTime(startedAt)
       setState("recording")
     }
-  }, [startCapture])
+  }, [debuggerSessionId, startCapture])
 
   const handleStartCapture = useCallback(async () => {
     if (captureType === "screenshot") {
@@ -333,7 +335,6 @@ function App() {
           }
         )
       }
-      await storeDebuggerSessionId(null)
 
       setResultUrl(`${env.VITE_APP_URL}${result.shareUrl}`)
       setSubmissionWarnings(
@@ -367,20 +368,20 @@ function App() {
   }, [duration, state])
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-50 p-8">
-      <Card className="w-full max-w-2xl shadow-lg">
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2 text-2xl">
-            🦗 Crikket Bug Report
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-b from-slate-50 to-slate-100/80 p-6 sm:p-8">
+      <Card className="w-full max-w-3xl border-border/80 shadow-lg shadow-slate-950/5">
+        <CardHeader className="gap-2 border-b bg-muted/20 text-left">
+          <CardTitle className="flex items-center gap-2 text-xl sm:text-2xl">
+            Crikket Bug Report
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-sm">
             {state === "idle" && "Ready to capture"}
             {state === "recording" && "Recording in progress..."}
             {state === "stopped" && "Review and submit"}
             {state === "success" && "Report submitted!"}
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 px-6 py-6">
           {error ? (
             <div className="flex items-center gap-2 rounded-md bg-destructive/15 p-4 text-destructive">
               <AlertCircle className="h-4 w-4" />
