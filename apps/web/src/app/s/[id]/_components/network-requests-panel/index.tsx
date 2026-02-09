@@ -27,7 +27,8 @@ export function NetworkRequestsPanel({
   bugReportId,
   entries,
   requests,
-  activeEntryId,
+  selectedEntryId,
+  highlightedEntryIds,
   isLoading,
   isFetchingNextPage,
   hasNextPage,
@@ -88,16 +89,23 @@ export function NetworkRequestsPanel({
     )
   }, [debouncedSearchValue, searchParamValue, setSearchParamValue])
 
+  const highlightedEntryIdSet = useMemo(
+    () => new Set(highlightedEntryIds),
+    [highlightedEntryIds]
+  )
+
   const selectedEntry = useMemo(() => {
-    if (activeEntryId) {
-      const activeMatch = entries.find((entry) => entry.id === activeEntryId)
-      if (activeMatch) {
-        return activeMatch
+    if (selectedEntryId) {
+      const selectedMatch = entries.find(
+        (entry) => entry.id === selectedEntryId
+      )
+      if (selectedMatch) {
+        return selectedMatch
       }
     }
 
     return entries[0] ?? null
-  }, [activeEntryId, entries])
+  }, [entries, selectedEntryId])
 
   const selectedRequest = selectedEntry
     ? requestsById.get(selectedEntry.id)
@@ -136,6 +144,22 @@ export function NetworkRequestsPanel({
       observer.disconnect()
     }
   }, [hasNextPage, isFetchingNextPage, onLoadMore])
+
+  useEffect(() => {
+    if (!(selectedEntryId && listContainerRef.current)) {
+      return
+    }
+
+    const escapedSelectedId = CSS.escape(selectedEntryId)
+    const selectedRow = listContainerRef.current.querySelector<HTMLElement>(
+      `[data-entry-id="${escapedSelectedId}"]`
+    )
+
+    selectedRow?.scrollIntoView({
+      behavior: "smooth",
+      block: "nearest",
+    })
+  }, [selectedEntryId])
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -187,9 +211,12 @@ export function NetworkRequestsPanel({
                     <button
                       className={cn(
                         "flex w-full flex-col gap-1.5 px-3 py-2.5 text-left transition-colors hover:bg-muted/50 focus:bg-muted/50 focus:outline-none",
+                        highlightedEntryIdSet.has(entry.id) &&
+                          "bg-muted/30 shadow-[inset_2px_0_0_0] shadow-primary/50",
                         entry.id === selectedEntry?.id &&
                           "bg-muted/60 shadow-[inset_2px_0_0_0] shadow-primary"
                       )}
+                      data-entry-id={entry.id}
                       key={entry.id}
                       onClick={() => onEntrySelect(entry)}
                       type="button"

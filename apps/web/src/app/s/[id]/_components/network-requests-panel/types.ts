@@ -17,7 +17,8 @@ export interface NetworkRequestsPanelProps {
   bugReportId: string
   entries: DebuggerTimelineEntry[]
   requests: DebuggerNetworkRequest[]
-  activeEntryId: string | null
+  selectedEntryId: string | null
+  highlightedEntryIds: string[]
   isLoading: boolean
   isFetchingNextPage: boolean
   hasNextPage: boolean

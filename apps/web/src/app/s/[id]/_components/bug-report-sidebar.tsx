@@ -27,7 +27,12 @@ interface BugReportSidebarProps {
   isFetchingMoreNetworkRequests: boolean
   hasMoreNetworkRequests: boolean
   onLoadMoreNetworkRequests: () => void
-  activeEntryId: string | null
+  selectedActionEntryId: string | null
+  selectedLogEntryId: string | null
+  selectedNetworkEntryId: string | null
+  highlightedActionEntryIds: string[]
+  highlightedLogEntryIds: string[]
+  highlightedNetworkEntryIds: string[]
   onEntrySelect: (entry: DebuggerTimelineEntry) => void
 }
 
@@ -44,7 +49,12 @@ export function BugReportSidebar({
   isFetchingMoreNetworkRequests,
   hasMoreNetworkRequests,
   onLoadMoreNetworkRequests,
-  activeEntryId,
+  selectedActionEntryId,
+  selectedLogEntryId,
+  selectedNetworkEntryId,
+  highlightedActionEntryIds,
+  highlightedLogEntryIds,
+  highlightedNetworkEntryIds,
   onEntrySelect,
 }: BugReportSidebarProps) {
   const deviceInfo = data.deviceInfo as DeviceInfo | null
@@ -125,35 +135,38 @@ export function BugReportSidebar({
 
         {activeTab === "actions" && (
           <TimelineList
-            activeId={activeEntryId}
             emptyMessage="No user actions captured."
             entries={actionEntries}
+            highlightedIds={highlightedActionEntryIds}
             icon={<MousePointerClick className="h-3 w-3" />}
             onSelect={onEntrySelect}
+            selectedId={selectedActionEntryId}
           />
         )}
 
         {activeTab === "console" && (
           <TimelineList
-            activeId={activeEntryId}
             emptyMessage="No console logs captured."
             entries={logEntries}
+            highlightedIds={highlightedLogEntryIds}
             icon={<Terminal className="h-3 w-3" />}
             onSelect={onEntrySelect}
+            selectedId={selectedLogEntryId}
           />
         )}
 
         {activeTab === "network" && (
           <NetworkRequestsPanel
-            activeEntryId={activeEntryId}
             bugReportId={bugReportId}
             entries={networkEntries}
             hasNextPage={hasMoreNetworkRequests}
+            highlightedEntryIds={highlightedNetworkEntryIds}
             isFetchingNextPage={isFetchingMoreNetworkRequests}
             isLoading={isNetworkRequestsLoading}
             onEntrySelect={onEntrySelect}
             onLoadMore={onLoadMoreNetworkRequests}
             requests={networkRequests}
+            selectedEntryId={selectedNetworkEntryId}
           />
         )}
       </div>
