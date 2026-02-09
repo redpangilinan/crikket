@@ -4,6 +4,7 @@ import type {
   MARK_RECORDING_STARTED_MESSAGE,
   PAGE_BRIDGE_SOURCE,
   PAGE_EVENT_MESSAGE,
+  PAGE_EVENTS_MESSAGE,
   START_SESSION_MESSAGE,
 } from "./constants"
 
@@ -146,16 +147,25 @@ export interface DebuggerPageEventMessage {
   }
 }
 
+export interface DebuggerPageEventsMessage {
+  type: typeof PAGE_EVENTS_MESSAGE
+  payload: {
+    events: unknown[]
+  }
+}
+
 export type DebuggerRuntimeMessage =
   | DebuggerStartSessionMessage
   | DebuggerMarkRecordingStartedMessage
   | DebuggerGetSessionSnapshotMessage
   | DebuggerDiscardSessionMessage
   | DebuggerPageEventMessage
+  | DebuggerPageEventsMessage
 
 export interface DebuggerContentBridgePayload {
   source: typeof PAGE_BRIDGE_SOURCE
-  event: unknown
+  event?: unknown
+  events?: unknown[]
 }
 
 export interface StoredDebuggerSession {

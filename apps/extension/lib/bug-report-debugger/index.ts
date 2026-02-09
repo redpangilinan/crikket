@@ -1,4 +1,3 @@
-export { registerDebuggerBackgroundListeners } from "./background"
 export {
   discardDebuggerSession,
   getDebuggerSessionSnapshot,
@@ -10,6 +9,7 @@ export {
   PAGE_BRIDGE_SOURCE,
 } from "./constants"
 export { setupDebuggerContentBridge } from "./content"
+export { registerDebuggerBackgroundListeners } from "./engine/background"
 export {
   buildDebuggerSubmissionPayload,
   hasDebuggerPayloadData,

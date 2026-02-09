@@ -5,6 +5,7 @@ import {
   MARK_RECORDING_STARTED_MESSAGE,
   PAGE_BRIDGE_SOURCE,
   PAGE_EVENT_MESSAGE,
+  PAGE_EVENTS_MESSAGE,
   START_SESSION_MESSAGE,
 } from "./constants"
 import { isRecordLike } from "./normalize"
@@ -44,15 +45,25 @@ export function sendDebuggerMessage<TData>(
 }
 
 export async function sendDebuggerPageEvent(rawEvent: unknown): Promise<void> {
+  await sendDebuggerPageEvents([rawEvent])
+}
+
+export async function sendDebuggerPageEvents(
+  rawEvents: unknown[]
+): Promise<void> {
+  if (rawEvents.length === 0) {
+    return
+  }
+
   try {
     await sendDebuggerMessage<undefined>({
-      type: PAGE_EVENT_MESSAGE,
+      type: PAGE_EVENTS_MESSAGE,
       payload: {
-        event: rawEvent,
+        events: rawEvents,
       },
     })
   } catch (error) {
-    reportNonFatalError("Failed to send debugger page event", error)
+    reportNonFatalError("Failed to send debugger page events", error)
   }
 }
 
@@ -69,7 +80,8 @@ export function isDebuggerRuntimeMessage(
     messageType === MARK_RECORDING_STARTED_MESSAGE ||
     messageType === GET_SESSION_SNAPSHOT_MESSAGE ||
     messageType === DISCARD_SESSION_MESSAGE ||
-    messageType === PAGE_EVENT_MESSAGE
+    messageType === PAGE_EVENT_MESSAGE ||
+    messageType === PAGE_EVENTS_MESSAGE
   )
 }
 
@@ -78,5 +90,12 @@ export function isDebuggerContentBridgePayload(
 ): value is DebuggerContentBridgePayload {
   if (!isRecordLike(value)) return false
 
-  return value.source === PAGE_BRIDGE_SOURCE && Object.hasOwn(value, "event")
+  if (value.source !== PAGE_BRIDGE_SOURCE) {
+    return false
+  }
+
+  const hasSingleEvent = Object.hasOwn(value, "event")
+  const hasEventBatch = Array.isArray(value.events)
+
+  return hasSingleEvent || hasEventBatch
 }
