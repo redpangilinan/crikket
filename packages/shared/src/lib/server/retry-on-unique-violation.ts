@@ -1,4 +1,4 @@
-import { isErrorWithCode } from "./errors"
+import { isErrorWithCode } from "../errors"
 
 const DEFAULT_MAX_ATTEMPTS = 3
 const POSTGRES_UNIQUE_VIOLATION_CODE = "23505"
