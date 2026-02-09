@@ -179,10 +179,7 @@ export function getStorageProvider(): StorageProvider {
 /**
  * Generate a unique filename with original extension preserved
  */
-export function generateFilename(
-  _id: string,
-  type: "video" | "screenshot"
-): string {
+export function generateFilename(type: "video" | "screenshot"): string {
   const timestamp = Date.now()
   const random = Math.random().toString(36).substring(2, 8)
   const ext = type === "video" ? "webm" : "png"

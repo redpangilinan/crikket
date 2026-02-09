@@ -5,6 +5,7 @@ import {
   bugReportNetworkRequest,
 } from "@crikket/db/schema/bug-report"
 import { reportNonFatalError } from "@crikket/shared/lib/errors"
+import { retryOnUniqueViolation } from "@crikket/shared/lib/retry-on-unique-violation"
 import { and, asc, count, eq, ilike, or, sql } from "drizzle-orm"
 import { nanoid } from "nanoid"
 import { z } from "zod"
@@ -292,17 +293,19 @@ export async function persistBugReportDebuggerData(
 
   if (actions.length > 0) {
     try {
-      await db.insert(bugReportAction).values(
-        actions.map((action) => ({
-          id: nanoid(16),
-          bugReportId,
-          type: action.type,
-          target: action.target,
-          timestamp: new Date(action.timestamp),
-          offset: normalizeOffset(action.offset),
-          metadata: action.metadata,
-        }))
-      )
+      await retryOnUniqueViolation(async () => {
+        await db.insert(bugReportAction).values(
+          actions.map((action) => ({
+            id: nanoid(16),
+            bugReportId,
+            type: action.type,
+            target: action.target,
+            timestamp: new Date(action.timestamp),
+            offset: normalizeOffset(action.offset),
+            metadata: action.metadata,
+          }))
+        )
+      })
       persisted.actions = actions.length
     } catch (error) {
       warnings.push("Failed to store debugger action events.")
@@ -315,17 +318,19 @@ export async function persistBugReportDebuggerData(
 
   if (logs.length > 0) {
     try {
-      await db.insert(bugReportLog).values(
-        logs.map((log) => ({
-          id: nanoid(16),
-          bugReportId,
-          level: log.level,
-          message: log.message,
-          timestamp: new Date(log.timestamp),
-          offset: normalizeOffset(log.offset),
-          metadata: log.metadata,
-        }))
-      )
+      await retryOnUniqueViolation(async () => {
+        await db.insert(bugReportLog).values(
+          logs.map((log) => ({
+            id: nanoid(16),
+            bugReportId,
+            level: log.level,
+            message: log.message,
+            timestamp: new Date(log.timestamp),
+            offset: normalizeOffset(log.offset),
+            metadata: log.metadata,
+          }))
+        )
+      })
       persisted.logs = logs.length
     } catch (error) {
       warnings.push("Failed to store debugger log events.")
@@ -338,22 +343,24 @@ export async function persistBugReportDebuggerData(
 
   if (networkRequests.length > 0) {
     try {
-      await db.insert(bugReportNetworkRequest).values(
-        networkRequests.map((request) => ({
-          id: nanoid(16),
-          bugReportId,
-          method: request.method,
-          url: request.url,
-          status: request.status ?? null,
-          duration: request.duration ?? null,
-          requestHeaders: request.requestHeaders,
-          responseHeaders: request.responseHeaders,
-          requestBody: request.requestBody,
-          responseBody: request.responseBody,
-          timestamp: new Date(request.timestamp),
-          offset: normalizeOffset(request.offset),
-        }))
-      )
+      await retryOnUniqueViolation(async () => {
+        await db.insert(bugReportNetworkRequest).values(
+          networkRequests.map((request) => ({
+            id: nanoid(16),
+            bugReportId,
+            method: request.method,
+            url: request.url,
+            status: request.status ?? null,
+            duration: request.duration ?? null,
+            requestHeaders: request.requestHeaders,
+            responseHeaders: request.responseHeaders,
+            requestBody: request.requestBody,
+            responseBody: request.responseBody,
+            timestamp: new Date(request.timestamp),
+            offset: normalizeOffset(request.offset),
+          }))
+        )
+      })
       persisted.networkRequests = networkRequests.length
     } catch (error) {
       warnings.push("Failed to store debugger network requests.")
