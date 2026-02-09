@@ -44,6 +44,7 @@ interface MarkRecordingStartedPayload {
 }
 
 interface DebuggerSessionStore {
+  injectDebuggerScriptForTab: (tabId: number) => Promise<void>
   startSession: (payload: StartSessionPayload) => Promise<{
     sessionId: string
     startedAt: number
@@ -328,6 +329,11 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
     }
   }
 
+  const injectDebuggerScriptForTab = async (tabId: number): Promise<void> => {
+    await ensureLoaded()
+    await injectDebuggerScriptIntoTab(tabId)
+  }
+
   const appendPageEvents = async (tabId: number, rawEvents: unknown[]) => {
     await ensureLoaded()
 
@@ -415,6 +421,7 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
   }
 
   return {
+    injectDebuggerScriptForTab,
     startSession,
     appendPageEvents,
     getSessionSnapshot,

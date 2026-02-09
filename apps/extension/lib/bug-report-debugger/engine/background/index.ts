@@ -2,6 +2,7 @@ import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import {
   BACKGROUND_LISTENER_FLAG,
   DISCARD_SESSION_MESSAGE,
+  ENSURE_PAGE_RUNTIME_MESSAGE,
   GET_SESSION_SNAPSHOT_MESSAGE,
   MARK_RECORDING_STARTED_MESSAGE,
   PAGE_EVENT_MESSAGE,
@@ -72,6 +73,13 @@ export function registerDebuggerBackgroundListeners(): void {
         }
         case PAGE_EVENTS_MESSAGE: {
           await appendEventsForSenderTab(message.payload.events)
+          safeSendResponse({ ok: true, data: undefined })
+          return
+        }
+        case ENSURE_PAGE_RUNTIME_MESSAGE: {
+          if (typeof tabId === "number") {
+            await store.injectDebuggerScriptForTab(tabId)
+          }
           safeSendResponse({ ok: true, data: undefined })
           return
         }

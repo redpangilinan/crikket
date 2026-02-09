@@ -1,5 +1,6 @@
 import type {
   DISCARD_SESSION_MESSAGE,
+  ENSURE_PAGE_RUNTIME_MESSAGE,
   GET_SESSION_SNAPSHOT_MESSAGE,
   MARK_RECORDING_STARTED_MESSAGE,
   PAGE_BRIDGE_SOURCE,
@@ -154,6 +155,11 @@ export interface DebuggerPageEventsMessage {
   }
 }
 
+export interface DebuggerEnsurePageRuntimeMessage {
+  type: typeof ENSURE_PAGE_RUNTIME_MESSAGE
+  payload?: Record<string, never>
+}
+
 export type DebuggerRuntimeMessage =
   | DebuggerStartSessionMessage
   | DebuggerMarkRecordingStartedMessage
@@ -161,6 +167,7 @@ export type DebuggerRuntimeMessage =
   | DebuggerDiscardSessionMessage
   | DebuggerPageEventMessage
   | DebuggerPageEventsMessage
+  | DebuggerEnsurePageRuntimeMessage
 
 export interface DebuggerContentBridgePayload {
   source: typeof PAGE_BRIDGE_SOURCE

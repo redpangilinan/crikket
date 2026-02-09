@@ -3,6 +3,7 @@ import {
   MAX_HEADER_NAME_LENGTH,
   MAX_HEADER_VALUE_LENGTH,
 } from "./constants"
+import type { PageDiagnostics } from "./diagnostics"
 import { parseRawHeaders, toHeaderRecord } from "./headers"
 import {
   createStringifyValue,
@@ -25,6 +26,14 @@ interface PostNetworkPayload {
 
 interface NetworkCaptureInput {
   reporter: Reporter
+  diagnostics: Pick<
+    PageDiagnostics,
+    | "recordFetchCall"
+    | "recordFetchFailure"
+    | "setFetchHookState"
+    | "recordXhrCall"
+    | "setXhrHookInstalled"
+  >
   postNetwork: (payload: PostNetworkPayload) => void
 }
 
@@ -97,11 +106,22 @@ const getFetchRequestBodyPreview = async (
 }
 
 function installFetchCapture(input: NetworkCaptureInput): void {
-  const { postNetwork, reporter } = input
+  const { diagnostics, postNetwork, reporter } = input
   const stringifyValue = createStringifyValue(reporter)
-  const originalFetch = window.fetch
+
+  const bindFetch = (candidate: typeof window.fetch): typeof window.fetch => {
+    return candidate.bind(window) as typeof window.fetch
+  }
+
+  if (typeof window.fetch !== "function") {
+    diagnostics.setFetchHookState("failed")
+    return
+  }
+
+  let delegateFetch = bindFetch(window.fetch)
 
   const patchedFetch = (async (...args: Parameters<typeof window.fetch>) => {
+    diagnostics.recordFetchCall()
     const [requestInput, requestInit] = args
     const startedAt = Date.now()
 
@@ -110,7 +130,7 @@ function installFetchCapture(input: NetworkCaptureInput): void {
     const normalizedUrl = toAbsoluteUrl(url, reporter)
 
     if (!normalizedUrl) {
-      return originalFetch(...args)
+      return delegateFetch(...args)
     }
 
     let requestHeaders: Record<string, string>
@@ -147,7 +167,7 @@ function installFetchCapture(input: NetworkCaptureInput): void {
     )
 
     try {
-      const response = await originalFetch(...args)
+      const response = await delegateFetch(...args)
 
       let responseBody: string | undefined
       try {
@@ -178,6 +198,7 @@ function installFetchCapture(input: NetworkCaptureInput): void {
 
       return response
     } catch (error) {
+      diagnostics.recordFetchFailure(truncate(stringifyValue(error), 300))
       postNetwork({
         method,
         url: normalizedUrl,
@@ -192,12 +213,62 @@ function installFetchCapture(input: NetworkCaptureInput): void {
     }
   }) as typeof window.fetch
 
-  Object.assign(patchedFetch, originalFetch)
-  window.fetch = patchedFetch
+  try {
+    Object.assign(patchedFetch, window.fetch)
+  } catch (error) {
+    reporter.reportNonFatalError(
+      "Failed to mirror fetch properties in debugger instrumentation",
+      error
+    )
+  }
+
+  const fetchDescriptor = Object.getOwnPropertyDescriptor(window, "fetch")
+  const canRedefineFetch = !fetchDescriptor || fetchDescriptor.configurable
+
+  if (canRedefineFetch) {
+    try {
+      Object.defineProperty(window, "fetch", {
+        configurable: true,
+        enumerable: fetchDescriptor?.enumerable ?? true,
+        get() {
+          return patchedFetch
+        },
+        set(nextFetch: unknown) {
+          if (typeof nextFetch !== "function") {
+            return
+          }
+
+          if (nextFetch === patchedFetch) {
+            return
+          }
+
+          delegateFetch = bindFetch(nextFetch as typeof window.fetch)
+        },
+      })
+      diagnostics.setFetchHookState("accessor")
+      return
+    } catch (error) {
+      reporter.reportNonFatalError(
+        "Failed to install fetch accessor in debugger instrumentation",
+        error
+      )
+    }
+  }
+
+  try {
+    window.fetch = patchedFetch
+    diagnostics.setFetchHookState("assignment")
+  } catch (error) {
+    diagnostics.setFetchHookState("failed")
+    reporter.reportNonFatalError(
+      "Failed to patch fetch in debugger instrumentation",
+      error
+    )
+  }
 }
 
 function installXhrCapture(input: NetworkCaptureInput): void {
-  const { postNetwork, reporter } = input
+  const { diagnostics, postNetwork, reporter } = input
   const stringifyValue = createStringifyValue(reporter)
 
   type XhrMeta = {
@@ -279,6 +350,7 @@ function installXhrCapture(input: NetworkCaptureInput): void {
   XMLHttpRequest.prototype.send = function (
     ...args: Parameters<typeof originalSend>
   ) {
+    diagnostics.recordXhrCall()
     const meta = xhrMetaMap.get(this)
     if (meta) {
       meta.startedAt = Date.now()
@@ -333,6 +405,8 @@ function installXhrCapture(input: NetworkCaptureInput): void {
 
     return originalSend.apply(this, args)
   }
+
+  diagnostics.setXhrHookInstalled()
 }
 
 export function installNetworkCapture(input: NetworkCaptureInput): void {

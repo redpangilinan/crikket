@@ -1,7 +1,15 @@
 import { FLUSH_INTERVAL_MS, MAX_BATCH_SIZE, PAGE_SOURCE } from "./constants"
 import type { EventQueue } from "./types"
 
-export function createEventQueue(): EventQueue {
+interface EventQueueDiagnostics {
+  recordQueuedEvent?: () => void
+  recordFlushedBatch?: () => void
+}
+
+export function createEventQueue(
+  input: EventQueueDiagnostics = {}
+): EventQueue {
+  const { recordFlushedBatch, recordQueuedEvent } = input
   const eventQueue: unknown[] = []
   let flushTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -13,6 +21,7 @@ export function createEventQueue(): EventQueue {
     }
 
     const batchedEvents = eventQueue.splice(0, MAX_BATCH_SIZE)
+    recordFlushedBatch?.()
 
     window.postMessage(
       {
@@ -38,6 +47,7 @@ export function createEventQueue(): EventQueue {
 
   const enqueueEvent = (event: unknown) => {
     eventQueue.push(event)
+    recordQueuedEvent?.()
 
     if (eventQueue.length >= MAX_BATCH_SIZE) {
       if (flushTimer) {

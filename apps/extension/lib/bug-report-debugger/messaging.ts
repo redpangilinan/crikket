@@ -1,6 +1,7 @@
 import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import {
   DISCARD_SESSION_MESSAGE,
+  ENSURE_PAGE_RUNTIME_MESSAGE,
   GET_SESSION_SNAPSHOT_MESSAGE,
   MARK_RECORDING_STARTED_MESSAGE,
   PAGE_BRIDGE_SOURCE,
@@ -63,7 +64,26 @@ export async function sendDebuggerPageEvents(
       },
     })
   } catch (error) {
+    if (isExpectedRuntimeDisconnectError(error)) {
+      return
+    }
+
     reportNonFatalError("Failed to send debugger page events", error)
+  }
+}
+
+export async function ensureDebuggerPageRuntime(): Promise<void> {
+  try {
+    await sendDebuggerMessage<undefined>({
+      type: ENSURE_PAGE_RUNTIME_MESSAGE,
+      payload: {},
+    })
+  } catch (error) {
+    if (isExpectedRuntimeDisconnectError(error)) {
+      return
+    }
+
+    reportNonFatalError("Failed to ensure debugger page runtime", error)
   }
 }
 
@@ -81,7 +101,8 @@ export function isDebuggerRuntimeMessage(
     messageType === GET_SESSION_SNAPSHOT_MESSAGE ||
     messageType === DISCARD_SESSION_MESSAGE ||
     messageType === PAGE_EVENT_MESSAGE ||
-    messageType === PAGE_EVENTS_MESSAGE
+    messageType === PAGE_EVENTS_MESSAGE ||
+    messageType === ENSURE_PAGE_RUNTIME_MESSAGE
   )
 }
 
@@ -98,4 +119,16 @@ export function isDebuggerContentBridgePayload(
   const hasEventBatch = Array.isArray(value.events)
 
   return hasSingleEvent || hasEventBatch
+}
+
+function isExpectedRuntimeDisconnectError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false
+  }
+
+  const message = error.message.toLowerCase()
+  return (
+    message.includes("extension context invalidated") ||
+    message.includes("receiving end does not exist")
+  )
 }

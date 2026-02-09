@@ -1,5 +1,6 @@
 import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import {
+  ensureDebuggerPageRuntime,
   isDebuggerContentBridgePayload,
   sendDebuggerPageEvents,
 } from "./messaging"
@@ -8,6 +9,11 @@ export function setupDebuggerContentBridge(): void {
   if (typeof window === "undefined" || window.top !== window) {
     return
   }
+
+  // Ask background to inject main-world runtime as early as possible on each load.
+  ensureDebuggerPageRuntime().catch((error: unknown) => {
+    reportNonFatalError("Failed to request debugger runtime injection", error)
+  })
 
   const queue: unknown[] = []
   let flushTimer: ReturnType<typeof setTimeout> | null = null
