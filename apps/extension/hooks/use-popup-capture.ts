@@ -19,7 +19,6 @@ import {
 export type PopupCaptureType = "video" | "screenshot"
 
 const RECORDING_COUNTDOWN_SECONDS = 3
-const INSTANT_REPLAY_LOOKBACK_MS = 120_000
 const ACTIVE_TAB_ERROR_MESSAGE =
   "Could not find an active browser tab to capture."
 
@@ -137,7 +136,6 @@ async function initializeDebuggerSession(
   const session = await startDebuggerSession({
     captureTabId,
     captureType,
-    instantReplayLookbackMs: INSTANT_REPLAY_LOOKBACK_MS,
   })
 
   return session.sessionId

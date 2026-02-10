@@ -134,7 +134,6 @@ function installFetchCapture(input: NetworkCaptureInput): void {
     }
 
     let requestHeaders: Record<string, string>
-    let requestBody: string | undefined
 
     let requestHeaderSource: Headers | null = null
     if (requestInit?.headers) {
@@ -158,7 +157,7 @@ function installFetchCapture(input: NetworkCaptureInput): void {
           ? toHeaderRecord(requestInput.headers)
           : {}
     }
-    requestBody = await getFetchRequestBodyPreview(
+    const requestBodyPromise = getFetchRequestBodyPreview(
       requestInput,
       requestInit,
       requestHeaderSource,
@@ -168,37 +167,66 @@ function installFetchCapture(input: NetworkCaptureInput): void {
 
     try {
       const response = await delegateFetch(...args)
+      const duration = Date.now() - startedAt
+      const responseHeaders = toHeaderRecord(response.headers)
 
-      let responseBody: string | undefined
-      try {
-        const contentType = response.headers.get("content-type") ?? ""
-        if (shouldCaptureTextContent(contentType)) {
-          responseBody = truncate(
-            await response.clone().text(),
-            MAX_BODY_LENGTH
+      // Never delay the page's fetch lifecycle for debugger body capture.
+      const postResponseEvent = async () => {
+        let requestBody: string | undefined
+        let responseBody: string | undefined
+
+        try {
+          requestBody = await requestBodyPromise
+        } catch (error) {
+          reporter.reportNonFatalError(
+            "Failed to resolve fetch request body in debugger instrumentation",
+            error
           )
         }
-      } catch (error) {
+
+        try {
+          const contentType = response.headers.get("content-type") ?? ""
+          if (shouldCaptureTextContent(contentType)) {
+            responseBody = truncate(
+              await response.clone().text(),
+              MAX_BODY_LENGTH
+            )
+          }
+        } catch (error) {
+          reporter.reportNonFatalError(
+            "Failed to capture fetch response body in debugger instrumentation",
+            error
+          )
+        }
+
+        postNetwork({
+          method,
+          url: normalizedUrl,
+          status: response.status,
+          duration,
+          requestHeaders,
+          responseHeaders,
+          requestBody,
+          responseBody,
+        })
+      }
+      postResponseEvent().catch((error: unknown) => {
         reporter.reportNonFatalError(
-          "Failed to capture fetch response body in debugger instrumentation",
+          "Failed to post fetch network event in debugger instrumentation",
           error
         )
-      }
-
-      postNetwork({
-        method,
-        url: normalizedUrl,
-        status: response.status,
-        duration: Date.now() - startedAt,
-        requestHeaders,
-        responseHeaders: toHeaderRecord(response.headers),
-        requestBody,
-        responseBody,
       })
 
       return response
     } catch (error) {
       diagnostics.recordFetchFailure(truncate(stringifyValue(error), 300))
+      let requestBody: string | undefined
+      try {
+        requestBody = await requestBodyPromise
+      } catch (_requestBodyError) {
+        requestBody = undefined
+      }
+
       postNetwork({
         method,
         url: normalizedUrl,
