@@ -136,6 +136,7 @@ async function initializeDebuggerSession(
   const session = await startDebuggerSession({
     captureTabId,
     captureType,
+    instantReplayLookbackMs: captureType === "screenshot" ? 10_000 : undefined,
   })
 
   return session.sessionId
