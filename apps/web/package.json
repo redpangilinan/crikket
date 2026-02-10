@@ -23,12 +23,13 @@
     "babel-plugin-react-compiler": "catalog:",
     "better-auth": "catalog:",
     "lucide-react": "catalog:",
-    "next": "^16.1.1",
+    "next": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
     "zod": "catalog:",
     "sonner": "catalog:",
-    "nuqs": "catalog:"
+    "nuqs": "catalog:",
+    "nextjs-toploader": "catalog:"
   },
   "devDependencies": {
     "@crikket/config": "workspace:*",

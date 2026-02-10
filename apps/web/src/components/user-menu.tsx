@@ -11,7 +11,7 @@ import {
 } from "@crikket/ui/components/ui/dropdown-menu"
 import { Skeleton } from "@crikket/ui/components/ui/skeleton"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { useRouter } from "nextjs-toploader/app"
 
 export default function UserMenu() {
   const router = useRouter()

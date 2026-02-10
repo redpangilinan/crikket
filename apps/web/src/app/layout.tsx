@@ -4,6 +4,7 @@ import { Geist, Geist_Mono } from "next/font/google"
 
 import "@crikket/ui/styles/globals.css"
 import { siteConfig } from "@crikket/shared/config/site"
+import NextTopLoader from "nextjs-toploader"
 import Providers from "@/components/providers"
 
 const geistSans = Geist({
@@ -35,6 +36,7 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
+        <NextTopLoader />
         <Providers>{children}</Providers>
       </body>
     </html>
