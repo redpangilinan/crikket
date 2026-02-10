@@ -63,6 +63,26 @@ export function buildNetworkEntry(
   }
 }
 
+export function applyVideoOffsetFallback(
+  entries: DebuggerTimelineEntry[],
+  enabled: boolean
+): DebuggerTimelineEntry[] {
+  if (!enabled) {
+    return entries
+  }
+
+  return entries.map((entry) => {
+    if (typeof entry.offset === "number") {
+      return entry
+    }
+
+    return {
+      ...entry,
+      offset: 0,
+    }
+  })
+}
+
 export function getPlaybackEntryIds(input: {
   showVideo: boolean
   playbackOffsetMs: number

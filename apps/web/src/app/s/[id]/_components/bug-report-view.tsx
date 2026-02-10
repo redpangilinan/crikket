@@ -26,6 +26,7 @@ import { BugReportHeader } from "./bug-report-header"
 import { BugReportSidebar, type SidebarTab } from "./bug-report-sidebar"
 import type { DebuggerTimelineEntry } from "./types"
 import {
+  applyVideoOffsetFallback,
   buildActionEntry,
   buildLogEntry,
   buildNetworkEntry,
@@ -144,16 +145,28 @@ export function BugReportView({ id }: BugReportViewProps) {
   const metadataDurationMs = getMetadataDurationMs(data?.metadata)
 
   const actionEntries = useMemo(
-    () => debuggerEvents.actions.map(buildActionEntry),
-    [debuggerEvents.actions]
+    () =>
+      applyVideoOffsetFallback(
+        debuggerEvents.actions.map(buildActionEntry),
+        showVideo
+      ),
+    [debuggerEvents.actions, showVideo]
   )
   const logEntries = useMemo(
-    () => debuggerEvents.logs.map(buildLogEntry),
-    [debuggerEvents.logs]
+    () =>
+      applyVideoOffsetFallback(
+        debuggerEvents.logs.map(buildLogEntry),
+        showVideo
+      ),
+    [debuggerEvents.logs, showVideo]
   )
   const networkEntries = useMemo(
-    () => networkRequests.map(buildNetworkEntry),
-    [networkRequests]
+    () =>
+      applyVideoOffsetFallback(
+        networkRequests.map(buildNetworkEntry),
+        showVideo
+      ),
+    [networkRequests, showVideo]
   )
 
   const playbackActionEntryIds = useMemo(
