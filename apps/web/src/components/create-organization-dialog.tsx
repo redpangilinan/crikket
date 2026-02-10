@@ -1,3 +1,5 @@
+"use client"
+
 import { authClient } from "@crikket/auth/client"
 import { Button } from "@crikket/ui/components/ui/button"
 import {
@@ -10,11 +12,13 @@ import {
 } from "@crikket/ui/components/ui/dialog"
 import { Field, FieldError, FieldLabel } from "@crikket/ui/components/ui/field"
 import { Input } from "@crikket/ui/components/ui/input"
+import { useLocalStorage } from "@crikket/ui/hooks/use-local-storage"
 import { useForm } from "@tanstack/react-form"
 import { useMutation } from "@tanstack/react-query"
 import { useRouter } from "nextjs-toploader/app"
 import { toast } from "sonner"
 import * as z from "zod"
+import { queryClient } from "@/utils/orpc"
 
 interface CreateOrganizationDialogProps {
   open: boolean
@@ -34,6 +38,13 @@ export function CreateOrganizationDialog({
   onOpenChange,
 }: CreateOrganizationDialogProps) {
   const router = useRouter()
+  const { data: session } = authClient.useSession()
+  const preferredOrgStorageKey = session?.user.id
+    ? `crikket:preferred-org:${session.user.id}`
+    : "crikket:preferred-org"
+  const { setValue: setPreferredOrganizationId } = useLocalStorage<
+    string | null
+  >(preferredOrgStorageKey, null)
 
   const { mutateAsync: createOrg, isPending } = useMutation({
     mutationFn: async (values: { name: string; slug: string }) => {
@@ -55,10 +66,17 @@ export function CreateOrganizationDialog({
       onChange: formSchema,
     },
     onSubmit: async ({ value }) => {
-      await createOrg({
+      const organization = await createOrg({
         name: value.name,
         slug: value.slug,
       })
+      const newOrganizationId = organization?.id
+
+      if (newOrganizationId) {
+        setPreferredOrganizationId(newOrganizationId)
+      }
+
+      await queryClient.invalidateQueries()
       toast.success("Organization created successfully")
       onOpenChange(false)
       router.refresh()
