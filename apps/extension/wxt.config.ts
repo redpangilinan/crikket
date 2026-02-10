@@ -8,14 +8,7 @@ export default defineConfig({
       default_title: "Crikket",
       default_popup: "popup.html",
     },
-    permissions: [
-      "activeTab",
-      "scripting",
-      "storage",
-      "tabCapture",
-      "tabs",
-      "webRequest",
-    ],
+    permissions: ["activeTab", "scripting", "storage", "tabCapture", "tabs"],
     host_permissions: ["<all_urls>"],
   },
 })
