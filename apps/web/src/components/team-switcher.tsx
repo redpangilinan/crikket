@@ -19,7 +19,7 @@ import {
   useSidebar,
 } from "@crikket/ui/components/ui/sidebar"
 import { ChevronsUpDown, Plus } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { useRouter } from "nextjs-toploader/app"
 import * as React from "react"
 import { toast } from "sonner"
 
