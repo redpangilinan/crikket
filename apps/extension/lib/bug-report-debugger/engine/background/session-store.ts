@@ -19,6 +19,7 @@ import {
   isInjectablePageUrl,
 } from "./injection"
 import {
+  appendActionEventWithDedup,
   appendEventWithRetentionPolicy,
   appendNetworkEventWithDedup,
 } from "./retention"
@@ -269,6 +270,8 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
     for (const event of events) {
       if (event.kind === "network") {
         appendNetworkEventWithDedup(replayBuffer.events, event)
+      } else if (event.kind === "action") {
+        appendActionEventWithDedup(replayBuffer.events, event)
       } else {
         appendEventWithRetentionPolicy(replayBuffer.events, event)
       }
@@ -279,6 +282,8 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
 
       if (event.kind === "network") {
         appendNetworkEventWithDedup(session.events, event)
+      } else if (event.kind === "action") {
+        appendActionEventWithDedup(session.events, event)
       } else {
         appendEventWithRetentionPolicy(session.events, event)
       }

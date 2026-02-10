@@ -26,14 +26,21 @@ import { BugReportHeader } from "./bug-report-header"
 import { BugReportSidebar, type SidebarTab } from "./bug-report-sidebar"
 import type { DebuggerTimelineEntry } from "./types"
 import {
+  applyVideoOffsetFallback,
   buildActionEntry,
   buildLogEntry,
   buildNetworkEntry,
-  getPlaybackEntryId,
+  getPlaybackEntryIds,
 } from "./utils"
 
 interface BugReportViewProps {
   id: string
+}
+
+interface SelectedEntryIds {
+  action: string | null
+  log: string | null
+  network: string | null
 }
 
 const CANVAS_MIN_WIDTH = "720px"
@@ -47,6 +54,24 @@ const SIDEBAR_TABS = [
   "console",
   "network",
 ] as const satisfies readonly SidebarTab[]
+const EMPTY_SELECTION: SelectedEntryIds = {
+  action: null,
+  log: null,
+  network: null,
+}
+
+function getMetadataDurationMs(metadata: unknown): number | null {
+  if (!metadata || typeof metadata !== "object") {
+    return null
+  }
+
+  const durationMs = (metadata as { durationMs?: unknown }).durationMs
+  if (typeof durationMs !== "number" || !Number.isFinite(durationMs)) {
+    return null
+  }
+
+  return Math.max(0, Math.floor(durationMs))
+}
 
 export function BugReportView({ id }: BugReportViewProps) {
   const { data, isLoading, error } = useQuery(
@@ -109,60 +134,125 @@ export function BugReportView({ id }: BugReportViewProps) {
     return networkRequestsQuery.data?.pages.flatMap((page) => page.items) ?? []
   }, [networkRequestsQuery.data])
 
-  const videoRef = useRef<HTMLVideoElement | null>(null)
+  const desktopVideoRef = useRef<HTMLVideoElement | null>(null)
+  const mobileVideoRef = useRef<HTMLVideoElement | null>(null)
   const [playbackOffsetMs, setPlaybackOffsetMs] = useState(0)
-  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
+  const [selectedEntryIds, setSelectedEntryIds] =
+    useState<SelectedEntryIds>(EMPTY_SELECTION)
 
   const showVideo =
     data?.attachmentType === "video" && Boolean(data.attachmentUrl)
+  const metadataDurationMs = getMetadataDurationMs(data?.metadata)
 
   const actionEntries = useMemo(
-    () => debuggerEvents.actions.map(buildActionEntry),
-    [debuggerEvents.actions]
+    () =>
+      applyVideoOffsetFallback(
+        debuggerEvents.actions.map(buildActionEntry),
+        showVideo
+      ),
+    [debuggerEvents.actions, showVideo]
   )
   const logEntries = useMemo(
-    () => debuggerEvents.logs.map(buildLogEntry),
-    [debuggerEvents.logs]
+    () =>
+      applyVideoOffsetFallback(
+        debuggerEvents.logs.map(buildLogEntry),
+        showVideo
+      ),
+    [debuggerEvents.logs, showVideo]
   )
   const networkEntries = useMemo(
-    () => networkRequests.map(buildNetworkEntry),
-    [networkRequests]
-  )
-
-  const allEntries = useMemo(
-    () => [...actionEntries, ...logEntries, ...networkEntries],
-    [actionEntries, logEntries, networkEntries]
-  )
-
-  const playbackEntryId = useMemo(
     () =>
-      getPlaybackEntryId({
+      applyVideoOffsetFallback(
+        networkRequests.map(buildNetworkEntry),
+        showVideo
+      ),
+    [networkRequests, showVideo]
+  )
+
+  const playbackActionEntryIds = useMemo(
+    () =>
+      getPlaybackEntryIds({
         showVideo: showVideo ?? false,
         playbackOffsetMs,
-        entries: allEntries,
+        entries: actionEntries,
       }),
-    [allEntries, playbackOffsetMs, showVideo]
+    [actionEntries, playbackOffsetMs, showVideo]
+  )
+  const playbackLogEntryIds = useMemo(
+    () =>
+      getPlaybackEntryIds({
+        showVideo: showVideo ?? false,
+        playbackOffsetMs,
+        entries: logEntries,
+      }),
+    [logEntries, playbackOffsetMs, showVideo]
+  )
+  const playbackNetworkEntryIds = useMemo(
+    () =>
+      getPlaybackEntryIds({
+        showVideo: showVideo ?? false,
+        playbackOffsetMs,
+        entries: networkEntries,
+      }),
+    [networkEntries, playbackOffsetMs, showVideo]
   )
 
-  const activeEntryId = selectedEntryId ?? playbackEntryId
+  const highlightedActionEntryIds = showVideo ? playbackActionEntryIds : []
+  const highlightedLogEntryIds = showVideo ? playbackLogEntryIds : []
+  const highlightedNetworkEntryIds = showVideo ? playbackNetworkEntryIds : []
+
+  const getVisibleVideoElement = useCallback((): HTMLVideoElement | null => {
+    const desktopVideo = desktopVideoRef.current
+    if (desktopVideo?.offsetParent !== null) {
+      return desktopVideo
+    }
+
+    const mobileVideo = mobileVideoRef.current
+    if (mobileVideo?.offsetParent !== null) {
+      return mobileVideo
+    }
+
+    return desktopVideo ?? mobileVideo ?? null
+  }, [])
 
   const handleEntrySelect = (entry: DebuggerTimelineEntry) => {
-    setSelectedEntryId(entry.id)
+    setSelectedEntryIds((current) => ({
+      ...current,
+      [entry.kind]: entry.id,
+    }))
 
     if (!showVideo) {
       return
     }
 
-    if (!videoRef.current || typeof entry.offset !== "number") {
+    if (typeof entry.offset !== "number") {
       return
     }
 
-    videoRef.current.currentTime = entry.offset / 1000
-    setPlaybackOffsetMs(entry.offset)
+    const clampedOffsetMs =
+      typeof metadataDurationMs === "number"
+        ? Math.min(entry.offset, metadataDurationMs)
+        : entry.offset
+    const targetSeconds = clampedOffsetMs / 1000
+    const visiblePlayer = getVisibleVideoElement()
+    const shouldResumePlayback = Boolean(visiblePlayer && !visiblePlayer.paused)
+    const knownPlayers = [desktopVideoRef.current, mobileVideoRef.current]
+    for (const player of knownPlayers) {
+      if (!player) {
+        continue
+      }
+      player.currentTime = targetSeconds
+    }
 
-    videoRef.current.play().catch((error: unknown) => {
+    setPlaybackOffsetMs(clampedOffsetMs)
+
+    if (!(visiblePlayer && shouldResumePlayback)) {
+      return
+    }
+
+    visiblePlayer.play().catch((error: unknown) => {
       reportNonFatalError(
-        "Failed to resume playback after timeline seek interaction",
+        "Failed to preserve playback after timeline seek interaction",
         error
       )
     })
@@ -244,7 +334,7 @@ export function BugReportView({ id }: BugReportViewProps) {
                   <BugReportCanvas
                     data={data}
                     onTimeUpdate={setPlaybackOffsetMs}
-                    ref={videoRef}
+                    ref={desktopVideoRef}
                   />
                 </div>
               </ResizablePanel>
@@ -257,13 +347,15 @@ export function BugReportView({ id }: BugReportViewProps) {
               >
                 <BugReportSidebar
                   actionEntries={actionEntries}
-                  activeEntryId={activeEntryId}
                   activeTab={activeTab}
                   bugReportId={data.id}
                   data={data}
                   hasMoreNetworkRequests={Boolean(
                     networkRequestsQuery.hasNextPage
                   )}
+                  highlightedActionEntryIds={highlightedActionEntryIds}
+                  highlightedLogEntryIds={highlightedLogEntryIds}
+                  highlightedNetworkEntryIds={highlightedNetworkEntryIds}
                   isFetchingMoreNetworkRequests={
                     networkRequestsQuery.isFetchingNextPage
                   }
@@ -274,6 +366,9 @@ export function BugReportView({ id }: BugReportViewProps) {
                   onEntrySelect={handleEntrySelect}
                   onLoadMoreNetworkRequests={handleLoadMoreNetworkRequests}
                   onTabChange={handleTabChange}
+                  selectedActionEntryId={selectedEntryIds.action}
+                  selectedLogEntryId={selectedEntryIds.log}
+                  selectedNetworkEntryId={selectedEntryIds.network}
                 />
               </ResizablePanel>
             </ResizablePanelGroup>
@@ -284,7 +379,7 @@ export function BugReportView({ id }: BugReportViewProps) {
             <BugReportCanvas
               data={data}
               onTimeUpdate={setPlaybackOffsetMs}
-              ref={videoRef}
+              ref={mobileVideoRef}
             />
           </div>
         </div>
@@ -294,11 +389,13 @@ export function BugReportView({ id }: BugReportViewProps) {
         <SheetTitle className="sr-only">Bug Report Details</SheetTitle>
         <BugReportSidebar
           actionEntries={actionEntries}
-          activeEntryId={activeEntryId}
           activeTab={activeTab}
           bugReportId={data.id}
           data={data}
           hasMoreNetworkRequests={Boolean(networkRequestsQuery.hasNextPage)}
+          highlightedActionEntryIds={highlightedActionEntryIds}
+          highlightedLogEntryIds={highlightedLogEntryIds}
+          highlightedNetworkEntryIds={highlightedNetworkEntryIds}
           isFetchingMoreNetworkRequests={
             networkRequestsQuery.isFetchingNextPage
           }
@@ -309,6 +406,9 @@ export function BugReportView({ id }: BugReportViewProps) {
           onEntrySelect={handleEntrySelect}
           onLoadMoreNetworkRequests={handleLoadMoreNetworkRequests}
           onTabChange={handleTabChange}
+          selectedActionEntryId={selectedEntryIds.action}
+          selectedLogEntryId={selectedEntryIds.log}
+          selectedNetworkEntryId={selectedEntryIds.network}
         />
       </SheetContent>
     </Sheet>

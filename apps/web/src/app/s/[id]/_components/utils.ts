@@ -6,6 +6,8 @@ import type {
   DebuggerTimelineEntry,
 } from "./types"
 
+const PLAYBACK_HIGHLIGHT_BUCKET_MS = 100
+
 export function buildActionEntry(
   action: DebuggerAction
 ): DebuggerTimelineEntry {
@@ -61,13 +63,33 @@ export function buildNetworkEntry(
   }
 }
 
-export function getPlaybackEntryId(input: {
+export function applyVideoOffsetFallback(
+  entries: DebuggerTimelineEntry[],
+  enabled: boolean
+): DebuggerTimelineEntry[] {
+  if (!enabled) {
+    return entries
+  }
+
+  return entries.map((entry) => {
+    if (typeof entry.offset === "number") {
+      return entry
+    }
+
+    return {
+      ...entry,
+      offset: 0,
+    }
+  })
+}
+
+export function getPlaybackEntryIds(input: {
   showVideo: boolean
   playbackOffsetMs: number
   entries: DebuggerTimelineEntry[]
-}): string | null {
+}): string[] {
   if (!input.showVideo) {
-    return null
+    return []
   }
 
   const timeline = input.entries
@@ -77,15 +99,21 @@ export function getPlaybackEntryId(input: {
     )
     .sort((a, b) => a.offset - b.offset)
 
-  let current: string | null = null
+  let activeOffsetBucket: number | null = null
 
   for (const entry of timeline) {
     if (entry.offset <= input.playbackOffsetMs) {
-      current = entry.id
+      activeOffsetBucket = getOffsetBucket(entry.offset)
     }
   }
 
-  return current
+  if (activeOffsetBucket === null) {
+    return []
+  }
+
+  return timeline
+    .filter((entry) => getOffsetBucket(entry.offset) === activeOffsetBucket)
+    .map((entry) => entry.id)
 }
 
 export function formatEventTimeLabel(entry: DebuggerTimelineEntry): string {
@@ -125,4 +153,8 @@ function safeParseUrl(value: string): URL | null {
 
 function asString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null
+}
+
+function getOffsetBucket(offsetMs: number): number {
+  return Math.floor(Math.max(0, offsetMs) / PLAYBACK_HIGHLIGHT_BUCKET_MS)
 }

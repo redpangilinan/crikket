@@ -1,10 +1,24 @@
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { FileText } from "lucide-react"
-import { forwardRef } from "react"
+import { forwardRef, type SyntheticEvent, useCallback, useRef } from "react"
 import type { SharedBugReport } from "./types"
 
 interface BugReportCanvasProps {
   data: SharedBugReport
   onTimeUpdate?: (currentTimeMs: number) => void
+}
+
+function getMetadataDurationMs(metadata: unknown): number | null {
+  if (!metadata || typeof metadata !== "object") {
+    return null
+  }
+
+  const durationMs = (metadata as { durationMs?: unknown }).durationMs
+  if (typeof durationMs !== "number" || !Number.isFinite(durationMs)) {
+    return null
+  }
+
+  return Math.max(0, Math.floor(durationMs))
 }
 
 export const BugReportCanvas = forwardRef<
@@ -15,6 +29,70 @@ export const BugReportCanvas = forwardRef<
     data.attachmentType === "video" && Boolean(data.attachmentUrl)
   const showImage =
     data.attachmentType === "screenshot" && Boolean(data.attachmentUrl)
+  const metadataDurationMs = getMetadataDurationMs(data.metadata)
+  const isPrimingDurationRef = useRef(false)
+
+  const handleLoadedMetadata = useCallback(
+    (event: SyntheticEvent<HTMLVideoElement>) => {
+      const player = event.currentTarget
+      if (isPrimingDurationRef.current) {
+        return
+      }
+
+      if (!(typeof metadataDurationMs === "number" && metadataDurationMs > 0)) {
+        return
+      }
+
+      if (Number.isFinite(player.duration) && player.duration > 0) {
+        return
+      }
+
+      const durationSeconds = metadataDurationMs / 1000
+      const safeSeekTargetSeconds = Math.max(0, durationSeconds - 0.001)
+      if (safeSeekTargetSeconds <= 0) {
+        return
+      }
+
+      isPrimingDurationRef.current = true
+      const originalTime = player.currentTime
+      const wasPaused = player.paused
+
+      const restorePosition = () => {
+        const maxDurationSeconds =
+          Number.isFinite(player.duration) && player.duration > 0
+            ? player.duration
+            : durationSeconds
+        player.currentTime = Math.min(originalTime, maxDurationSeconds)
+        isPrimingDurationRef.current = false
+
+        if (wasPaused) {
+          return
+        }
+
+        player.play().catch((error: unknown) => {
+          reportNonFatalError(
+            "Failed to restore playback state after metadata-duration sync",
+            error
+          )
+        })
+      }
+
+      player.addEventListener(
+        "seeked",
+        () => {
+          restorePosition()
+        },
+        { once: true }
+      )
+
+      try {
+        player.currentTime = safeSeekTargetSeconds
+      } catch {
+        isPrimingDurationRef.current = false
+      }
+    },
+    [metadataDurationMs]
+  )
 
   return (
     <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-muted/20 p-4 md:p-8">
@@ -24,9 +102,14 @@ export const BugReportCanvas = forwardRef<
           <video
             className="max-h-full max-w-full rounded-lg bg-black object-contain shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
             controls
+            onLoadedMetadata={handleLoadedMetadata}
             onTimeUpdate={(event) => {
+              if (isPrimingDurationRef.current) {
+                return
+              }
               onTimeUpdate?.(event.currentTarget.currentTime * 1000)
             }}
+            preload="metadata"
             ref={ref}
             src={data.attachmentUrl ?? undefined}
           />

@@ -35,6 +35,17 @@ export function appendNetworkEventWithDedup(
   appendEventWithRetentionPolicy(events, event)
 }
 
+export function appendActionEventWithDedup(
+  events: DebuggerEvent[],
+  event: Extract<DebuggerEvent, { kind: "action" }>
+): void {
+  if (isLikelyDuplicateNavigationEvent(events, event)) {
+    return
+  }
+
+  appendEventWithRetentionPolicy(events, event)
+}
+
 function isLikelyDuplicateNetworkEvent(
   events: DebuggerEvent[],
   candidate: Extract<DebuggerEvent, { kind: "network" }>
@@ -65,6 +76,56 @@ function isLikelyDuplicateNetworkEvent(
   }
 
   return false
+}
+
+function isLikelyDuplicateNavigationEvent(
+  events: DebuggerEvent[],
+  candidate: Extract<DebuggerEvent, { kind: "action" }>
+): boolean {
+  if (candidate.actionType !== "navigation") {
+    return false
+  }
+
+  const DUPLICATE_WINDOW_MS = 500
+  const candidateUrl = getNavigationUrl(candidate)
+  if (!candidateUrl) {
+    return false
+  }
+
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index]
+    if (
+      !event ||
+      event.kind !== "action" ||
+      event.actionType !== "navigation"
+    ) {
+      continue
+    }
+
+    const delta = Math.abs(event.timestamp - candidate.timestamp)
+    if (delta > DUPLICATE_WINDOW_MS) {
+      return false
+    }
+
+    const previousUrl = getNavigationUrl(event)
+    if (previousUrl === candidateUrl) {
+      return true
+    }
+  }
+
+  return false
+}
+
+function getNavigationUrl(
+  event: Extract<DebuggerEvent, { kind: "action" }>
+): string | null {
+  const metadata = event.metadata
+  if (!(metadata && typeof metadata === "object")) {
+    return null
+  }
+
+  const url = metadata.url
+  return typeof url === "string" && url.length > 0 ? url : null
 }
 
 function enforceKindCap(
