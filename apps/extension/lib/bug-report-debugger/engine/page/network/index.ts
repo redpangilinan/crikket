@@ -1,4 +1,4 @@
-import { installFetchCapture } from "./fetch"
+import { installFetchCapture } from "./fetch/install"
 import type { NetworkCaptureInput } from "./types"
 import { installXhrCapture } from "./xhr"
 
