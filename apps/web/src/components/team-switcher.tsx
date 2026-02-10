@@ -24,27 +24,53 @@ import * as React from "react"
 import { toast } from "sonner"
 
 import { CreateOrganizationDialog } from "@/components/create-organization-dialog"
+import { queryClient } from "@/utils/orpc"
 
 type Organization = typeof auth.$Infer.Organization
 
 interface TeamSwitcherProps {
   organizations: Organization[]
   activeOrganization?: Organization
+  userId: string
 }
 
 export function TeamSwitcher({
   organizations,
   activeOrganization,
+  userId,
 }: TeamSwitcherProps) {
   const { isMobile } = useSidebar()
   const router = useRouter()
   const [showCreateDialog, setShowCreateDialog] = React.useState(false)
+  const [isAutoSwitching, setIsAutoSwitching] = React.useState(false)
+
+  const preferredOrgStorageKey = React.useMemo(
+    () => `crikket:preferred-org:${userId}`,
+    [userId]
+  )
+
+  const persistPreferredOrganization = React.useCallback(
+    (orgId: string) => {
+      localStorage.setItem(preferredOrgStorageKey, orgId)
+    },
+    [preferredOrgStorageKey]
+  )
+
+  const invalidateDashboardData = React.useCallback(async () => {
+    await queryClient.invalidateQueries()
+  }, [])
 
   const handleSwitchOrganization = async (orgId: string) => {
+    if (orgId === activeOrganization?.id) {
+      return
+    }
+
     try {
       await authClient.organization.setActive({
         organizationId: orgId,
       })
+      persistPreferredOrganization(orgId)
+      await invalidateDashboardData()
       router.refresh()
       toast.success("Organization switched successfully")
     } catch (error) {
@@ -52,6 +78,54 @@ export function TeamSwitcher({
       toast.error("Failed to switch organization")
     }
   }
+
+  React.useEffect(() => {
+    if (activeOrganization?.id) {
+      persistPreferredOrganization(activeOrganization.id)
+      return
+    }
+
+    if (organizations.length < 1 || isAutoSwitching) {
+      return
+    }
+
+    const preferredOrgId = localStorage.getItem(preferredOrgStorageKey)
+    const preferredOrgExists = organizations.some(
+      (org) => org.id === preferredOrgId
+    )
+    const organizationIdToActivate =
+      preferredOrgExists && preferredOrgId
+        ? preferredOrgId
+        : organizations[0]?.id
+
+    if (!organizationIdToActivate) {
+      return
+    }
+
+    setIsAutoSwitching(true)
+    authClient.organization
+      .setActive({ organizationId: organizationIdToActivate })
+      .then(async () => {
+        persistPreferredOrganization(organizationIdToActivate)
+        await invalidateDashboardData()
+        router.refresh()
+      })
+      .catch((error) => {
+        console.error(error)
+        toast.error("Failed to restore organization")
+      })
+      .finally(() => {
+        setIsAutoSwitching(false)
+      })
+  }, [
+    activeOrganization?.id,
+    invalidateDashboardData,
+    isAutoSwitching,
+    organizations,
+    persistPreferredOrganization,
+    preferredOrgStorageKey,
+    router,
+  ])
 
   return (
     <SidebarMenu>

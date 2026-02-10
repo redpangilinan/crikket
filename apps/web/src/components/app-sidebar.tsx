@@ -63,6 +63,7 @@ export function AppSidebar({
         <TeamSwitcher
           activeOrganization={activeOrganization}
           organizations={organizations}
+          userId={user.id}
         />
       </SidebarHeader>
       <SidebarContent>
