@@ -18,6 +18,7 @@ import {
   SidebarMenuItem,
   useSidebar,
 } from "@crikket/ui/components/ui/sidebar"
+import { useLocalStorage } from "@crikket/ui/hooks/use-local-storage"
 import { ChevronsUpDown, Plus } from "lucide-react"
 import { useRouter } from "nextjs-toploader/app"
 import * as React from "react"
@@ -48,12 +49,16 @@ export function TeamSwitcher({
     () => `crikket:preferred-org:${userId}`,
     [userId]
   )
+  const {
+    setValue: setPreferredOrganizationId,
+    value: preferredOrganizationId,
+  } = useLocalStorage<string | null>(preferredOrgStorageKey, null)
 
   const persistPreferredOrganization = React.useCallback(
     (orgId: string) => {
-      localStorage.setItem(preferredOrgStorageKey, orgId)
+      setPreferredOrganizationId(orgId)
     },
-    [preferredOrgStorageKey]
+    [setPreferredOrganizationId]
   )
 
   const invalidateDashboardData = React.useCallback(async () => {
@@ -89,13 +94,12 @@ export function TeamSwitcher({
       return
     }
 
-    const preferredOrgId = localStorage.getItem(preferredOrgStorageKey)
     const preferredOrgExists = organizations.some(
-      (org) => org.id === preferredOrgId
+      (org) => org.id === preferredOrganizationId
     )
     const organizationIdToActivate =
-      preferredOrgExists && preferredOrgId
-        ? preferredOrgId
+      preferredOrgExists && preferredOrganizationId
+        ? preferredOrganizationId
         : organizations[0]?.id
 
     if (!organizationIdToActivate) {
@@ -123,7 +127,7 @@ export function TeamSwitcher({
     isAutoSwitching,
     organizations,
     persistPreferredOrganization,
-    preferredOrgStorageKey,
+    preferredOrganizationId,
     router,
   ])
 
