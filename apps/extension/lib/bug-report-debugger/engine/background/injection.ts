@@ -1,5 +1,6 @@
 import { reportNonFatalError } from "@crikket/shared/lib/errors"
 
+const DEBUGGER_CONTENT_BRIDGE_FILE = "debugger-content-bridge.js"
 const DEBUGGER_PAGE_RUNTIME_FILE = "debugger-page.js"
 
 export function createSessionId(): string {
@@ -22,6 +23,13 @@ export async function injectDebuggerScriptIntoTab(
   }
 
   try {
+    await chrome.scripting.executeScript({
+      target: {
+        tabId,
+      },
+      files: [DEBUGGER_CONTENT_BRIDGE_FILE],
+    })
+
     await chrome.scripting.executeScript({
       target: {
         tabId,

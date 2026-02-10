@@ -1,13 +1,6 @@
 import { reportNonFatalError } from "@crikket/shared/lib/errors"
-import {
-  DEBUGGER_REPLAY_BUFFERS_STORAGE_KEY,
-  DEBUGGER_SESSIONS_STORAGE_KEY,
-} from "../../constants"
-import {
-  normalizeDebuggerEvent,
-  normalizeStoredReplayBuffer,
-  normalizeStoredSession,
-} from "../../normalize"
+import { DEBUGGER_SESSIONS_STORAGE_KEY } from "../../constants"
+import { normalizeDebuggerEvent, normalizeStoredSession } from "../../normalize"
 import type {
   DebuggerEvent,
   DebuggerSessionSnapshot,
@@ -24,19 +17,9 @@ import {
   appendNetworkEventWithDedup,
 } from "./retention"
 
-const ROLLING_REPLAY_WINDOW_MS = 2 * 60 * 1000
-const MAX_ROLLING_REPLAY_EVENTS_PER_TAB = 1500
-const DEFAULT_INSTANT_REPLAY_LOOKBACK_MS = 120 * 1000
-
-interface TabReplayBuffer {
-  events: DebuggerEvent[]
-  lastTouchedAt: number
-}
-
 interface StartSessionPayload {
   captureTabId: number
   captureType: "video" | "screenshot"
-  instantReplayLookbackMs?: number
 }
 
 interface MarkRecordingStartedPayload {
@@ -65,7 +48,6 @@ interface DebuggerSessionStore {
 export function createDebuggerSessionStore(): DebuggerSessionStore {
   const sessionsById = new Map<string, StoredDebuggerSession>()
   const tabToSession = new Map<number, string>()
-  const replayBuffersByTab = new Map<number, TabReplayBuffer>()
 
   let isLoaded = false
   let loadPromise: Promise<void> | null = null
@@ -86,91 +68,31 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
 
   const persistState = async () => {
     const sessionsSnapshot = Array.from(sessionsById.values())
-    const replayBuffersSnapshot = Array.from(replayBuffersByTab.entries()).map(
-      ([tabId, replayBuffer]) => ({
-        tabId,
-        lastTouchedAt: replayBuffer.lastTouchedAt,
-        events: replayBuffer.events,
-      })
-    )
 
     await chrome.storage.local.set({
       [DEBUGGER_SESSIONS_STORAGE_KEY]: sessionsSnapshot,
-      [DEBUGGER_REPLAY_BUFFERS_STORAGE_KEY]: replayBuffersSnapshot,
     })
-  }
-
-  const pruneReplayBuffer = (
-    replayBuffer: TabReplayBuffer,
-    now: number
-  ): void => {
-    while (replayBuffer.events.length > 0) {
-      const oldestEvent = replayBuffer.events[0]
-      if (!oldestEvent) {
-        break
-      }
-
-      if (now - oldestEvent.timestamp <= ROLLING_REPLAY_WINDOW_MS) {
-        break
-      }
-
-      replayBuffer.events.shift()
-    }
-
-    while (replayBuffer.events.length > MAX_ROLLING_REPLAY_EVENTS_PER_TAB) {
-      replayBuffer.events.shift()
-    }
-
-    replayBuffer.lastTouchedAt = now
-  }
-
-  const pruneAllReplayBuffers = (now: number): void => {
-    for (const [tabId, replayBuffer] of replayBuffersByTab) {
-      pruneReplayBuffer(replayBuffer, now)
-
-      const isStale =
-        now - replayBuffer.lastTouchedAt > ROLLING_REPLAY_WINDOW_MS
-      if (replayBuffer.events.length === 0 && isStale) {
-        replayBuffersByTab.delete(tabId)
-      }
-    }
   }
 
   const hydrateStoredState = async () => {
     const result = await chrome.storage.local.get([
       DEBUGGER_SESSIONS_STORAGE_KEY,
-      DEBUGGER_REPLAY_BUFFERS_STORAGE_KEY,
     ])
     const storedSessions = result[DEBUGGER_SESSIONS_STORAGE_KEY]
-    const storedReplayBuffers = result[DEBUGGER_REPLAY_BUFFERS_STORAGE_KEY]
 
-    if (Array.isArray(storedSessions)) {
-      for (const candidate of storedSessions) {
-        const session = normalizeStoredSession(candidate)
-        if (!session) {
-          continue
-        }
-
-        sessionsById.set(session.sessionId, session)
-        tabToSession.set(session.captureTabId, session.sessionId)
-      }
+    if (!Array.isArray(storedSessions)) {
+      return
     }
 
-    if (Array.isArray(storedReplayBuffers)) {
-      for (const candidate of storedReplayBuffers) {
-        const replayBuffer = normalizeStoredReplayBuffer(candidate)
-        if (!replayBuffer) {
-          continue
-        }
-
-        replayBuffersByTab.set(replayBuffer.tabId, {
-          events: replayBuffer.events,
-          lastTouchedAt: replayBuffer.lastTouchedAt,
-        })
+    for (const candidate of storedSessions) {
+      const session = normalizeStoredSession(candidate)
+      if (!session) {
+        continue
       }
-    }
 
-    pruneAllReplayBuffers(Date.now())
+      sessionsById.set(session.sessionId, session)
+      tabToSession.set(session.captureTabId, session.sessionId)
+    }
   }
 
   const ensureLoaded = async () => {
@@ -209,52 +131,7 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
     }
   }
 
-  const getOrCreateReplayBuffer = (tabId: number): TabReplayBuffer => {
-    const existing = replayBuffersByTab.get(tabId)
-    if (existing) {
-      return existing
-    }
-
-    const created: TabReplayBuffer = {
-      events: [],
-      lastTouchedAt: Date.now(),
-    }
-    replayBuffersByTab.set(tabId, created)
-    return created
-  }
-
-  const normalizeInstantReplayLookbackMs = (
-    value: number | undefined
-  ): number => {
-    if (typeof value !== "number" || !Number.isFinite(value)) {
-      return DEFAULT_INSTANT_REPLAY_LOOKBACK_MS
-    }
-
-    const normalized = Math.floor(value)
-    return Math.max(0, Math.min(ROLLING_REPLAY_WINDOW_MS, normalized))
-  }
-
-  const getReplaySeedEvents = (
-    tabId: number,
-    lookbackMs: number,
-    now: number
-  ): DebuggerEvent[] => {
-    if (lookbackMs <= 0) {
-      return []
-    }
-
-    const replayBuffer = replayBuffersByTab.get(tabId)
-    if (!replayBuffer) {
-      return []
-    }
-
-    pruneReplayBuffer(replayBuffer, now)
-    const lowerBound = now - lookbackMs
-
-    return replayBuffer.events.filter((event) => event.timestamp >= lowerBound)
-  }
-
-  const appendEventsToTabTargets = (
+  const appendEventsToSession = (
     tabId: number,
     events: DebuggerEvent[]
   ): void => {
@@ -262,24 +139,13 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
       return
     }
 
-    const now = Date.now()
-    const replayBuffer = getOrCreateReplayBuffer(tabId)
     const sessionId = tabToSession.get(tabId)
     const session = sessionId ? sessionsById.get(sessionId) : undefined
+    if (!session) {
+      return
+    }
 
     for (const event of events) {
-      if (event.kind === "network") {
-        appendNetworkEventWithDedup(replayBuffer.events, event)
-      } else if (event.kind === "action") {
-        appendActionEventWithDedup(replayBuffer.events, event)
-      } else {
-        appendEventWithRetentionPolicy(replayBuffer.events, event)
-      }
-
-      if (!session) {
-        continue
-      }
-
       if (event.kind === "network") {
         appendNetworkEventWithDedup(session.events, event)
       } else if (event.kind === "action") {
@@ -289,8 +155,6 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
       }
     }
 
-    pruneReplayBuffer(replayBuffer, now)
-    pruneAllReplayBuffers(now)
     schedulePersist()
   }
 
@@ -299,14 +163,6 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
 
     const startedAt = Date.now()
     const sessionId = createSessionId()
-    const replayLookbackMs = normalizeInstantReplayLookbackMs(
-      payload.instantReplayLookbackMs
-    )
-    const replaySeedEvents = getReplaySeedEvents(
-      payload.captureTabId,
-      replayLookbackMs,
-      startedAt
-    )
 
     const session: StoredDebuggerSession = {
       sessionId,
@@ -315,7 +171,7 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
       startedAt,
       recordingStartedAt:
         payload.captureType === "screenshot" ? startedAt : null,
-      events: replaySeedEvents,
+      events: [],
     }
 
     sessionsById.set(sessionId, session)
@@ -331,6 +187,11 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
 
   const injectDebuggerScriptForTab = async (tabId: number): Promise<void> => {
     await ensureLoaded()
+
+    if (!tabToSession.has(tabId)) {
+      return
+    }
+
     await injectDebuggerScriptIntoTab(tabId)
   }
 
@@ -351,7 +212,7 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
       normalizedEvents.push(normalizedEvent)
     }
 
-    appendEventsToTabTargets(tabId, normalizedEvents)
+    appendEventsToSession(tabId, normalizedEvents)
   }
 
   const getSessionSnapshot = async (
@@ -405,6 +266,10 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
       return
     }
 
+    if (!tabToSession.has(tabId)) {
+      return
+    }
+
     await injectDebuggerScriptIntoTab(tabId)
   }
 
@@ -412,12 +277,12 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
     await ensureLoaded()
 
     const sessionId = tabToSession.get(tabId)
-    if (sessionId) {
-      removeSession(sessionId)
-      schedulePersist()
+    if (!sessionId) {
+      return
     }
 
-    replayBuffersByTab.delete(tabId)
+    removeSession(sessionId)
+    schedulePersist()
   }
 
   return {

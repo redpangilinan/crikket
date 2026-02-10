@@ -133,26 +133,4 @@ export function registerDebuggerBackgroundListeners(): void {
       )
     })
   })
-
-  chrome.tabs
-    .query({})
-    .then((tabs) => {
-      for (const tab of tabs) {
-        if (typeof tab.id !== "number") {
-          continue
-        }
-
-        store
-          .ensureDebuggerScriptForTab(tab.id, tab.url ?? undefined)
-          .catch((error: unknown) => {
-            reportNonFatalError(
-              `Failed to inject debugger instrumentation for existing tab ${tab.id}`,
-              error
-            )
-          })
-      }
-    })
-    .catch((error: unknown) => {
-      reportNonFatalError("Failed to list tabs for debugger injection", error)
-    })
 }

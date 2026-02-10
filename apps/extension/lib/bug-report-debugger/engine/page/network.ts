@@ -37,6 +37,29 @@ interface NetworkCaptureInput {
   postNetwork: (payload: PostNetworkPayload) => void
 }
 
+const scheduleBackgroundTask = (
+  reporter: Reporter,
+  task: () => void | Promise<void>
+): void => {
+  const executeTask = () => {
+    Promise.resolve(task()).catch((error: unknown) => {
+      reporter.reportNonFatalError(
+        "Background debugger instrumentation task failed",
+        error
+      )
+    })
+  }
+
+  if (typeof window.requestIdleCallback === "function") {
+    window.requestIdleCallback(() => {
+      executeTask()
+    })
+    return
+  }
+
+  window.setTimeout(executeTask, 0)
+}
+
 function resolveFetchMethod(
   input: RequestInfo | URL,
   init: RequestInit | undefined
@@ -105,12 +128,188 @@ const getFetchRequestBodyPreview = async (
   }
 }
 
+const getRequestBodyPreviewAsync = (
+  reporter: Reporter,
+  body: unknown,
+  stringifyValue: (value: unknown) => string
+): Promise<string | undefined> => {
+  return new Promise((resolve) => {
+    scheduleBackgroundTask(reporter, () => {
+      resolve(getRequestBodyPreview(body, stringifyValue))
+    })
+  })
+}
+
+const getTextBodyPreviewAsync = (
+  reporter: Reporter,
+  contentType: string,
+  errorContext: string,
+  readBody: () => Promise<string>
+): Promise<string | undefined> => {
+  return new Promise((resolve) => {
+    scheduleBackgroundTask(reporter, async () => {
+      if (!shouldCaptureTextContent(contentType)) {
+        resolve(undefined)
+        return
+      }
+
+      try {
+        resolve(truncate(await readBody(), MAX_BODY_LENGTH))
+      } catch (error) {
+        reporter.reportNonFatalError(errorContext, error)
+        resolve(undefined)
+      }
+    })
+  })
+}
+
+const resolveFetchRequestBodyPromise = (
+  requestInput: RequestInfo | URL,
+  requestInit: RequestInit | undefined,
+  requestHeaderSource: Headers | null,
+  stringifyValue: (value: unknown) => string,
+  reporter: Reporter,
+  requestBodyByRequest: WeakMap<Request, Promise<string | undefined>>
+): Promise<string | undefined> => {
+  if (requestInput instanceof Request) {
+    return (
+      requestBodyByRequest.get(requestInput) ??
+      getFetchRequestBodyPreview(
+        requestInput,
+        requestInit,
+        requestHeaderSource,
+        stringifyValue,
+        reporter
+      )
+    )
+  }
+
+  return getFetchRequestBodyPreview(
+    requestInput,
+    requestInit,
+    requestHeaderSource,
+    stringifyValue,
+    reporter
+  )
+}
+
+const cloneFetchResponseForCapture = (
+  response: Response,
+  reporter: Reporter
+): {
+  contentType: string
+  responseClone: Response | null
+} => {
+  const contentType = response.headers.get("content-type") ?? ""
+  if (!shouldCaptureTextContent(contentType) || response.bodyUsed) {
+    return {
+      contentType,
+      responseClone: null,
+    }
+  }
+
+  try {
+    return {
+      contentType,
+      responseClone: response.clone(),
+    }
+  } catch (error) {
+    reporter.reportNonFatalError(
+      "Failed to clone fetch response body in debugger instrumentation",
+      error
+    )
+    return {
+      contentType,
+      responseClone: null,
+    }
+  }
+}
+
 function installFetchCapture(input: NetworkCaptureInput): void {
   const { diagnostics, postNetwork, reporter } = input
   const stringifyValue = createStringifyValue(reporter)
+  const requestBodyByRequest = new WeakMap<
+    Request,
+    Promise<string | undefined>
+  >()
 
   const bindFetch = (candidate: typeof window.fetch): typeof window.fetch => {
     return candidate.bind(window) as typeof window.fetch
+  }
+
+  if (typeof window.Request === "function") {
+    const OriginalRequest = window.Request
+    const patchedRequest = new Proxy(OriginalRequest, {
+      construct(target, argArray, newTarget) {
+        const [, requestInit] = argArray as [
+          RequestInfo | URL,
+          RequestInit | undefined,
+        ]
+        const requestInstance = Reflect.construct(
+          target,
+          argArray,
+          newTarget
+        ) as Request
+
+        let requestHeaderSource: Headers
+        if (requestInit?.headers !== undefined) {
+          try {
+            requestHeaderSource = new Headers(requestInit.headers)
+          } catch (error) {
+            reporter.reportNonFatalError(
+              "Failed to normalize Request headers in debugger instrumentation",
+              error
+            )
+            requestHeaderSource = requestInstance.headers
+          }
+        } else {
+          requestHeaderSource = requestInstance.headers
+        }
+
+        const contentType = requestHeaderSource.get("content-type") ?? ""
+
+        const requestBodyPromise =
+          requestInit?.body !== undefined
+            ? getRequestBodyPreviewAsync(
+                reporter,
+                requestInit.body,
+                stringifyValue
+              )
+            : getTextBodyPreviewAsync(
+                reporter,
+                contentType,
+                "Failed to capture Request body text in debugger instrumentation",
+                () => {
+                  if (requestInstance.bodyUsed) {
+                    return Promise.resolve("")
+                  }
+
+                  return requestInstance.clone().text()
+                }
+              )
+
+        requestBodyByRequest.set(requestInstance, requestBodyPromise)
+        return requestInstance
+      },
+    })
+
+    try {
+      Object.assign(patchedRequest, OriginalRequest)
+    } catch (error) {
+      reporter.reportNonFatalError(
+        "Failed to mirror Request constructor properties in debugger instrumentation",
+        error
+      )
+    }
+
+    try {
+      window.Request = patchedRequest as typeof Request
+    } catch (error) {
+      reporter.reportNonFatalError(
+        "Failed to patch Request constructor in debugger instrumentation",
+        error
+      )
+    }
   }
 
   if (typeof window.fetch !== "function") {
@@ -118,9 +317,17 @@ function installFetchCapture(input: NetworkCaptureInput): void {
     return
   }
 
-  let delegateFetch = bindFetch(window.fetch)
+  const baseFetch = bindFetch(window.fetch)
+  let delegateFetch = baseFetch
+  let isInsidePatchedFetch = false
 
   const patchedFetch = (async (...args: Parameters<typeof window.fetch>) => {
+    if (isInsidePatchedFetch) {
+      // Prevent recursion when third-party fetch wrappers call window.fetch().
+      return baseFetch(...args)
+    }
+
+    isInsidePatchedFetch = true
     diagnostics.recordFetchCall()
     const [requestInput, requestInit] = args
     const startedAt = Date.now()
@@ -130,11 +337,14 @@ function installFetchCapture(input: NetworkCaptureInput): void {
     const normalizedUrl = toAbsoluteUrl(url, reporter)
 
     if (!normalizedUrl) {
-      return delegateFetch(...args)
+      try {
+        return delegateFetch(...args)
+      } finally {
+        isInsidePatchedFetch = false
+      }
     }
 
     let requestHeaders: Record<string, string>
-    let requestBody: string | undefined
 
     let requestHeaderSource: Headers | null = null
     if (requestInit?.headers) {
@@ -158,58 +368,95 @@ function installFetchCapture(input: NetworkCaptureInput): void {
           ? toHeaderRecord(requestInput.headers)
           : {}
     }
-    requestBody = await getFetchRequestBodyPreview(
+    const requestBodyPromise = resolveFetchRequestBodyPromise(
       requestInput,
       requestInit,
       requestHeaderSource,
       stringifyValue,
-      reporter
+      reporter,
+      requestBodyByRequest
     )
 
     try {
       const response = await delegateFetch(...args)
+      const duration = Date.now() - startedAt
+      const responseHeaders = toHeaderRecord(response.headers)
+      const { contentType, responseClone } = cloneFetchResponseForCapture(
+        response,
+        reporter
+      )
 
-      let responseBody: string | undefined
-      try {
-        const contentType = response.headers.get("content-type") ?? ""
-        if (shouldCaptureTextContent(contentType)) {
-          responseBody = truncate(
-            await response.clone().text(),
-            MAX_BODY_LENGTH
+      // Never delay the page's fetch lifecycle for debugger capture.
+      scheduleBackgroundTask(reporter, async () => {
+        let requestBody: string | undefined
+        let responseBody: string | undefined
+
+        try {
+          requestBody = await requestBodyPromise
+        } catch (error) {
+          reporter.reportNonFatalError(
+            "Failed to resolve fetch request body in debugger instrumentation",
+            error
           )
         }
-      } catch (error) {
-        reporter.reportNonFatalError(
-          "Failed to capture fetch response body in debugger instrumentation",
-          error
-        )
-      }
 
-      postNetwork({
-        method,
-        url: normalizedUrl,
-        status: response.status,
-        duration: Date.now() - startedAt,
-        requestHeaders,
-        responseHeaders: toHeaderRecord(response.headers),
-        requestBody,
-        responseBody,
+        try {
+          responseBody = await getTextBodyPreviewAsync(
+            reporter,
+            contentType,
+            "Failed to capture fetch response body text in debugger instrumentation",
+            () => {
+              if (!responseClone) {
+                return Promise.resolve("")
+              }
+
+              return responseClone.text()
+            }
+          )
+        } catch (error) {
+          reporter.reportNonFatalError(
+            "Failed to capture fetch response body in debugger instrumentation",
+            error
+          )
+        }
+
+        postNetwork({
+          method,
+          url: normalizedUrl,
+          status: response.status,
+          duration,
+          requestHeaders,
+          responseHeaders,
+          requestBody,
+          responseBody,
+        })
       })
 
       return response
     } catch (error) {
       diagnostics.recordFetchFailure(truncate(stringifyValue(error), 300))
-      postNetwork({
-        method,
-        url: normalizedUrl,
-        status: 0,
-        duration: Date.now() - startedAt,
-        requestHeaders,
-        requestBody,
-        responseBody: truncate(stringifyValue(error), MAX_BODY_LENGTH),
+      scheduleBackgroundTask(reporter, async () => {
+        let requestBody: string | undefined
+        try {
+          requestBody = await requestBodyPromise
+        } catch (_requestBodyError) {
+          requestBody = undefined
+        }
+
+        postNetwork({
+          method,
+          url: normalizedUrl,
+          status: 0,
+          duration: Date.now() - startedAt,
+          requestHeaders,
+          requestBody,
+          responseBody: truncate(stringifyValue(error), MAX_BODY_LENGTH),
+        })
       })
 
       throw error
+    } finally {
+      isInsidePatchedFetch = false
     }
   }) as typeof window.fetch
 
@@ -275,11 +522,57 @@ function installXhrCapture(input: NetworkCaptureInput): void {
     method: string
     url: string
     startedAt: number
-    requestBody?: string
+    requestBodyPromise: Promise<string | undefined>
     requestHeaders: Record<string, string>
   }
 
   const xhrMetaMap = new WeakMap<XMLHttpRequest, XhrMeta>()
+
+  const postXhrLoadEndEvent = (xhr: XMLHttpRequest) => {
+    scheduleBackgroundTask(reporter, async () => {
+      const state = xhrMetaMap.get(xhr)
+      if (!state) {
+        return
+      }
+
+      const normalizedUrl = toAbsoluteUrl(state.url, reporter)
+      if (!normalizedUrl) {
+        return
+      }
+
+      let requestBody: string | undefined
+      let responseBody: string | undefined
+      try {
+        requestBody = await state.requestBodyPromise
+      } catch (_requestBodyError) {
+        requestBody = undefined
+      }
+
+      try {
+        if (xhr.responseType === "" || xhr.responseType === "text") {
+          responseBody = truncate(xhr.responseText || "", MAX_BODY_LENGTH)
+        } else if (xhr.responseType === "json") {
+          responseBody = truncate(stringifyValue(xhr.response), MAX_BODY_LENGTH)
+        }
+      } catch (error) {
+        reporter.reportNonFatalError(
+          "Failed to capture XHR response body in debugger instrumentation",
+          error
+        )
+      }
+
+      postNetwork({
+        method: state.method,
+        url: normalizedUrl,
+        status: xhr.status,
+        duration: Date.now() - state.startedAt,
+        requestHeaders: state.requestHeaders,
+        responseHeaders: parseRawHeaders(xhr.getAllResponseHeaders()),
+        requestBody,
+        responseBody,
+      })
+    })
+  }
 
   const originalOpen = XMLHttpRequest.prototype.open
   const openWithOptionalArgs = originalOpen as unknown as (
@@ -305,6 +598,7 @@ function installXhrCapture(input: NetworkCaptureInput): void {
       method: normalizedMethod,
       url: normalizedUrl,
       startedAt: Date.now(),
+      requestBodyPromise: Promise.resolve(undefined),
       requestHeaders: {},
     })
 
@@ -354,49 +648,17 @@ function installXhrCapture(input: NetworkCaptureInput): void {
     const meta = xhrMetaMap.get(this)
     if (meta) {
       meta.startedAt = Date.now()
-      meta.requestBody = getRequestBodyPreview(args[0], stringifyValue)
+      meta.requestBodyPromise = getRequestBodyPreviewAsync(
+        reporter,
+        args[0],
+        stringifyValue
+      )
     }
 
     this.addEventListener(
       "loadend",
       () => {
-        const state = xhrMetaMap.get(this)
-        if (!state) {
-          return
-        }
-
-        const normalizedUrl = toAbsoluteUrl(state.url, reporter)
-        if (!normalizedUrl) {
-          return
-        }
-
-        let responseBody: string | undefined
-        try {
-          if (this.responseType === "" || this.responseType === "text") {
-            responseBody = truncate(this.responseText || "", MAX_BODY_LENGTH)
-          } else if (this.responseType === "json") {
-            responseBody = truncate(
-              stringifyValue(this.response),
-              MAX_BODY_LENGTH
-            )
-          }
-        } catch (error) {
-          reporter.reportNonFatalError(
-            "Failed to capture XHR response body in debugger instrumentation",
-            error
-          )
-        }
-
-        postNetwork({
-          method: state.method,
-          url: normalizedUrl,
-          status: this.status,
-          duration: Date.now() - state.startedAt,
-          requestHeaders: state.requestHeaders,
-          responseHeaders: parseRawHeaders(this.getAllResponseHeaders()),
-          requestBody: state.requestBody,
-          responseBody,
-        })
+        postXhrLoadEndEvent(this)
       },
       {
         once: true,

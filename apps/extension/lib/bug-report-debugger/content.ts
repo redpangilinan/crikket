@@ -1,22 +1,24 @@
 import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import {
-  ensureDebuggerPageRuntime,
   isDebuggerContentBridgePayload,
   sendDebuggerPageEvents,
 } from "./messaging"
+
+const CONTENT_BRIDGE_INSTALL_FLAG = "__crikketDebuggerContentBridgeInstalled"
 
 export function setupDebuggerContentBridge(): void {
   if (typeof window === "undefined") {
     return
   }
 
-  const isTopWindow = window.top === window
-
-  if (isTopWindow) {
-    ensureDebuggerPageRuntime().catch((error: unknown) => {
-      reportNonFatalError("Failed to request debugger runtime injection", error)
-    })
+  const scope = window as Window & {
+    [CONTENT_BRIDGE_INSTALL_FLAG]?: boolean
   }
+
+  if (scope[CONTENT_BRIDGE_INSTALL_FLAG]) {
+    return
+  }
+  scope[CONTENT_BRIDGE_INSTALL_FLAG] = true
 
   const queue: unknown[] = []
   let flushTimer: ReturnType<typeof setTimeout> | null = null
