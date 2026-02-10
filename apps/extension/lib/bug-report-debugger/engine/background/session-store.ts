@@ -20,6 +20,7 @@ import {
 interface StartSessionPayload {
   captureTabId: number
   captureType: "video" | "screenshot"
+  instantReplayLookbackMs?: number
 }
 
 interface MarkRecordingStartedPayload {
@@ -48,6 +49,7 @@ interface DebuggerSessionStore {
 export function createDebuggerSessionStore(): DebuggerSessionStore {
   const sessionsById = new Map<string, StoredDebuggerSession>()
   const tabToSession = new Map<number, string>()
+  const recentEventsByTab = new Map<number, DebuggerEvent[]>()
 
   let isLoaded = false
   let loadPromise: Promise<void> | null = null
@@ -158,11 +160,67 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
     schedulePersist()
   }
 
+  const appendEventsToRecentBuffer = (
+    tabId: number,
+    events: DebuggerEvent[]
+  ): void => {
+    if (events.length === 0) {
+      return
+    }
+
+    const now = Date.now()
+    const MAX_RECENT_EVENT_AGE_MS = 60_000
+    const MAX_RECENT_EVENT_COUNT = 250
+    const existing = recentEventsByTab.get(tabId) ?? []
+
+    const merged = [...existing, ...events].filter((event) => {
+      return now - event.timestamp <= MAX_RECENT_EVENT_AGE_MS
+    })
+
+    if (merged.length > MAX_RECENT_EVENT_COUNT) {
+      recentEventsByTab.set(
+        tabId,
+        merged.slice(merged.length - MAX_RECENT_EVENT_COUNT)
+      )
+      return
+    }
+
+    recentEventsByTab.set(tabId, merged)
+  }
+
+  const consumeInstantReplayEvents = (
+    tabId: number,
+    lookbackMs: number
+  ): DebuggerEvent[] => {
+    const now = Date.now()
+    const recentEvents = recentEventsByTab.get(tabId) ?? []
+    if (recentEvents.length === 0) {
+      return []
+    }
+
+    return recentEvents.filter((event) => {
+      return now - event.timestamp <= lookbackMs
+    })
+  }
+
   const startSession = async (payload: StartSessionPayload) => {
     await ensureLoaded()
 
     const startedAt = Date.now()
     const sessionId = createSessionId()
+    const instantReplayLookbackMs =
+      typeof payload.instantReplayLookbackMs === "number" &&
+      Number.isFinite(payload.instantReplayLookbackMs) &&
+      payload.instantReplayLookbackMs > 0
+        ? Math.floor(payload.instantReplayLookbackMs)
+        : 0
+    const instantReplayEvents =
+      instantReplayLookbackMs > 0
+        ? consumeInstantReplayEvents(
+            payload.captureTabId,
+            instantReplayLookbackMs
+          )
+        : []
 
     const session: StoredDebuggerSession = {
       sessionId,
@@ -171,7 +229,7 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
       startedAt,
       recordingStartedAt:
         payload.captureType === "screenshot" ? startedAt : null,
-      events: [],
+      events: instantReplayEvents,
     }
 
     sessionsById.set(sessionId, session)
@@ -212,6 +270,7 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
       normalizedEvents.push(normalizedEvent)
     }
 
+    appendEventsToRecentBuffer(tabId, normalizedEvents)
     appendEventsToSession(tabId, normalizedEvents)
   }
 
@@ -252,7 +311,11 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
   const discardSession = async (sessionId: string) => {
     await ensureLoaded()
 
+    const session = sessionsById.get(sessionId)
     removeSession(sessionId)
+    if (session) {
+      recentEventsByTab.delete(session.captureTabId)
+    }
     schedulePersist()
   }
 
@@ -282,6 +345,7 @@ export function createDebuggerSessionStore(): DebuggerSessionStore {
     }
 
     removeSession(sessionId)
+    recentEventsByTab.delete(tabId)
     schedulePersist()
   }
 
