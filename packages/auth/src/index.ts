@@ -4,6 +4,7 @@ import { env } from "@crikket/env/server"
 import { checkout, polar, portal } from "@polar-sh/better-auth"
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
+import { admin } from "better-auth/plugins"
 import { organization } from "better-auth/plugins/organization"
 
 import { polarClient } from "./lib/payments"
@@ -28,6 +29,7 @@ export const auth = betterAuth({
     },
   },
   plugins: [
+    admin(),
     organization(),
     ...(env.ENABLE_PAYMENTS
       ? [

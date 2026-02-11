@@ -8,6 +8,13 @@
       "when": 1770485159005,
       "tag": "0000_shiny_doorman",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1770813868666,
+      "tag": "0001_right_green_goblin",
+      "breakpoints": true
     }
   ]
 }
