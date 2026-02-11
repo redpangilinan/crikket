@@ -1,3 +1,8 @@
+import type {
+  Page as FumaPage,
+  LoaderConfig,
+  LoaderOutput,
+} from "fumadocs-core/source"
 import {
   DocsBody,
   DocsDescription,
@@ -11,6 +16,14 @@ import { notFound } from "next/navigation"
 import { LLMCopyButton, ViewOptions } from "@/components/ai/page-actions"
 import { getPageImage, source } from "@/lib/source"
 import { getMDXComponents } from "@/mdx-components"
+
+const createRelativeLinkForPage = (
+  currentPage: FumaPage
+): ReturnType<typeof createRelativeLink> =>
+  createRelativeLink(
+    source as unknown as LoaderOutput<LoaderConfig>,
+    currentPage
+  )
 
 export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
   const params = await props.params
@@ -42,7 +55,7 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
         <MDX
           components={getMDXComponents({
             // this allows you to link to other pages with relative file paths
-            a: createRelativeLink(source, page),
+            a: createRelativeLinkForPage(page as unknown as FumaPage),
           })}
         />
       </DocsBody>

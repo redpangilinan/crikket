@@ -36,6 +36,7 @@
       "@tanstack/react-query-devtools": "^5.91.1",
       "babel-plugin-react-compiler": "^1.0.0",
       "@tailwindcss/postcss": "^4.1.10",
+      "postcss": "^8.5.6",
       "@types/react": "^19.2.7",
       "@types/react-dom": "^19.2.3",
       "next": "^16.1.1",
