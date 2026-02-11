@@ -7,6 +7,9 @@ export const RECORDER_TAB_ID_STORAGE_KEY = "recorderTabId"
 export const RECORDING_COUNTDOWN_ENDS_AT_STORAGE_KEY =
   "recordingCountdownEndsAt"
 export const RECORDING_STARTED_AT_STORAGE_KEY = "recordingStartedAt"
+export const HOTKEY_START_VIDEO_CAPTURE_STORAGE_KEY = "hotkeyStartVideoCapture"
+export const HOTKEY_START_SCREENSHOT_CAPTURE_STORAGE_KEY =
+  "hotkeyStartScreenshotCapture"
 
 const isExtensionUrl = (url?: string): boolean =>
   typeof url === "string" &&
