@@ -14,6 +14,7 @@ import { FormStep } from "@/components/form-step"
 import { RecordingStep } from "@/components/recording-step"
 import { SuccessStep } from "@/components/success-step"
 import { useCaptureContext } from "@/hooks/use-capture-context"
+import { useCommandShortcuts } from "@/hooks/use-command-shortcuts"
 import { type CaptureType, useRecorderInit } from "@/hooks/use-recorder-init"
 import { useRecorderRecordingSync } from "@/hooks/use-recorder-recording-sync"
 import { useScreenCapture } from "@/hooks/use-screen-capture"
@@ -49,6 +50,7 @@ interface DebuggerSubmissionInput {
 }
 
 function App() {
+  const shortcuts = useCommandShortcuts()
   const [state, setState] = useState<State>("idle")
   const [captureType, setCaptureType] = useState<CaptureType>("video")
   const [startTime, setStartTime] = useState<number | null>(null)
@@ -398,6 +400,7 @@ function App() {
             <RecordingStep
               duration={duration}
               onStopRecording={handleStopRecording}
+              stopRecordingShortcut={shortcuts.stopRecording}
             />
           ) : null}
 

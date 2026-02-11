@@ -1,8 +1,18 @@
+import { reportNonFatalError } from "@crikket/shared/lib/errors"
+import { Button } from "@crikket/ui/components/ui/button"
+import { Keyboard } from "lucide-react"
 import { PopupCaptureActions } from "@/components/popup-capture-actions"
+import { useCommandShortcuts } from "@/hooks/use-command-shortcuts"
+import { useHotkeyTrigger } from "@/hooks/use-hotkey-trigger"
 import { usePopupCapture } from "@/hooks/use-popup-capture"
 import { usePopupRecordingStatus } from "@/hooks/use-popup-recording-status"
+import {
+  HOTKEY_START_SCREENSHOT_CAPTURE_STORAGE_KEY,
+  HOTKEY_START_VIDEO_CAPTURE_STORAGE_KEY,
+} from "@/lib/capture-context"
 
 function App() {
+  const shortcuts = useCommandShortcuts()
   const {
     captureError,
     clearPendingCapture,
@@ -25,6 +35,23 @@ function App() {
     localRecordingCountdown ?? syncedRecordingCountdown ?? null
   const error = stopError ?? captureError
   const isBusy = isCapturing || isStoppingFromPopup
+
+  useHotkeyTrigger({
+    storageKey: HOTKEY_START_VIDEO_CAPTURE_STORAGE_KEY,
+    enabled: !isRecordingInProgress,
+    errorMessage: "Failed to start capture from hotkey popup flow",
+    onTrigger: async () => {
+      await startCapture("video")
+    },
+  })
+  useHotkeyTrigger({
+    storageKey: HOTKEY_START_SCREENSHOT_CAPTURE_STORAGE_KEY,
+    enabled: !isRecordingInProgress,
+    errorMessage: "Failed to start screenshot capture from hotkey popup flow",
+    onTrigger: async () => {
+      await startCapture("screenshot")
+    },
+  })
 
   return (
     <div className="w-[380px] space-y-4 p-4">
@@ -51,6 +78,9 @@ function App() {
           pendingCaptureType={pendingCaptureType}
           recordingCountdown={recordingCountdown}
           recordingDurationMs={recordingDurationMs}
+          startRecordingShortcut={shortcuts.startRecording}
+          startScreenshotShortcut={shortcuts.startScreenshot}
+          stopRecordingShortcut={shortcuts.stopRecording}
         />
 
         <div className="rounded-md border bg-muted p-3">
@@ -59,6 +89,26 @@ function App() {
             you to review and submit your report.
           </p>
         </div>
+
+        <Button
+          className="justify-start text-muted-foreground"
+          onClick={async () => {
+            try {
+              await chrome.tabs.create({ url: "chrome://extensions/shortcuts" })
+              window.close()
+            } catch (error: unknown) {
+              reportNonFatalError(
+                "Failed to open Chrome extension shortcuts settings",
+                error
+              )
+            }
+          }}
+          size="sm"
+          variant="ghost"
+        >
+          <Keyboard />
+          Keyboard shortcuts
+        </Button>
       </div>
     </div>
   )
