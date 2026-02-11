@@ -1,3 +1,4 @@
+import { gitConfig } from "@crikket/shared/config/git"
 import type {
   Page as FumaPage,
   LoaderConfig,
@@ -12,7 +13,6 @@ import {
 import { createRelativeLink } from "fumadocs-ui/mdx"
 import type { Metadata } from "next"
 import { notFound } from "next/navigation"
-
 import { LLMCopyButton, ViewOptions } from "@/components/ai/page-actions"
 import { getPageImage, source } from "@/lib/source"
 import { getMDXComponents } from "@/mdx-components"
@@ -31,11 +31,6 @@ export default async function Page(props: PageProps<"/docs/[[...slug]]">) {
   if (!page) notFound()
 
   const MDX = page.data.body
-  const gitConfig = {
-    user: "username",
-    repo: "repo",
-    branch: "main",
-  }
 
   return (
     <DocsPage full={page.data.full} toc={page.data.toc}>

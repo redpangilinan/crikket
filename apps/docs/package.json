@@ -10,6 +10,7 @@
     "postinstall": "fumadocs-mdx"
   },
   "dependencies": {
+    "@crikket/shared": "workspace:*",
     "fumadocs-core": "16.5.0",
     "fumadocs-mdx": "14.2.6",
     "fumadocs-ui": "16.5.0",
