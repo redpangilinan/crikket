@@ -1,5 +1,6 @@
 import { Button } from "@crikket/ui/components/ui/button"
 import { Camera, Video } from "lucide-react"
+import { ShortcutKbd } from "@/components/shortcut-kbd"
 import type { PopupCaptureType } from "@/hooks/use-popup-capture"
 import { formatDuration } from "@/lib/utils"
 
@@ -9,6 +10,9 @@ interface PopupCaptureActionsProps {
   recordingCountdown: number | null
   recordingDurationMs: number
   pendingCaptureType: PopupCaptureType | null
+  startRecordingShortcut: string | null
+  startScreenshotShortcut: string | null
+  stopRecordingShortcut: string | null
   onRequestCapture: (captureType: PopupCaptureType) => void
   onStopFromPopup: () => Promise<void>
   onStartCapture: (captureType: PopupCaptureType) => Promise<void>
@@ -21,6 +25,9 @@ export function PopupCaptureActions({
   recordingCountdown,
   recordingDurationMs,
   pendingCaptureType,
+  startRecordingShortcut,
+  startScreenshotShortcut,
+  stopRecordingShortcut,
   onRequestCapture,
   onStopFromPopup,
   onStartCapture,
@@ -56,6 +63,10 @@ export function PopupCaptureActions({
           >
             <Video className="h-5 w-5" />
             <span>Stop Recording</span>
+            <ShortcutKbd
+              className="bg-destructive-foreground/15 text-destructive-foreground"
+              shortcut={stopRecordingShortcut}
+            />
           </Button>
         </div>
       ) : (
@@ -69,6 +80,10 @@ export function PopupCaptureActions({
           >
             <Video className="h-5 w-5" />
             <span>Record Screen</span>
+            <ShortcutKbd
+              className="bg-primary-foreground/15 text-primary-foreground"
+              shortcut={startRecordingShortcut}
+            />
           </Button>
 
           <Button
@@ -80,6 +95,10 @@ export function PopupCaptureActions({
           >
             <Camera className="h-5 w-5" />
             <span>Take Screenshot</span>
+            <ShortcutKbd
+              className="bg-muted text-foreground"
+              shortcut={startScreenshotShortcut}
+            />
           </Button>
         </div>
       )}
