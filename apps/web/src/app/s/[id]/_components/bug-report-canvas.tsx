@@ -6,6 +6,7 @@ import type { SharedBugReport } from "./types"
 interface BugReportCanvasProps {
   data: SharedBugReport
   onTimeUpdate?: (currentTimeMs: number) => void
+  compact?: boolean
 }
 
 function getMetadataDurationMs(metadata: unknown): number | null {
@@ -24,7 +25,7 @@ function getMetadataDurationMs(metadata: unknown): number | null {
 export const BugReportCanvas = forwardRef<
   HTMLVideoElement,
   BugReportCanvasProps
->(({ data, onTimeUpdate }, ref) => {
+>(({ data, onTimeUpdate, compact = false }, ref) => {
   const showVideo =
     data.attachmentType === "video" && Boolean(data.attachmentUrl)
   const showImage =
@@ -95,12 +96,28 @@ export const BugReportCanvas = forwardRef<
   )
 
   return (
-    <div className="relative flex flex-1 items-center justify-center overflow-hidden bg-muted/20 p-4 md:p-8">
-      <div className="relative flex h-full w-full max-w-7xl items-center justify-center">
+    <div
+      className={
+        compact
+          ? "relative flex items-center justify-center overflow-hidden bg-muted/20 p-0"
+          : "relative flex flex-1 items-center justify-center overflow-hidden bg-muted/20 p-4 md:p-8"
+      }
+    >
+      <div
+        className={
+          compact
+            ? "relative flex w-full items-center justify-center"
+            : "relative flex h-full w-full max-w-7xl items-center justify-center"
+        }
+      >
         {showVideo ? (
           // biome-ignore lint/a11y/useMediaCaption: uploaded bug recordings do not have caption tracks yet
           <video
-            className="max-h-full max-w-full rounded-lg bg-black object-contain shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={
+              compact
+                ? "h-auto w-full bg-black object-contain outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                : "max-h-full max-w-full rounded-lg bg-black object-contain shadow-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            }
             controls
             onLoadedMetadata={handleLoadedMetadata}
             onTimeUpdate={(event) => {
@@ -116,7 +133,11 @@ export const BugReportCanvas = forwardRef<
         ) : showImage ? (
           <img
             alt={data.title ?? "Bug report attachment"}
-            className="max-h-full max-w-full rounded-lg object-contain shadow-sm"
+            className={
+              compact
+                ? "h-auto w-full object-contain"
+                : "max-h-full max-w-full rounded-lg object-contain shadow-sm"
+            }
             src={data.attachmentUrl ?? undefined}
           />
         ) : (

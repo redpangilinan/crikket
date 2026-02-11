@@ -1,21 +1,14 @@
 "use client"
 
 import { reportNonFatalError } from "@crikket/shared/lib/errors"
-import { Button, buttonVariants } from "@crikket/ui/components/ui/button"
+import { Button } from "@crikket/ui/components/ui/button"
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@crikket/ui/components/ui/resizable"
-import {
-  Sheet,
-  SheetContent,
-  SheetTitle,
-  SheetTrigger,
-} from "@crikket/ui/components/ui/sheet"
-import { cn } from "@crikket/ui/lib/utils"
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query"
-import { AlertCircle, Loader2, Menu } from "lucide-react"
+import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react"
 import Link from "next/link"
 import { parseAsString, parseAsStringLiteral, useQueryState } from "nuqs"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -137,6 +130,7 @@ export function BugReportView({ id }: BugReportViewProps) {
   const desktopVideoRef = useRef<HTMLVideoElement | null>(null)
   const mobileVideoRef = useRef<HTMLVideoElement | null>(null)
   const [playbackOffsetMs, setPlaybackOffsetMs] = useState(0)
+  const [isMobileVideoHidden, setIsMobileVideoHidden] = useState(false)
   const [selectedEntryIds, setSelectedEntryIds] =
     useState<SelectedEntryIds>(EMPTY_SELECTION)
 
@@ -306,111 +300,116 @@ export function BugReportView({ id }: BugReportViewProps) {
   }
 
   return (
-    <Sheet>
-      <div className="flex h-screen flex-col overflow-hidden bg-background">
-        <BugReportHeader
-          data={data}
-          sidebarTrigger={
-            <SheetTrigger
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "icon" }),
-                "-ml-2 h-8 w-8"
-              )}
-            >
-              <Menu className="h-4 w-4" />
-            </SheetTrigger>
-          }
-        />
+    <div className="flex h-screen flex-col overflow-hidden bg-background">
+      <BugReportHeader data={data} />
 
-        <div className="flex flex-1 overflow-hidden">
-          {/* Desktop View */}
-          <div className="hidden h-full w-full md:block">
-            <ResizablePanelGroup
-              className="h-full w-full"
-              orientation="horizontal"
-            >
-              <ResizablePanel minSize={CANVAS_MIN_WIDTH}>
-                <div className="flex h-full">
-                  <BugReportCanvas
-                    data={data}
-                    onTimeUpdate={setPlaybackOffsetMs}
-                    ref={desktopVideoRef}
-                  />
-                </div>
-              </ResizablePanel>
-              <ResizableHandle withHandle />
-
-              <ResizablePanel
-                defaultSize={SIDEBAR_DEFAULT_WIDTH}
-                maxSize={SIDEBAR_MAX_WIDTH}
-                minSize={SIDEBAR_MIN_WIDTH}
-              >
-                <BugReportSidebar
-                  actionEntries={actionEntries}
-                  activeTab={activeTab}
-                  bugReportId={data.id}
+      <div className="flex flex-1 overflow-hidden">
+        {/* Desktop View */}
+        <div className="hidden h-full w-full md:block">
+          <ResizablePanelGroup
+            className="h-full w-full"
+            orientation="horizontal"
+          >
+            <ResizablePanel minSize={CANVAS_MIN_WIDTH}>
+              <div className="flex h-full">
+                <BugReportCanvas
                   data={data}
-                  hasMoreNetworkRequests={Boolean(
-                    networkRequestsQuery.hasNextPage
-                  )}
-                  highlightedActionEntryIds={highlightedActionEntryIds}
-                  highlightedLogEntryIds={highlightedLogEntryIds}
-                  highlightedNetworkEntryIds={highlightedNetworkEntryIds}
-                  isFetchingMoreNetworkRequests={
-                    networkRequestsQuery.isFetchingNextPage
-                  }
-                  isNetworkRequestsLoading={networkRequestsQuery.isLoading}
-                  logEntries={logEntries}
-                  networkEntries={networkEntries}
-                  networkRequests={networkRequests}
-                  onEntrySelect={handleEntrySelect}
-                  onLoadMoreNetworkRequests={handleLoadMoreNetworkRequests}
-                  onTabChange={handleTabChange}
-                  selectedActionEntryId={selectedEntryIds.action}
-                  selectedLogEntryId={selectedEntryIds.log}
-                  selectedNetworkEntryId={selectedEntryIds.network}
+                  onTimeUpdate={setPlaybackOffsetMs}
+                  ref={desktopVideoRef}
                 />
-              </ResizablePanel>
-            </ResizablePanelGroup>
-          </div>
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
 
-          {/* Mobile View */}
-          <div className="flex h-full w-full flex-col md:hidden">
-            <BugReportCanvas
+            <ResizablePanel
+              defaultSize={SIDEBAR_DEFAULT_WIDTH}
+              maxSize={SIDEBAR_MAX_WIDTH}
+              minSize={SIDEBAR_MIN_WIDTH}
+            >
+              <BugReportSidebar
+                actionEntries={actionEntries}
+                activeTab={activeTab}
+                bugReportId={data.id}
+                data={data}
+                hasMoreNetworkRequests={Boolean(
+                  networkRequestsQuery.hasNextPage
+                )}
+                highlightedActionEntryIds={highlightedActionEntryIds}
+                highlightedLogEntryIds={highlightedLogEntryIds}
+                highlightedNetworkEntryIds={highlightedNetworkEntryIds}
+                isFetchingMoreNetworkRequests={
+                  networkRequestsQuery.isFetchingNextPage
+                }
+                isNetworkRequestsLoading={networkRequestsQuery.isLoading}
+                logEntries={logEntries}
+                networkEntries={networkEntries}
+                networkRequests={networkRequests}
+                onEntrySelect={handleEntrySelect}
+                onLoadMoreNetworkRequests={handleLoadMoreNetworkRequests}
+                onTabChange={handleTabChange}
+                selectedActionEntryId={selectedEntryIds.action}
+                selectedLogEntryId={selectedEntryIds.log}
+                selectedNetworkEntryId={selectedEntryIds.network}
+              />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        </div>
+
+        {/* Mobile View */}
+        <div className="flex h-full w-full flex-col md:hidden">
+          {!isMobileVideoHidden && (
+            <div className="shrink-0 border-b">
+              <BugReportCanvas
+                compact
+                data={data}
+                onTimeUpdate={setPlaybackOffsetMs}
+                ref={mobileVideoRef}
+              />
+            </div>
+          )}
+          <div className="min-h-0 flex-1">
+            <BugReportSidebar
+              actionEntries={actionEntries}
+              activeTab={activeTab}
+              bugReportId={data.id}
               data={data}
-              onTimeUpdate={setPlaybackOffsetMs}
-              ref={mobileVideoRef}
+              hasMoreNetworkRequests={Boolean(networkRequestsQuery.hasNextPage)}
+              highlightedActionEntryIds={highlightedActionEntryIds}
+              highlightedLogEntryIds={highlightedLogEntryIds}
+              highlightedNetworkEntryIds={highlightedNetworkEntryIds}
+              isFetchingMoreNetworkRequests={
+                networkRequestsQuery.isFetchingNextPage
+              }
+              isNetworkRequestsLoading={networkRequestsQuery.isLoading}
+              logEntries={logEntries}
+              networkEntries={networkEntries}
+              networkRequests={networkRequests}
+              onEntrySelect={handleEntrySelect}
+              onLoadMoreNetworkRequests={handleLoadMoreNetworkRequests}
+              onTabChange={handleTabChange}
+              selectedActionEntryId={selectedEntryIds.action}
+              selectedLogEntryId={selectedEntryIds.log}
+              selectedNetworkEntryId={selectedEntryIds.network}
+              tabAction={
+                <button
+                  aria-label={isMobileVideoHidden ? "Show video" : "Hide video"}
+                  className="rounded-[4px] p-2 text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+                  onClick={() => {
+                    setIsMobileVideoHidden((current) => !current)
+                  }}
+                  type="button"
+                >
+                  {isMobileVideoHidden ? (
+                    <Eye className="h-3.5 w-3.5" />
+                  ) : (
+                    <EyeOff className="h-3.5 w-3.5" />
+                  )}
+                </button>
+              }
             />
           </div>
         </div>
       </div>
-
-      <SheetContent className="w-[90%] p-0 sm:max-w-md" side="left">
-        <SheetTitle className="sr-only">Bug Report Details</SheetTitle>
-        <BugReportSidebar
-          actionEntries={actionEntries}
-          activeTab={activeTab}
-          bugReportId={data.id}
-          data={data}
-          hasMoreNetworkRequests={Boolean(networkRequestsQuery.hasNextPage)}
-          highlightedActionEntryIds={highlightedActionEntryIds}
-          highlightedLogEntryIds={highlightedLogEntryIds}
-          highlightedNetworkEntryIds={highlightedNetworkEntryIds}
-          isFetchingMoreNetworkRequests={
-            networkRequestsQuery.isFetchingNextPage
-          }
-          isNetworkRequestsLoading={networkRequestsQuery.isLoading}
-          logEntries={logEntries}
-          networkEntries={networkEntries}
-          networkRequests={networkRequests}
-          onEntrySelect={handleEntrySelect}
-          onLoadMoreNetworkRequests={handleLoadMoreNetworkRequests}
-          onTabChange={handleTabChange}
-          selectedActionEntryId={selectedEntryIds.action}
-          selectedLogEntryId={selectedEntryIds.log}
-          selectedNetworkEntryId={selectedEntryIds.network}
-        />
-      </SheetContent>
-    </Sheet>
+    </div>
   )
 }

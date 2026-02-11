@@ -18,6 +18,7 @@ interface BugReportSidebarProps {
   bugReportId: string
   data: SharedBugReport
   activeTab: SidebarTab
+  tabAction?: ReactNode
   onTabChange: (tab: SidebarTab) => void
   actionEntries: DebuggerTimelineEntry[]
   logEntries: DebuggerTimelineEntry[]
@@ -40,6 +41,7 @@ export function BugReportSidebar({
   bugReportId,
   data,
   activeTab,
+  tabAction,
   onTabChange,
   actionEntries,
   logEntries,
@@ -62,7 +64,7 @@ export function BugReportSidebar({
   return (
     <div className="z-20 flex h-full w-full flex-col bg-background shadow-xl md:relative md:top-0 md:border-l md:shadow-none">
       {/* Tabs Navigation */}
-      <div className="flex items-center border-b px-1 py-1">
+      <div className="flex items-center gap-1 border-b px-1 py-1">
         <TabButton
           active={activeTab === "details"}
           icon={<Info className="h-3.5 w-3.5" />}
@@ -87,6 +89,7 @@ export function BugReportSidebar({
           label="Network"
           onClick={() => onTabChange("network")}
         />
+        {tabAction ? <div className="shrink-0">{tabAction}</div> : null}
       </div>
 
       {/* Tab Content */}
