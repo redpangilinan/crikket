@@ -3,7 +3,7 @@ title: Quick Start
 description: Fastest way to run Crikket, including prerequisites and deployment options.
 ---
 
-Use this path if you want the most direct setup.
+import { Step, Steps } from "fumadocs-ui/components/steps";
 
 ## Prerequisites
 
@@ -18,14 +18,21 @@ Security baseline:
 - Keep `3000`, `3001`, and `5432` private
 - Use a strong `BETTER_AUTH_SECRET`
 
-## 1. Clone the Repository
+<Steps>
+  <Step>
+
+### Clone Repository
 
 ```bash
 git clone https://github.com/redpangilinan/crikket
 cd crikket
 ```
 
-## 2. Create Runtime Env File
+  </Step>
+
+  <Step>
+
+### Create Env Files
 
 ```bash
 cp .env.example .env
@@ -33,16 +40,20 @@ cp apps/server/.env.example apps/server/.env
 cp apps/web/.env.example apps/web/.env
 ```
 
-## 3. Configure Environment
+  </Step>
 
-Root `.env` is Docker-only (images/ports/bundled Postgres settings).
+  <Step>
+
+### Configure App Env
+
+Root `.env` is Docker-only (images, ports, bundled Postgres config).
 
 App settings belong in:
 
 - `apps/server/.env`
 - `apps/web/.env`
 
-For production, set these explicitly in app env files:
+For production, set these explicitly:
 
 ```bash
 DATABASE_URL
@@ -56,27 +67,38 @@ GOOGLE_CLIENT_SECRET
 ENABLE_PAYMENTS (false)
 ```
 
-## 4. Start Services
+  </Step>
 
-Use prebuilt images (default):
+  <Step>
+
+### Start Stack
+
+Prebuilt images (default):
 
 ```bash
 docker compose up -d
 ```
 
-Build locally from source:
+Local source build:
 
 ```bash
 docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 ```
 
-## 5. Validate Deployment
+  </Step>
+
+  <Step>
+
+### Validate Deployment
 
 ```bash
 docker compose ps
 docker compose logs -f server
 docker compose logs -f web
 ```
+
+  </Step>
+</Steps>
 
 Schema migrations run automatically through the `migrate` service before `server` starts.
 
