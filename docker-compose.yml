@@ -19,7 +19,7 @@ services:
       retries: 10
 
   server:
-    image: ${CRIKKET_SERVER_IMAGE:-ghcr.io/redpangilinan/crikket-server:latest}
+    image: ghcr.io/redpangilinan/crikket-server:latest
     pull_policy: always
     container_name: crikket-server
     restart: unless-stopped
@@ -33,7 +33,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}@postgres:5432/${POSTGRES_DB:-crikket}}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-crikket}}
       STORAGE_PATH: /app/storage
     ports:
       - "${SERVER_PORT:-3000}:3000"
@@ -53,7 +53,7 @@ services:
       retries: 12
 
   migrate:
-    image: ${CRIKKET_SERVER_IMAGE:-ghcr.io/redpangilinan/crikket-server:latest}
+    image: ghcr.io/redpangilinan/crikket-server:latest
     pull_policy: always
     restart: "no"
     env_file:
@@ -63,11 +63,11 @@ services:
         condition: service_healthy
     environment:
       NODE_ENV: production
-      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}@postgres:5432/${POSTGRES_DB:-crikket}}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-crikket}}
     command: ["bun", "run", "--filter", "@crikket/db", "db:migrate"]
 
   web:
-    image: ${CRIKKET_WEB_IMAGE:-ghcr.io/redpangilinan/crikket-web:latest}
+    image: ghcr.io/redpangilinan/crikket-web:latest
     pull_policy: always
     container_name: crikket-web
     restart: unless-stopped
