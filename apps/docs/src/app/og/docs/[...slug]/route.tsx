@@ -1,3 +1,4 @@
+import { siteConfig } from "@crikket/shared/config/site"
 import { generate as DefaultImage } from "fumadocs-ui/og"
 import { notFound } from "next/navigation"
 import { ImageResponse } from "next/og"
@@ -17,7 +18,7 @@ export async function GET(
   return new ImageResponse(
     <DefaultImage
       description={page.data.description}
-      site="My App"
+      site={siteConfig.name}
       title={page.data.title}
     />,
     {

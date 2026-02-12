@@ -1,0 +1,69 @@
+---
+title: Operations
+description: Operations including updates, backups, monitoring, and runbook commands.
+---
+
+## Update Procedure
+
+Prebuilt image mode:
+
+```bash
+docker compose pull
+docker compose up -d
+```
+
+Local build mode:
+
+```bash
+git pull
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+Post-update checks:
+
+- `docker compose ps`
+- Review `server` and `web` logs
+- Verify login and one end-to-end API action
+
+## Backup Strategy
+
+Minimum recommendation:
+
+- Daily PostgreSQL backup
+- Frequent upload storage backup
+- Retention of at least 7-14 days
+- Monthly restore drill
+
+Example database dump:
+
+```bash
+docker exec crikket-postgres pg_dump -U postgres crikket > backup-$(date +%F).sql
+```
+
+## Monitoring
+
+Track at minimum:
+
+- Container health and restart counts
+- API latency and error rate
+- Disk usage on data volumes
+- Host memory pressure
+
+## Quick Commands
+
+```bash
+# Start
+docker compose up -d
+
+# Status
+docker compose ps
+
+# Migrate schema manually (if needed)
+docker compose run --rm migrate
+
+# Logs
+docker compose logs -f
+
+# Stop
+docker compose down
+```

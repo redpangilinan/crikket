@@ -1,0 +1,105 @@
+---
+title: Quick Start
+description: Fastest way to run Crikket, including prerequisites and deployment options.
+---
+
+import { Step, Steps } from "fumadocs-ui/components/steps";
+
+## Prerequisites
+
+- Docker Engine 24+ and Docker Compose v2
+- 2 vCPU / 4 GB RAM / 40 GB SSD recommended baseline
+- Linux VPS (Ubuntu 22.04+ recommended) or local machine with Docker Desktop
+- Domain + reverse proxy for production (`80/443`)
+
+Security baseline:
+
+- Expose only `80/443` publicly
+- Keep `3000`, `3001`, and `5432` private
+- Use a strong `BETTER_AUTH_SECRET`
+
+<Steps>
+  <Step>
+
+### Clone Repository
+
+```bash
+git clone https://github.com/redpangilinan/crikket
+cd crikket
+```
+
+  </Step>
+
+  <Step>
+
+### Create Env Files
+
+```bash
+cp .env.example .env
+cp apps/server/.env.example apps/server/.env
+cp apps/web/.env.example apps/web/.env
+```
+
+  </Step>
+
+  <Step>
+
+### Configure App Env
+
+Root `.env` is Docker-only (images, ports, bundled Postgres config).
+
+App settings belong in:
+
+- `apps/server/.env`
+- `apps/web/.env`
+
+For production, set these explicitly:
+
+```bash
+DATABASE_URL
+BETTER_AUTH_SECRET (32+ characters)
+NEXT_PUBLIC_APP_URL
+NEXT_PUBLIC_SERVER_URL
+BETTER_AUTH_URL
+CORS_ORIGIN
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+ENABLE_PAYMENTS (false)
+```
+
+  </Step>
+
+  <Step>
+
+### Start Stack
+
+Prebuilt images (default):
+
+```bash
+docker compose up -d
+```
+
+Local source build:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+  </Step>
+
+  <Step>
+
+### Validate Deployment
+
+```bash
+docker compose ps
+docker compose logs -f server
+docker compose logs -f web
+```
+
+  </Step>
+</Steps>
+
+Schema migrations run automatically through the `migrate` service before `server` starts.
+
+Next: [Production Setup](/docs/self-hosting/production).

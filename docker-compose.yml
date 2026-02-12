@@ -1,0 +1,96 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: crikket-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_DB: ${POSTGRES_DB:-crikket}
+      POSTGRES_HOST_AUTH_METHOD: ${POSTGRES_HOST_AUTH_METHOD:-trust}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-crikket}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  server:
+    image: ${CRIKKET_SERVER_IMAGE:-ghcr.io/redpangilinan/crikket-server:latest}
+    pull_policy: always
+    container_name: crikket-server
+    restart: unless-stopped
+    env_file:
+      - ./apps/server/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}@postgres:5432/${POSTGRES_DB:-crikket}}
+      STORAGE_PATH: /app/storage
+    ports:
+      - "${SERVER_PORT:-3000}:3000"
+      - "${WEB_PORT:-3001}:3001"
+    volumes:
+      - uploads_data:/app/storage
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://localhost:3000').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  migrate:
+    image: ${CRIKKET_SERVER_IMAGE:-ghcr.io/redpangilinan/crikket-server:latest}
+    pull_policy: always
+    restart: "no"
+    env_file:
+      - ./apps/server/.env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}@postgres:5432/${POSTGRES_DB:-crikket}}
+    command: ["bun", "run", "--filter", "@crikket/db", "db:migrate"]
+
+  web:
+    image: ${CRIKKET_WEB_IMAGE:-ghcr.io/redpangilinan/crikket-web:latest}
+    pull_policy: always
+    container_name: crikket-web
+    restart: unless-stopped
+    env_file:
+      - ./apps/web/.env
+    depends_on:
+      server:
+        condition: service_healthy
+    network_mode: "service:server"
+    environment:
+      NODE_ENV: production
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "bun",
+          "-e",
+          "fetch('http://localhost:3001').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  postgres_data:
+  uploads_data:

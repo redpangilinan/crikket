@@ -1,0 +1,86 @@
+---
+title: Install Without Web Store
+description: Build and load the Chrome extension locally as unpacked output.
+---
+
+import { Step, Steps } from "fumadocs-ui/components/steps"
+
+This guide installs the Crikket extension without the Chrome Web Store.
+
+## Prerequisites
+
+- Chrome or any Chromium-based browser
+- `web` and `server` running (local or deployed)
+- Dependencies installed in repo root:
+
+```bash
+bun install
+```
+
+<Steps>
+  <Step>
+
+  ### Configure Extension Env
+
+  ```bash
+  cp apps/extension/.env.example apps/extension/.env
+  ```
+
+  Default values:
+
+  ```bash
+  VITE_APP_URL=http://localhost:3001
+  VITE_SERVER_URL=http://localhost:3000
+  ```
+
+  If your app is deployed, replace those with deployed URLs.
+
+  </Step>
+
+  <Step>
+
+  ### Build Extension Output
+
+  ```bash
+  bun run --filter extension build
+  ```
+
+  Output path:
+
+  ```bash
+  apps/extension/.output/chrome-mv3
+  ```
+
+  </Step>
+
+  <Step>
+
+  ### Load Unpacked in Chrome
+
+  1. Open `chrome://extensions`
+  2. Turn on `Developer mode`
+  3. Click `Load unpacked`
+  4. Select `apps/extension/.output/chrome-mv3`
+
+  </Step>
+
+  <Step>
+
+  ### Verify
+
+  - Extension appears in extensions list
+  - Popup opens without errors
+  - Recording/capture actions can reach your configured backend
+
+  </Step>
+</Steps>
+
+## Update Loop
+
+After extension code changes:
+
+```bash
+bun run --filter extension build
+```
+
+Then in `chrome://extensions`, click reload on the Crikket extension.
