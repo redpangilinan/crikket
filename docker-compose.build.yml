@@ -1,0 +1,24 @@
+services:
+  server:
+    image: crikket-server:local
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+
+  migrate:
+    image: crikket-server:local
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: apps/server/Dockerfile
+
+  web:
+    image: crikket-web:local
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3001}
+        NEXT_PUBLIC_SERVER_URL: ${NEXT_PUBLIC_SERVER_URL:-http://localhost:3000}

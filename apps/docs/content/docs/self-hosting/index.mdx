@@ -1,0 +1,27 @@
+---
+title: Overview
+description: Start here for self-hosting architecture, scope, and navigation.
+---
+
+This section covers how to deploy and operate Crikket in your own infrastructure.
+
+## In This Section
+
+- [Quick Start](/docs/self-hosting/quick-start)
+- [Production Setup](/docs/self-hosting/production)
+- [Operations](/docs/self-hosting/operations)
+- [Troubleshooting](/docs/self-hosting/troubleshooting)
+
+## Architecture
+
+Crikket runs as three services:
+
+- `web`: Next.js frontend (container port `3001`)
+- `server`: Hono API backend (container port `3000`)
+- `postgres`: PostgreSQL database (container port `5432`)
+
+Repository resources used in this guide:
+
+- `docker-compose.yml` for pull-and-run
+- `docker-compose.build.yml` for local source builds
+- `.env.example` for runtime configuration
