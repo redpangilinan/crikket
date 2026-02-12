@@ -43,6 +43,9 @@ export function NetworkRequestsPanel({
     searchParamValue ?? ""
   )
   const debouncedSearchValue = useDebounce(searchInputValue)
+  const lastSyncedSearchParamRef = useRef<string | null>(
+    (searchParamValue ?? "").trim() || null
+  )
   const listContainerRef = useRef<HTMLDivElement | null>(null)
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
@@ -59,26 +62,25 @@ export function NetworkRequestsPanel({
   const normalizedQuery = (searchParamValue ?? "").trim().toLowerCase()
 
   useEffect(() => {
-    const nextInputValue = searchParamValue ?? ""
-    setSearchInputValue((current) =>
-      current === nextInputValue ? current : nextInputValue
-    )
+    const normalizedSearchParamValue = (searchParamValue ?? "").trim() || null
+    if (normalizedSearchParamValue === lastSyncedSearchParamRef.current) {
+      return
+    }
+
+    lastSyncedSearchParamRef.current = normalizedSearchParamValue
+    setSearchInputValue(searchParamValue ?? "")
   }, [searchParamValue])
 
   useEffect(() => {
     const normalizedDebouncedValue = debouncedSearchValue.trim()
     const nextSearchParamValue =
       normalizedDebouncedValue.length > 0 ? normalizedDebouncedValue : null
-    const normalizedCurrentSearchParam = (searchParamValue ?? "").trim()
-    const currentSearchParamValue =
-      normalizedCurrentSearchParam.length > 0
-        ? normalizedCurrentSearchParam
-        : null
 
-    if (currentSearchParamValue === nextSearchParamValue) {
+    if (nextSearchParamValue === lastSyncedSearchParamRef.current) {
       return
     }
 
+    lastSyncedSearchParamRef.current = nextSearchParamValue
     setSearchParamValue(nextSearchParamValue, { history: "replace" }).catch(
       (error: unknown) => {
         reportNonFatalError(
@@ -87,7 +89,7 @@ export function NetworkRequestsPanel({
         )
       }
     )
-  }, [debouncedSearchValue, searchParamValue, setSearchParamValue])
+  }, [debouncedSearchValue, setSearchParamValue])
 
   const highlightedEntryIdSet = useMemo(
     () => new Set(highlightedEntryIds),
