@@ -1,0 +1,45 @@
+---
+title: Troubleshooting
+description: Troubleshooting common issues with Crikket.
+---
+
+## Troubleshooting
+
+### Containers Won't Start
+
+```bash
+docker compose config
+docker compose logs -f server
+docker compose logs -f web
+```
+
+Common causes:
+
+- Missing required env vars
+- Invalid image tag
+- Port conflicts on host
+
+### Auth Issues
+
+Verify these are aligned:
+
+- `BETTER_AUTH_URL`
+- `NEXT_PUBLIC_SERVER_URL`
+- `NEXT_PUBLIC_APP_URL`
+- `CORS_ORIGIN`
+
+### Database Connection Errors
+
+- Check `DATABASE_URL` credentials and host
+- Confirm `postgres` service is healthy
+- In Docker, `localhost` points to the container itself
+  - Use `postgres` for bundled Compose Postgres
+  - Use `host.docker.internal` for host-machine Postgres
+- If tables are missing in a fresh database:
+  - `docker compose run --rm migrate`
+
+### Uploads Not Accessible
+
+- Check `STORAGE_BASE_URL`
+- For local storage, verify volume mount + write permissions
+- For S3/R2, verify bucket policy and credentials

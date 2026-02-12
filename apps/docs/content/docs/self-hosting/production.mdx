@@ -1,0 +1,74 @@
+---
+title: Production Setup
+description: Configure domains, TLS, storage, and critical environment variables for production.
+---
+
+## Required Environment Variables
+
+Set these in `apps/server/.env`:
+
+```bash
+DATABASE_URL
+BETTER_AUTH_SECRET
+BETTER_AUTH_URL
+CORS_ORIGIN
+GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET
+ENABLE_PAYMENTS (false)
+```
+
+Set these in `apps/web/.env`:
+
+```bash
+NEXT_PUBLIC_APP_URL
+NEXT_PUBLIC_SERVER_URL
+```
+
+Optional but common:
+
+- `STORAGE_*` for S3/R2
+
+Notes:
+
+- `DATABASE_URL` is the source of truth for the app.
+- `POSTGRES_*` vars are only for configuring the bundled Compose Postgres service.
+- Root `.env` is Docker-only (image tags, ports, bundled Postgres init).
+
+## Reverse Proxy and HTTPS
+
+Recommended layout:
+
+- Public traffic -> reverse proxy (`80/443`)
+- Proxy -> `web:3001`
+- API reachable via public URL (for example `https://api.example.com`)
+
+Container routing note:
+
+- In the default compose file, `web` and `server` run as two containers.
+- `web` shares `server` networking, so server-side calls to `localhost:3000` work without extra internal URL variables.
+
+If using a separate API domain:
+
+- `NEXT_PUBLIC_SERVER_URL=https://api.example.com`
+- `BETTER_AUTH_URL=https://api.example.com`
+- `CORS_ORIGIN=https://app.example.com`
+
+## Storage
+
+Default:
+
+- Local volume mounted at `/app/storage`
+
+For better durability and scale:
+
+- Use `STORAGE_PROVIDER=s3` or `STORAGE_PROVIDER=r2`
+- Configure `STORAGE_BUCKET`, `STORAGE_REGION`, `STORAGE_ENDPOINT`, and credentials
+
+## Data Durability
+
+Compose volume persistence:
+
+- PostgreSQL data in `postgres_data`
+- Upload data in `uploads_data`
+
+Also implement off-host backups and periodic restore tests.

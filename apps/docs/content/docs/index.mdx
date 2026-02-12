@@ -1,13 +1,31 @@
 ---
-title: Hello World
-description: Your first document
+title: Introduction
+description: Welcome to the Crikket documentation.
 ---
 
-Welcome to the docs! You can start writing documents in `/content/docs`.
+Crikket helps teams capture, triage, and share high-quality bug reports.
+These docs focus on running Crikket reliably, especially in self-hosted environments.
 
-## What is Next?
+## What You Will Find Here
 
 <Cards>
-  <Card title="Learn more about Next.js" href="https://nextjs.org/docs" />
-  <Card title="Learn more about Fumadocs" href="https://fumadocs.dev" />
+  <Card title="Self-Hosting" href="/docs/self-hosting" />
+  <Card title="Quick Start" href="/docs/self-hosting/quick-start" />
+  <Card title="Production Setup" href="/docs/self-hosting/production" />
+  <Card title="Operations" href="/docs/self-hosting/operations" />
+  <Card title="Troubleshooting" href="/docs/self-hosting/troubleshooting" />
 </Cards>
+
+## Platform at a Glance
+
+Crikket deploys as:
+
+- `web` (Next.js frontend)
+- `server` (Hono API backend)
+- `postgres` (database)
+
+Core deployment assets are already in this repository:
+
+- `docker-compose.yml`
+- `docker-compose.build.yml`
+- `.env.example`

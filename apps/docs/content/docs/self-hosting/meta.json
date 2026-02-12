@@ -1,0 +1,11 @@
+{
+  "title": "Self-Hosting",
+  "defaultOpen": true,
+  "pages": [
+    "index",
+    "quick-start",
+    "production",
+    "operations",
+    "troubleshooting"
+  ]
+}
