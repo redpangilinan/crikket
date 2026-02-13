@@ -41,9 +41,11 @@ export function TeamSwitcher({
   userId,
 }: TeamSwitcherProps) {
   const { isMobile } = useSidebar()
+  const { data: session, isPending: isSessionPending } = authClient.useSession()
   const router = useRouter()
   const [showCreateDialog, setShowCreateDialog] = React.useState(false)
   const [isAutoSwitching, setIsAutoSwitching] = React.useState(false)
+  const hasAttemptedAutoRestoreRef = React.useRef(false)
 
   const preferredOrgStorageKey = React.useMemo(
     () => `crikket:preferred-org:${userId}`,
@@ -65,32 +67,55 @@ export function TeamSwitcher({
     await queryClient.invalidateQueries()
   }, [])
 
-  const handleSwitchOrganization = async (orgId: string) => {
-    if (orgId === activeOrganization?.id) {
-      return
-    }
-
-    try {
-      await authClient.organization.setActive({
+  const setActiveOrganization = React.useCallback(
+    async (orgId: string) => {
+      const { error } = await authClient.organization.setActive({
         organizationId: orgId,
       })
+
+      if (error) {
+        throw new Error(error.message ?? "Failed to switch organization")
+      }
+
       persistPreferredOrganization(orgId)
       await invalidateDashboardData()
       router.refresh()
-      toast.success("Organization switched successfully")
-    } catch (error) {
-      console.error(error)
-      toast.error("Failed to switch organization")
-    }
-  }
+    },
+    [invalidateDashboardData, persistPreferredOrganization, router]
+  )
+
+  const handleSwitchOrganization = React.useCallback(
+    async (orgId: string) => {
+      if (orgId === activeOrganization?.id) {
+        return
+      }
+
+      try {
+        await setActiveOrganization(orgId)
+        toast.success("Organization switched successfully")
+      } catch (error) {
+        console.error(error)
+        toast.error("Failed to switch organization")
+      }
+    },
+    [activeOrganization?.id, setActiveOrganization]
+  )
 
   React.useEffect(() => {
     if (activeOrganization?.id) {
       persistPreferredOrganization(activeOrganization.id)
+      hasAttemptedAutoRestoreRef.current = false
       return
     }
 
-    if (organizations.length < 1 || isAutoSwitching) {
+    if (
+      organizations.length < 1 ||
+      isAutoSwitching ||
+      isSessionPending ||
+      !session ||
+      session.user.id !== userId ||
+      hasAttemptedAutoRestoreRef.current
+    ) {
       return
     }
 
@@ -106,14 +131,9 @@ export function TeamSwitcher({
       return
     }
 
+    hasAttemptedAutoRestoreRef.current = true
     setIsAutoSwitching(true)
-    authClient.organization
-      .setActive({ organizationId: organizationIdToActivate })
-      .then(async () => {
-        persistPreferredOrganization(organizationIdToActivate)
-        await invalidateDashboardData()
-        router.refresh()
-      })
+    setActiveOrganization(organizationIdToActivate)
       .catch((error) => {
         console.error(error)
         toast.error("Failed to restore organization")
@@ -123,12 +143,14 @@ export function TeamSwitcher({
       })
   }, [
     activeOrganization?.id,
-    invalidateDashboardData,
     isAutoSwitching,
+    isSessionPending,
     organizations,
     persistPreferredOrganization,
     preferredOrganizationId,
-    router,
+    session,
+    setActiveOrganization,
+    userId,
   ])
 
   return (

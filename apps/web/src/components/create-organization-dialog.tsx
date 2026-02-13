@@ -17,21 +17,13 @@ import { useForm } from "@tanstack/react-form"
 import { useMutation } from "@tanstack/react-query"
 import { useRouter } from "nextjs-toploader/app"
 import { toast } from "sonner"
-import * as z from "zod"
+import { organizationFormSchema } from "@/lib/schema/organization"
 import { queryClient } from "@/utils/orpc"
 
 interface CreateOrganizationDialogProps {
   open: boolean
   onOpenChange: (open: boolean) => void
 }
-
-const formSchema = z.object({
-  name: z.string().min(1, "Organization name is required"),
-  slug: z
-    .string()
-    .min(1, "Slug is required")
-    .regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with hyphens"),
-})
 
 export function CreateOrganizationDialog({
   open,
@@ -63,7 +55,7 @@ export function CreateOrganizationDialog({
       slug: "",
     },
     validators: {
-      onChange: formSchema,
+      onChange: organizationFormSchema,
     },
     onSubmit: async ({ value }) => {
       const organization = await createOrg({

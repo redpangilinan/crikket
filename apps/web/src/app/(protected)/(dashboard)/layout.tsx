@@ -39,6 +39,10 @@ export default async function ProtectedLayout({
     },
   })
 
+  if (!organizations || organizations.length === 0) {
+    redirect("/onboarding")
+  }
+
   const activeOrganization = organizations?.find(
     (org) => org.id === session.session.activeOrganizationId
   )
