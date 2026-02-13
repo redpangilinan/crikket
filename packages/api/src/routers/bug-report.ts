@@ -3,10 +3,13 @@ import {
   deleteBugReport,
   deleteBugReportsBulk,
   getBugReportById,
+  getBugReportDashboardStats,
   getBugReportDebuggerEvents,
   getBugReportNetworkRequestPayload,
   getBugReportNetworkRequests,
   listBugReports,
+  updateBugReport,
+  updateBugReportsBulk,
   updateBugReportVisibility,
 } from "@crikket/bug-reports"
 
@@ -21,7 +24,10 @@ export const bugReportRouter = {
   getDebuggerEvents: getBugReportDebuggerEvents,
   getNetworkRequests: getBugReportNetworkRequests,
   getNetworkRequestPayload: getBugReportNetworkRequestPayload,
+  getDashboardStats: getBugReportDashboardStats,
   delete: deleteBugReport,
   deleteBulk: deleteBugReportsBulk,
+  update: updateBugReport,
+  updateBulk: updateBugReportsBulk,
   updateVisibility: updateBugReportVisibility,
 }

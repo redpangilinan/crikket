@@ -2,6 +2,7 @@
 
 import { Button } from "@crikket/ui/components/ui/button"
 import type { ReactNode } from "react"
+import { FloatingActionBar } from "./floating-action-bar"
 
 interface SelectionActionBarProps {
   selectedCount: number
@@ -14,21 +15,23 @@ export function SelectionActionBar({
   actions,
   onClearSelection,
 }: SelectionActionBarProps) {
-  if (selectedCount < 1) {
-    return null
-  }
-
   return (
-    <div className="sticky top-0 z-30 rounded-md border bg-background/95 p-3 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/70">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="font-medium text-sm">{selectedCount} selected</p>
-        <div className="flex items-center gap-2">
+    <FloatingActionBar
+      actions={
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {actions}
-          <Button onClick={onClearSelection} size="sm" variant="ghost">
+          <Button
+            className="flex-1 sm:flex-none"
+            onClick={onClearSelection}
+            size="sm"
+            variant="ghost"
+          >
             Clear
           </Button>
         </div>
-      </div>
-    </div>
+      }
+      title={`${selectedCount} selected`}
+      visible={selectedCount > 0}
+    />
   )
 }
