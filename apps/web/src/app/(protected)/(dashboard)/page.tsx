@@ -1,6 +1,6 @@
 import type { Metadata } from "next"
 
-import { BugReportsList } from "./_components/bug-reports-list"
+import { BugReportsList } from "./_components/bug-reports/bug-reports-list"
 
 const META = {
   title: "Bug Reports",

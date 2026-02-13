@@ -1,12 +1,24 @@
 import type { auth } from "@crikket/auth"
 import { db } from "@crikket/db"
 import { bugReport } from "@crikket/db/schema/bug-report"
+import {
+  BUG_REPORT_STATUS_OPTIONS,
+  BUG_REPORT_VISIBILITY_OPTIONS,
+  type BugReportStatus,
+  type BugReportVisibility,
+} from "@crikket/shared/constants/bug-report"
 import { ORPCError } from "@orpc/server"
 import { eq } from "drizzle-orm"
 import { z } from "zod"
 
 const attachmentTypes = ["video", "screenshot"] as const
-export const visibilityValues = ["public", "private"] as const
+export const visibilityValues = Object.values(
+  BUG_REPORT_VISIBILITY_OPTIONS
+) as [BugReportVisibility, ...BugReportVisibility[]]
+export const statusValues = Object.values(BUG_REPORT_STATUS_OPTIONS) as [
+  BugReportStatus,
+  ...BugReportStatus[],
+]
 const DEFAULT_DEBUGGER_NETWORK_REQUEST_PAGE_SIZE = 10
 const MAX_DEBUGGER_NETWORK_REQUEST_PAGE_SIZE = 200
 
@@ -70,6 +82,15 @@ export function isVisibility(
   return (
     typeof value === "string" &&
     (visibilityValues as readonly string[]).includes(value)
+  )
+}
+
+export function isStatus(
+  value: unknown
+): value is (typeof statusValues)[number] {
+  return (
+    typeof value === "string" &&
+    (statusValues as readonly string[]).includes(value)
   )
 }
 
