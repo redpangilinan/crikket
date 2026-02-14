@@ -1,7 +1,10 @@
-"use client"
-
-import SignInForm from "@/components/sign-in-form"
+import { Suspense } from "react"
+import { SignInForm } from "@/components/auth/sign-in-form"
 
 export default function LoginPage() {
-  return <SignInForm />
+  return (
+    <Suspense fallback={null}>
+      <SignInForm />
+    </Suspense>
+  )
 }

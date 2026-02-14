@@ -54,5 +54,24 @@
         "noUnusedFunctionParameters": "off"
       }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["apps/web/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noRestrictedImports": {
+              "level": "error",
+              "options": {
+                "paths": {
+                  "@crikket/auth": "Use @crikket/auth/client in apps/web. Do not import server auth."
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  ]
 }

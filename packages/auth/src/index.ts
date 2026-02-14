@@ -4,33 +4,137 @@ import { env } from "@crikket/env/server"
 import { checkout, polar, portal } from "@polar-sh/better-auth"
 import { betterAuth } from "better-auth"
 import { drizzleAdapter } from "better-auth/adapters/drizzle"
-import { admin } from "better-auth/plugins"
+import { admin } from "better-auth/plugins/admin"
+import { emailOTP } from "better-auth/plugins/email-otp"
 import { organization } from "better-auth/plugins/organization"
 
+import {
+  sendEmailOtpEmail,
+  sendEmailVerificationLinkEmail,
+  sendPasswordResetLinkEmail,
+} from "./lib/email/auth-emails"
 import { polarClient } from "./lib/payments"
 
+const MINUTE = 60
+const HOUR = 60 * MINUTE
+const DAY = 24 * HOUR
+
+const isProduction = env.NODE_ENV === "production"
+const allowedOrigins =
+  env.CORS_ORIGINS.length > 0
+    ? env.CORS_ORIGINS
+    : env.CORS_ORIGIN
+      ? [env.CORS_ORIGIN]
+      : []
+const trustedOrigins = Array.from(
+  new Set([env.BETTER_AUTH_URL, ...allowedOrigins])
+)
+
+const socialProviders =
+  env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET
+    ? {
+        google: {
+          clientId: env.GOOGLE_CLIENT_ID,
+          clientSecret: env.GOOGLE_CLIENT_SECRET,
+        },
+      }
+    : undefined
+
 export const auth = betterAuth({
+  appName: "crikket",
   database: drizzleAdapter(db, {
     provider: "pg",
     schema,
   }),
-  trustedOrigins: [env.CORS_ORIGIN],
-  socialProviders: {
-    google: {
-      clientId: env.GOOGLE_CLIENT_ID,
-      clientSecret: env.GOOGLE_CLIENT_SECRET,
+  trustedOrigins,
+  ...(socialProviders ? { socialProviders } : {}),
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url }) => {
+      await sendEmailVerificationLinkEmail({
+        email: user.email,
+        verificationUrl: url,
+      })
+    },
+    sendOnSignUp: false,
+    sendOnSignIn: false,
+    expiresIn: DAY,
+  },
+  emailAndPassword: {
+    enabled: true,
+    requireEmailVerification: false,
+    minPasswordLength: 8,
+    maxPasswordLength: 128,
+    sendResetPassword: async ({ user, url }) => {
+      await sendPasswordResetLinkEmail({
+        email: user.email,
+        resetUrl: url,
+      })
+    },
+    resetPasswordTokenExpiresIn: HOUR,
+    revokeSessionsOnPasswordReset: true,
+  },
+  session: {
+    expiresIn: 14 * DAY,
+    updateAge: DAY,
+    cookieCache: {
+      enabled: true,
+      maxAge: HOUR,
+    },
+  },
+  rateLimit: {
+    enabled: true,
+    storage: "database",
+    window: MINUTE,
+    max: 100,
+    customRules: {
+      "/sign-in/email": {
+        window: MINUTE,
+        max: 5,
+      },
+      "/sign-up/email": {
+        window: MINUTE,
+        max: 3,
+      },
+      "/request-password-reset": {
+        window: MINUTE,
+        max: 5,
+      },
+      "/email-otp/send-verification-otp": {
+        window: MINUTE,
+        max: 5,
+      },
+      "/email-otp/reset-password": {
+        window: MINUTE,
+        max: 5,
+      },
     },
   },
   advanced: {
+    useSecureCookies: isProduction,
     defaultCookieAttributes: {
-      sameSite: "none",
-      secure: true,
+      sameSite: isProduction ? "none" : "lax",
+      secure: isProduction,
       httpOnly: true,
     },
   },
   plugins: [
     admin(),
     organization(),
+    emailOTP({
+      sendVerificationOTP: async ({ email, otp, type }) => {
+        await sendEmailOtpEmail({
+          email,
+          otp,
+          type,
+        })
+      },
+      sendVerificationOnSignUp: true,
+      overrideDefaultEmailVerification: true,
+      expiresIn: 10 * MINUTE,
+      otpLength: 6,
+      allowedAttempts: 5,
+      storeOTP: "hashed",
+    }),
     ...(env.ENABLE_PAYMENTS
       ? [
           polar({

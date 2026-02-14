@@ -1,6 +1,6 @@
 "use client"
 
-import type { auth } from "@crikket/auth"
+import type { authClient } from "@crikket/auth/client"
 import {
   Sidebar,
   SidebarContent,
@@ -20,10 +20,10 @@ import type * as React from "react"
 import { TeamSwitcher } from "@/components/team-switcher"
 import { UserNav } from "@/components/user-nav"
 
-type Organization = typeof auth.$Infer.Organization
+type Organization = typeof authClient.$Infer.Organization
 
 interface AppSidebarProps extends React.ComponentProps<typeof Sidebar> {
-  user: typeof auth.$Infer.Session.user
+  user: typeof authClient.$Infer.Session.user
   organizations: Organization[]
   activeOrganization?: Organization
 }

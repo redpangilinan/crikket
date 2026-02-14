@@ -1,4 +1,3 @@
-import { authClient } from "@crikket/auth/client"
 import { ModeToggle } from "@crikket/ui/components/mode-toggle"
 import {
   Breadcrumb,
@@ -13,45 +12,38 @@ import {
   SidebarProvider,
   SidebarTrigger,
 } from "@crikket/ui/components/ui/sidebar"
-import { headers } from "next/headers"
 import { redirect } from "next/navigation"
+
+import { getProtectedAuthData } from "@/app/(protected)/_lib/get-protected-auth-data"
 import { AppSidebar } from "@/components/app-sidebar"
+import { UnverifiedEmailBanner } from "@/components/auth/unverified-email-banner"
 import { Shell } from "@/components/shell"
 
-export default async function ProtectedLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const { data: session } = await authClient.getSession({
-    fetchOptions: {
-      headers: await headers(),
-    },
-  })
+  const { organizations, session } = await getProtectedAuthData()
 
   if (!session) {
     redirect("/login")
   }
 
-  const { data: organizations } = await authClient.organization.list({
-    fetchOptions: {
-      headers: await headers(),
-    },
-  })
-
-  if (!organizations || organizations.length === 0) {
+  if (organizations.length === 0) {
     redirect("/onboarding")
   }
 
-  const activeOrganization = organizations?.find(
-    (org) => org.id === session.session.activeOrganizationId
-  )
+  const activeOrganization =
+    organizations.find(
+      (organization) => organization.id === session.session.activeOrganizationId
+    ) ?? organizations[0]
 
   return (
     <SidebarProvider className="min-h-svh items-stretch">
       <AppSidebar
         activeOrganization={activeOrganization}
-        organizations={organizations ?? []}
+        organizations={organizations}
         user={session.user}
       />
       <SidebarInset>
@@ -72,7 +64,12 @@ export default async function ProtectedLayout({
           </div>
           <ModeToggle />
         </header>
-        <Shell>{children}</Shell>
+        <Shell>
+          {session.user.emailVerified ? null : (
+            <UnverifiedEmailBanner email={session.user.email} />
+          )}
+          {children}
+        </Shell>
       </SidebarInset>
     </SidebarProvider>
   )

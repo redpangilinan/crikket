@@ -13,15 +13,22 @@ import { cors } from "hono/cors"
 import { logger } from "hono/logger"
 
 const app = new Hono()
+const allowedCorsOrigins =
+  env.CORS_ORIGINS.length > 0
+    ? env.CORS_ORIGINS
+    : env.CORS_ORIGIN
+      ? [env.CORS_ORIGIN]
+      : []
+const fallbackCorsOrigin = allowedCorsOrigins[0] ?? env.BETTER_AUTH_URL
 
 app.use(logger())
 app.use(
   "/*",
   cors({
     origin: (origin) => {
-      if (origin === env.CORS_ORIGIN) return origin
+      if (allowedCorsOrigins.includes(origin)) return origin
       if (origin.startsWith("chrome-extension://")) return origin
-      return env.CORS_ORIGIN
+      return fallbackCorsOrigin
     },
     allowMethods: ["GET", "POST", "OPTIONS"],
     allowHeaders: ["Content-Type", "Authorization"],

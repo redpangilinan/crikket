@@ -19,12 +19,17 @@
     "@polar-sh/better-auth": "catalog:",
     "@polar-sh/checkout": "catalog:",
     "@polar-sh/sdk": "catalog:",
+    "@react-email/components": "catalog:",
+    "@react-email/render": "catalog:",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
+    "react": "catalog:",
+    "resend": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@crikket/config": "workspace:*",
+    "@types/react": "catalog:",
     "typescript": "catalog:"
   }
 }

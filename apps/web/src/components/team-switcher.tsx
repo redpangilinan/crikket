@@ -1,6 +1,5 @@
 "use client"
 
-import type { auth } from "@crikket/auth"
 import { authClient } from "@crikket/auth/client"
 import {
   DropdownMenu,
@@ -27,7 +26,7 @@ import { toast } from "sonner"
 import { CreateOrganizationDialog } from "@/components/create-organization-dialog"
 import { queryClient } from "@/utils/orpc"
 
-type Organization = typeof auth.$Infer.Organization
+type Organization = typeof authClient.$Infer.Organization
 
 interface TeamSwitcherProps {
   organizations: Organization[]

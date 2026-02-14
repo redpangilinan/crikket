@@ -16,6 +16,7 @@
     "@base-ui/react": "catalog:",
     "class-variance-authority": "catalog:",
     "clsx": "catalog:",
+    "input-otp": "catalog:",
     "lucide-react": "catalog:",
     "next-themes": "^0.4.6",
     "react-resizable-panels": "^4.6.2",

@@ -15,6 +15,20 @@
       "when": 1770813868666,
       "tag": "0001_right_green_goblin",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1771030519839,
+      "tag": "0002_mushy_gauntlet",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1771087008069,
+      "tag": "0003_loose_puck",
+      "breakpoints": true
     }
   ]
 }
