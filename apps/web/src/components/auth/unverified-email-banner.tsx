@@ -2,6 +2,7 @@
 
 import { authClient } from "@crikket/auth/client"
 import { Button, buttonVariants } from "@crikket/ui/components/ui/button"
+import { useCooldown } from "@crikket/ui/hooks/use-cooldown"
 import { cn } from "@crikket/ui/lib/utils"
 import { X } from "lucide-react"
 import Link from "next/link"
@@ -16,6 +17,10 @@ type UnverifiedEmailBannerProps = {
 export function UnverifiedEmailBanner({ email }: UnverifiedEmailBannerProps) {
   const [isSendingCode, setIsSendingCode] = useState(false)
   const [isDismissed, setIsDismissed] = useState(false)
+  const { isCoolingDown, isHydrated, remainingSeconds, start } = useCooldown({
+    durationSeconds: 60,
+    key: "auth-code-send",
+  })
 
   const handleResendCode = async () => {
     try {
@@ -31,6 +36,7 @@ export function UnverifiedEmailBanner({ email }: UnverifiedEmailBannerProps) {
         return
       }
 
+      start()
       toast.success("Verification code sent.")
     } catch (_error) {
       toast.error("Unable to send verification code. Please try again.")
@@ -72,13 +78,17 @@ export function UnverifiedEmailBanner({ email }: UnverifiedEmailBannerProps) {
           Verify email
         </Link>
         <Button
-          disabled={isSendingCode}
+          disabled={!isHydrated || isSendingCode || isCoolingDown}
           onClick={handleResendCode}
           size="sm"
           type="button"
           variant="outline"
         >
-          {isSendingCode ? "Sending..." : "Resend code"}
+          {isSendingCode
+            ? "Sending..."
+            : isCoolingDown
+              ? `Resend in ${remainingSeconds}s`
+              : "Resend code"}
         </Button>
       </div>
     </div>

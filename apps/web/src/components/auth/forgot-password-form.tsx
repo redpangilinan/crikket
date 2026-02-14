@@ -4,6 +4,7 @@ import { authClient } from "@crikket/auth/client"
 import { Button } from "@crikket/ui/components/ui/button"
 import { Field, FieldError, FieldLabel } from "@crikket/ui/components/ui/field"
 import { Input } from "@crikket/ui/components/ui/input"
+import { useCooldown } from "@crikket/ui/hooks/use-cooldown"
 import { useForm } from "@tanstack/react-form"
 import Link from "next/link"
 import { useRouter } from "nextjs-toploader/app"
@@ -23,6 +24,10 @@ export function ForgotPasswordForm() {
   const [emailQuery] = useQueryState("email", parseAsString.withDefault(""))
   const [isCodeSent, setIsCodeSent] = useState(false)
   const [isSendingCode, setIsSendingCode] = useState(false)
+  const { isCoolingDown, isHydrated, remainingSeconds, start } = useCooldown({
+    durationSeconds: 60,
+    key: "auth-code-send",
+  })
 
   const form = useForm({
     defaultValues: {
@@ -77,6 +82,7 @@ export function ForgotPasswordForm() {
       }
 
       setIsCodeSent(true)
+      start()
       toast.success("A reset code has been sent to your email.")
     } finally {
       setIsSendingCode(false)
@@ -125,12 +131,21 @@ export function ForgotPasswordForm() {
         </form.Field>
 
         <Button
-          disabled={isSendingCode || form.state.isSubmitting}
+          disabled={
+            !isHydrated ||
+            isSendingCode ||
+            isCoolingDown ||
+            form.state.isSubmitting
+          }
           onClick={handleRequestResetCode}
           type="button"
           variant="outline"
         >
-          {isSendingCode ? "Sending code..." : "Send reset code"}
+          {isSendingCode
+            ? "Sending code..."
+            : isCoolingDown
+              ? `Send again in ${remainingSeconds}s`
+              : "Send reset code"}
         </Button>
 
         {isCodeSent ? (

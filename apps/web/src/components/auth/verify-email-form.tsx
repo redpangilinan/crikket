@@ -3,6 +3,7 @@
 import { authClient } from "@crikket/auth/client"
 import { Button } from "@crikket/ui/components/ui/button"
 import { Field, FieldError } from "@crikket/ui/components/ui/field"
+import { useCooldown } from "@crikket/ui/hooks/use-cooldown"
 import { useForm } from "@tanstack/react-form"
 import Link from "next/link"
 import { useRouter } from "nextjs-toploader/app"
@@ -20,6 +21,10 @@ type VerifyEmailFormProps = {
 export function VerifyEmailForm({ email }: VerifyEmailFormProps) {
   const router = useRouter()
   const [isSendingCode, setIsSendingCode] = useState(false)
+  const { isCoolingDown, isHydrated, remainingSeconds, start } = useCooldown({
+    durationSeconds: 60,
+    key: "auth-code-send",
+  })
 
   const form = useForm({
     defaultValues: {
@@ -59,6 +64,7 @@ export function VerifyEmailForm({ email }: VerifyEmailFormProps) {
         return
       }
 
+      start()
       toast.success("Verification code sent to your email.")
     } finally {
       setIsSendingCode(false)
@@ -110,12 +116,21 @@ export function VerifyEmailForm({ email }: VerifyEmailFormProps) {
 
         <div className="grid gap-2 sm:grid-cols-2">
           <Button
-            disabled={isSendingCode || form.state.isSubmitting}
+            disabled={
+              !isHydrated ||
+              isSendingCode ||
+              isCoolingDown ||
+              form.state.isSubmitting
+            }
             onClick={handleSendCode}
             type="button"
             variant="outline"
           >
-            {isSendingCode ? "Sending..." : "Send code"}
+            {isSendingCode
+              ? "Sending..."
+              : isCoolingDown
+                ? `Send again in ${remainingSeconds}s`
+                : "Send code"}
           </Button>
           <Button
             disabled={isSendingCode || form.state.isSubmitting}
