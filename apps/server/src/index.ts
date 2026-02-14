@@ -13,12 +13,7 @@ import { cors } from "hono/cors"
 import { logger } from "hono/logger"
 
 const app = new Hono()
-const allowedCorsOrigins =
-  env.CORS_ORIGINS.length > 0
-    ? env.CORS_ORIGINS
-    : env.CORS_ORIGIN
-      ? [env.CORS_ORIGIN]
-      : []
+const allowedCorsOrigins = env.CORS_ORIGINS
 const fallbackCorsOrigin = allowedCorsOrigins[0] ?? env.BETTER_AUTH_URL
 
 app.use(logger())

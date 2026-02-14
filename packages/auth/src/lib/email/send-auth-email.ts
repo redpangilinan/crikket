@@ -11,6 +11,7 @@ type SendAuthEmailInput = {
 }
 
 const resendClient = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null
+const fromEmail = env.RESEND_FROM_EMAIL
 
 export const sendAuthEmail = async ({
   to,
@@ -21,30 +22,31 @@ export const sendAuthEmail = async ({
   if (!resendClient) {
     if (env.NODE_ENV === "production") {
       throw new Error(
-        "RESEND_API_KEY is required to send authentication emails"
+        "Missing RESEND_API_KEY. Set RESEND_API_KEY in apps/server/.env."
       )
     }
 
     console.warn(
-      `[auth-email] Missing RESEND_API_KEY. Skipping email delivery for ${to}.`
+      `[email] Missing RESEND_API_KEY in apps/server/.env. Skipping email delivery for ${to}.`
     )
 
     return
   }
 
+  if (!fromEmail) {
+    throw new Error(
+      "Missing RESEND_FROM_EMAIL. Set RESEND_FROM_EMAIL in apps/server/.env."
+    )
+  }
+
   const html = await render(react)
 
   const { error } = await resendClient.emails.send({
-    from: env.AUTH_EMAIL_FROM,
+    from: fromEmail,
     to,
     subject,
     html,
     text,
-    ...(env.AUTH_EMAIL_REPLY_TO
-      ? {
-          replyTo: env.AUTH_EMAIL_REPLY_TO,
-        }
-      : {}),
   })
 
   if (error) {

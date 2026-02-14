@@ -20,14 +20,8 @@ const HOUR = 60 * MINUTE
 const DAY = 24 * HOUR
 
 const isProduction = env.NODE_ENV === "production"
-const allowedOrigins =
-  env.CORS_ORIGINS.length > 0
-    ? env.CORS_ORIGINS
-    : env.CORS_ORIGIN
-      ? [env.CORS_ORIGIN]
-      : []
 const trustedOrigins = Array.from(
-  new Set([env.BETTER_AUTH_URL, ...allowedOrigins])
+  new Set([env.BETTER_AUTH_URL, ...env.CORS_ORIGINS])
 )
 
 const socialProviders =

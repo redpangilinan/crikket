@@ -11,7 +11,6 @@ export const env = createEnv({
     POLAR_SUCCESS_URL: z.url().optional(),
     POLAR_WEBHOOK_SECRET: z.string().min(1).optional(),
     POLAR_PRODUCT_ID: z.string().min(1).optional(),
-    CORS_ORIGIN: z.url().optional(),
     CORS_ORIGINS: z
       .string()
       .optional()
@@ -23,8 +22,7 @@ export const env = createEnv({
             .filter((origin) => origin.length > 0) ?? []
       ),
     RESEND_API_KEY: z.string().min(1).optional(),
-    AUTH_EMAIL_FROM: z.string().min(1),
-    AUTH_EMAIL_REPLY_TO: z.string().min(1).optional(),
+    RESEND_FROM_EMAIL: z.email().optional(),
     ENABLE_PAYMENTS: z
       .enum(["true", "false"])
       .default("true")

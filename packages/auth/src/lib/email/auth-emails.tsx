@@ -39,7 +39,7 @@ export const sendEmailOtpEmail = async ({
   otp,
   type,
 }: SendEmailOtpEmailInput): Promise<void> => {
-  const actionUrl = new URL(OTP_ACTION_URLS[type], env.CORS_ORIGIN)
+  const actionUrl = new URL(OTP_ACTION_URLS[type], env.BETTER_AUTH_URL)
   actionUrl.searchParams.set("email", email)
 
   await sendAuthEmail({
