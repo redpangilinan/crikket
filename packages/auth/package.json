@@ -8,6 +8,9 @@
     "./client": {
       "default": "./src/client.ts"
     },
+    "./procedures/*": {
+      "default": "./src/procedures/*.ts"
+    },
     "./*": {
       "default": "./src/*.ts"
     }
@@ -19,8 +22,10 @@
     "@polar-sh/better-auth": "catalog:",
     "@polar-sh/checkout": "catalog:",
     "@polar-sh/sdk": "catalog:",
+    "@orpc/server": "catalog:",
     "@react-email/components": "catalog:",
     "@react-email/render": "catalog:",
+    "drizzle-orm": "catalog:",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
     "react": "catalog:",

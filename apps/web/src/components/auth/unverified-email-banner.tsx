@@ -1,6 +1,5 @@
 "use client"
 
-import { authClient } from "@crikket/auth/client"
 import { Button, buttonVariants } from "@crikket/ui/components/ui/button"
 import { useCooldown } from "@crikket/ui/hooks/use-cooldown"
 import { cn } from "@crikket/ui/lib/utils"
@@ -8,13 +7,9 @@ import { X } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import { toast } from "sonner"
-import { getAuthErrorMessage } from "@/lib/auth"
+import { client } from "@/utils/orpc"
 
-type UnverifiedEmailBannerProps = {
-  email: string
-}
-
-export function UnverifiedEmailBanner({ email }: UnverifiedEmailBannerProps) {
+export function UnverifiedEmailBanner() {
   const [isSendingCode, setIsSendingCode] = useState(false)
   const [isDismissed, setIsDismissed] = useState(false)
   const { isCoolingDown, isHydrated, remainingSeconds, start } = useCooldown({
@@ -26,20 +21,16 @@ export function UnverifiedEmailBanner({ email }: UnverifiedEmailBannerProps) {
     try {
       setIsSendingCode(true)
 
-      const { error } = await authClient.emailOtp.sendVerificationOtp({
-        email,
-        type: "email-verification",
-      })
-
-      if (error) {
-        toast.error(getAuthErrorMessage(error))
-        return
-      }
+      await client.auth.sendEmailVerificationOtpStrict({})
 
       start()
       toast.success("Verification code sent.")
-    } catch (_error) {
-      toast.error("Unable to send verification code. Please try again.")
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Unable to send verification code. Please try again."
+      toast.error(errorMessage)
     } finally {
       setIsSendingCode(false)
     }

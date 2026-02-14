@@ -155,6 +155,7 @@
       "dependencies": {
         "@crikket/db": "workspace:*",
         "@crikket/env": "workspace:*",
+        "@orpc/server": "catalog:",
         "@polar-sh/better-auth": "catalog:",
         "@polar-sh/checkout": "catalog:",
         "@polar-sh/sdk": "catalog:",
@@ -162,6 +163,7 @@
         "@react-email/render": "catalog:",
         "better-auth": "catalog:",
         "dotenv": "catalog:",
+        "drizzle-orm": "catalog:",
         "react": "catalog:",
         "resend": "catalog:",
         "zod": "catalog:",

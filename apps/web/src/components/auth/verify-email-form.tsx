@@ -13,6 +13,7 @@ import { AuthShell } from "@/components/auth/auth-shell"
 import { OtpCodeInput } from "@/components/auth/otp-code-input"
 import { getAuthErrorMessage } from "@/lib/auth"
 import { verifyEmailOtpFormSchema } from "@/lib/schema/auth"
+import { client } from "@/utils/orpc"
 
 type VerifyEmailFormProps = {
   email: string
@@ -54,18 +55,16 @@ export function VerifyEmailForm({ email }: VerifyEmailFormProps) {
     try {
       setIsSendingCode(true)
 
-      const { error } = await authClient.emailOtp.sendVerificationOtp({
-        email,
-        type: "email-verification",
-      })
-
-      if (error) {
-        toast.error(getAuthErrorMessage(error))
-        return
-      }
+      await client.auth.sendEmailVerificationOtpStrict({})
 
       start()
       toast.success("Verification code sent to your email.")
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "Unable to send verification code. Please try again."
+      toast.error(errorMessage)
     } finally {
       setIsSendingCode(false)
     }

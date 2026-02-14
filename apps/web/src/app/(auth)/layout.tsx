@@ -1,3 +1,10 @@
+import type { Metadata } from "next"
+
+export const metadata: Metadata = {
+  title: "Authentication",
+  description: "Manage access to your Crikket account.",
+}
+
 export default function AuthLayout({
   children,
 }: {

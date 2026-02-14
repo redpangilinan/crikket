@@ -65,9 +65,7 @@ export default async function DashboardLayout({
           <ModeToggle />
         </header>
         <Shell>
-          {session.user.emailVerified ? null : (
-            <UnverifiedEmailBanner email={session.user.email} />
-          )}
+          {session.user.emailVerified ? null : <UnverifiedEmailBanner />}
           {children}
         </Shell>
       </SidebarInset>

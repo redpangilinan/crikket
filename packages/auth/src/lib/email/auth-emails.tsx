@@ -34,13 +34,27 @@ const OTP_ACTION_URLS: Record<AuthEmailOtpType, string> = {
   "sign-in": "/login",
 }
 
+const appUrl = env.CORS_ORIGINS[0]
+
+if (!appUrl) {
+  throw new Error(
+    "CORS_ORIGINS must include a frontend origin for auth email links."
+  )
+}
+
+const toAppUrl = (urlOrPath: string): string => {
+  const parsed = new URL(urlOrPath, appUrl)
+  const appRelativeUrl = `${parsed.pathname}${parsed.search}${parsed.hash}`
+
+  return new URL(appRelativeUrl, appUrl).toString()
+}
+
 export const sendEmailOtpEmail = async ({
   email,
   otp,
   type,
 }: SendEmailOtpEmailInput): Promise<void> => {
-  const actionUrl = new URL(OTP_ACTION_URLS[type], env.BETTER_AUTH_URL)
-  actionUrl.searchParams.set("email", email)
+  const actionUrl = new URL(OTP_ACTION_URLS[type], appUrl)
 
   await sendAuthEmail({
     to: email,
@@ -60,11 +74,15 @@ export const sendEmailVerificationLinkEmail = async ({
   email,
   verificationUrl,
 }: SendEmailVerificationLinkEmailInput): Promise<void> => {
+  const appVerificationUrl = toAppUrl(verificationUrl)
+
   await sendAuthEmail({
     to: email,
     subject: "Verify your email address",
-    text: `Verify your email using this link: ${verificationUrl}`,
-    react: <EmailVerificationLinkTemplate verificationUrl={verificationUrl} />,
+    text: `Verify your email using this link: ${appVerificationUrl}`,
+    react: (
+      <EmailVerificationLinkTemplate verificationUrl={appVerificationUrl} />
+    ),
   })
 }
 
@@ -72,10 +90,12 @@ export const sendPasswordResetLinkEmail = async ({
   email,
   resetUrl,
 }: SendPasswordResetLinkEmailInput): Promise<void> => {
+  const appResetUrl = toAppUrl(resetUrl)
+
   await sendAuthEmail({
     to: email,
     subject: "Reset your password",
-    text: `Reset your password using this link: ${resetUrl}`,
-    react: <PasswordResetLinkTemplate resetUrl={resetUrl} />,
+    text: `Reset your password using this link: ${appResetUrl}`,
+    react: <PasswordResetLinkTemplate resetUrl={appResetUrl} />,
   })
 }

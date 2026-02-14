@@ -12,6 +12,7 @@ type SendAuthEmailInput = {
 
 const resendClient = env.RESEND_API_KEY ? new Resend(env.RESEND_API_KEY) : null
 const fromEmail = env.RESEND_FROM_EMAIL
+const fromName = "Crikket"
 
 export const sendAuthEmail = async ({
   to,
@@ -42,7 +43,7 @@ export const sendAuthEmail = async ({
   const html = await render(react)
 
   const { error } = await resendClient.emails.send({
-    from: fromEmail,
+    from: `${fromName} <${fromEmail}>`,
     to,
     subject,
     html,

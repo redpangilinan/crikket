@@ -2,6 +2,7 @@ import type { RouterClient } from "@orpc/server"
 
 import { protectedProcedure, publicProcedure } from "../index"
 
+import { authRouter } from "./auth"
 import { bugReportRouter } from "./bug-report"
 
 export const appRouter = {
@@ -14,6 +15,7 @@ export const appRouter = {
       user: context.session?.user,
     }
   }),
+  auth: authRouter,
   bugReport: bugReportRouter,
 }
 export type AppRouter = typeof appRouter
