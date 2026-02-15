@@ -4,7 +4,6 @@ import { sendAuthEmail } from "./send-auth-email"
 import type { AuthEmailOtpType } from "./templates/email-otp-template"
 import { AuthEmailOtpTemplate } from "./templates/email-otp-template"
 import { EmailVerificationLinkTemplate } from "./templates/email-verification-link-template"
-import { PasswordResetLinkTemplate } from "./templates/password-reset-link-template"
 
 type SendEmailOtpEmailInput = {
   email: string
@@ -15,11 +14,6 @@ type SendEmailOtpEmailInput = {
 type SendEmailVerificationLinkEmailInput = {
   email: string
   verificationUrl: string
-}
-
-type SendPasswordResetLinkEmailInput = {
-  email: string
-  resetUrl: string
 }
 
 const OTP_SUBJECTS: Record<AuthEmailOtpType, string> = {
@@ -83,19 +77,5 @@ export const sendEmailVerificationLinkEmail = async ({
     react: (
       <EmailVerificationLinkTemplate verificationUrl={appVerificationUrl} />
     ),
-  })
-}
-
-export const sendPasswordResetLinkEmail = async ({
-  email,
-  resetUrl,
-}: SendPasswordResetLinkEmailInput): Promise<void> => {
-  const appResetUrl = toAppUrl(resetUrl)
-
-  await sendAuthEmail({
-    to: email,
-    subject: "Reset your password",
-    text: `Reset your password using this link: ${appResetUrl}`,
-    react: <PasswordResetLinkTemplate resetUrl={appResetUrl} />,
   })
 }

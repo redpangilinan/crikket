@@ -34,6 +34,7 @@ export function ForgotPasswordForm() {
       email: emailQuery,
       otp: "",
       newPassword: "",
+      confirmPassword: "",
     },
     validators: {
       onChange: forgotPasswordResetSchema,
@@ -187,6 +188,39 @@ export function ForgotPasswordForm() {
                 return (
                   <Field data-invalid={isInvalid}>
                     <FieldLabel htmlFor={field.name}>New Password</FieldLabel>
+                    <Input
+                      aria-invalid={isInvalid}
+                      autoComplete="new-password"
+                      id={field.name}
+                      name={field.name}
+                      onBlur={field.handleBlur}
+                      onChange={(event) =>
+                        field.handleChange(event.target.value)
+                      }
+                      placeholder="••••••••"
+                      required
+                      type="password"
+                      value={field.state.value}
+                    />
+                    {isInvalid ? (
+                      <FieldError errors={field.state.meta.errors} />
+                    ) : null}
+                  </Field>
+                )
+              }}
+            </form.Field>
+
+            <form.Field name="confirmPassword">
+              {(field) => {
+                const isInvalid =
+                  field.state.meta.isTouched &&
+                  field.state.meta.errors.length > 0
+
+                return (
+                  <Field data-invalid={isInvalid}>
+                    <FieldLabel htmlFor={field.name}>
+                      Confirm Password
+                    </FieldLabel>
                     <Input
                       aria-invalid={isInvalid}
                       autoComplete="new-password"

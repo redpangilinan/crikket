@@ -11,7 +11,6 @@ import { organization } from "better-auth/plugins/organization"
 import {
   sendEmailOtpEmail,
   sendEmailVerificationLinkEmail,
-  sendPasswordResetLinkEmail,
 } from "./lib/email/auth-emails"
 import { polarClient } from "./lib/payments"
 
@@ -58,13 +57,6 @@ export const auth = betterAuth({
     requireEmailVerification: false,
     minPasswordLength: 8,
     maxPasswordLength: 128,
-    sendResetPassword: async ({ user, url }) => {
-      await sendPasswordResetLinkEmail({
-        email: user.email,
-        resetUrl: url,
-      })
-    },
-    resetPasswordTokenExpiresIn: HOUR,
     revokeSessionsOnPasswordReset: true,
   },
   session: {
@@ -89,7 +81,7 @@ export const auth = betterAuth({
         window: MINUTE,
         max: 3,
       },
-      "/request-password-reset": {
+      "/email-otp/request-password-reset": {
         window: MINUTE,
         max: 5,
       },
