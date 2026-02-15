@@ -19,13 +19,14 @@ export const forgotPasswordRequestSchema = z.object({
   email: z.email("Enter a valid email address"),
 })
 
-export const forgotPasswordResetSchema = z.object({
-  email: z.email("Enter a valid email address"),
-  otp: z.string().length(6, "Code must be 6 digits"),
-  newPassword: z.string().min(8, "Password must be at least 8 characters"),
-})
-
-export const resetPasswordFormSchema = z.object({
-  token: z.string().min(1, "Reset token is required"),
-  newPassword: z.string().min(8, "Password must be at least 8 characters"),
-})
+export const forgotPasswordResetSchema = z
+  .object({
+    email: z.email("Enter a valid email address"),
+    otp: z.string().length(6, "Code must be 6 digits"),
+    newPassword: z.string().min(8, "Password must be at least 8 characters"),
+    confirmPassword: z.string().min(1, "Confirm password is required"),
+  })
+  .refine((value) => value.newPassword === value.confirmPassword, {
+    message: "Passwords do not match",
+    path: ["confirmPassword"],
+  })
