@@ -96,6 +96,27 @@ export function SignInForm() {
       description="Sign in to your account to continue"
       title="Welcome back"
     >
+      <Button
+        className="h-12 w-full font-semibold text-base shadow-sm transition-all hover:bg-muted/50 hover:shadow-md active:scale-[0.98]"
+        disabled={isSocialSignInPending || form.state.isSubmitting}
+        onClick={handleGoogleSignIn}
+        type="button"
+        variant="outline"
+      >
+        <Icons.google className="mr-3 h-5 w-5" />
+        Continue with Google
+      </Button>
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-muted border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-card px-2 font-medium text-muted-foreground">
+            Or continue with email
+          </span>
+        </div>
+      </div>
+
       <form
         className="grid gap-4"
         onSubmit={(event) => {
@@ -173,31 +194,9 @@ export function SignInForm() {
           disabled={form.state.isSubmitting || isSocialSignInPending}
           type="submit"
         >
-          {form.state.isSubmitting ? "Signing in..." : "Sign in with Email"}
+          {form.state.isSubmitting ? "Signing in..." : "Sign in"}
         </Button>
       </form>
-
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-muted border-t" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-card px-2 font-medium text-muted-foreground">
-            Or continue with
-          </span>
-        </div>
-      </div>
-
-      <Button
-        className="h-12 w-full font-semibold text-base shadow-sm transition-all hover:bg-muted/50 hover:shadow-md active:scale-[0.98]"
-        disabled={isSocialSignInPending || form.state.isSubmitting}
-        onClick={handleGoogleSignIn}
-        type="button"
-        variant="outline"
-      >
-        <Icons.google className="mr-3 h-5 w-5" />
-        Continue with Google
-      </Button>
 
       <p className="text-center text-muted-foreground text-sm">
         Don&apos;t have an account?{" "}

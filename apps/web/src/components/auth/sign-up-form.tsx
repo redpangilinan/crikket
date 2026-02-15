@@ -179,9 +179,7 @@ export function SignUpForm() {
           disabled={form.state.isSubmitting}
           type="submit"
         >
-          {form.state.isSubmitting
-            ? "Creating account..."
-            : "Sign up with Email"}
+          {form.state.isSubmitting ? "Creating account..." : "Sign up"}
         </Button>
       </form>
 
