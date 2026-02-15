@@ -1,20 +1,10 @@
-import { ORPCError, os } from "@orpc/server"
+import { createSessionProcedures } from "@crikket/shared/lib/server/orpc-auth"
 import type { auth } from "../index"
 
 export type SessionContext = typeof auth.$Infer.Session
 
-const o = os.$context<{ session?: SessionContext }>()
-
-const requireAuth = o.middleware(({ context, next }) => {
-  if (!context.session?.user) {
-    throw new ORPCError("UNAUTHORIZED")
-  }
-
-  return next({
-    context: {
-      session: context.session,
-    },
-  })
+const { protectedProcedure } = createSessionProcedures<SessionContext>({
+  isAuthorized: (session) => Boolean(session?.user),
 })
 
-export const protectedProcedure = o.use(requireAuth)
+export { protectedProcedure }

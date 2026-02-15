@@ -19,6 +19,7 @@
   "dependencies": {
     "@crikket/db": "workspace:*",
     "@crikket/env": "workspace:*",
+    "@crikket/shared": "workspace:*",
     "@polar-sh/better-auth": "catalog:",
     "@polar-sh/checkout": "catalog:",
     "@polar-sh/sdk": "catalog:",
