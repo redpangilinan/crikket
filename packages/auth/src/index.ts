@@ -1,4 +1,5 @@
 import { polarClient } from "@crikket/billing/lib/payments"
+import { assertHostedPaymentsConfiguration } from "@crikket/billing/service/checkout/shared"
 import { assertOrganizationCanAddMembers } from "@crikket/billing/service/entitlements/organization-entitlements"
 import { processPolarWebhookPayload } from "@crikket/billing/service/webhooks/process-polar-webhook-payload"
 import { db } from "@crikket/db"
@@ -75,6 +76,37 @@ const polarCheckout = checkout({
 })
 
 const polarPortal = portal()
+
+const paymentsPlugins = env.ENABLE_PAYMENTS
+  ? (() => {
+      assertHostedPaymentsConfiguration()
+
+      const webhookSecret = env.POLAR_WEBHOOK_SECRET
+      if (!webhookSecret) {
+        throw new Error("ENABLE_PAYMENTS=true requires POLAR_WEBHOOK_SECRET")
+      }
+
+      return [
+        polar({
+          client: polarClient,
+          createCustomerOnSignUp: true,
+          enableCustomerPortal: true,
+          use: [
+            polarCheckout,
+            polarPortal,
+            webhooks({
+              secret: webhookSecret,
+              onPayload: async (payload) => {
+                await processPolarWebhookPayload(
+                  payload as Record<string, unknown>
+                )
+              },
+            }),
+          ],
+        }),
+      ]
+    })()
+  : []
 
 export const auth = betterAuth({
   appName: "crikket",
@@ -183,28 +215,6 @@ export const auth = betterAuth({
       allowedAttempts: 5,
       storeOTP: "hashed",
     }),
-    ...(env.ENABLE_PAYMENTS
-      ? [
-          polar({
-            client: polarClient,
-            createCustomerOnSignUp: true,
-            enableCustomerPortal: true,
-            use: env.POLAR_WEBHOOK_SECRET
-              ? [
-                  polarCheckout,
-                  polarPortal,
-                  webhooks({
-                    secret: env.POLAR_WEBHOOK_SECRET,
-                    onPayload: async (payload) => {
-                      await processPolarWebhookPayload(
-                        payload as Record<string, unknown>
-                      )
-                    },
-                  }),
-                ]
-              : [polarCheckout, polarPortal],
-          }),
-        ]
-      : []),
+    ...paymentsPlugins,
   ],
 })

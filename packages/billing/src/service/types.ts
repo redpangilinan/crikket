@@ -13,6 +13,7 @@ export type BillingProjectionInput = {
   currentPeriodStart?: Date
   currentPeriodEnd?: Date
   cancelAtPeriodEnd?: boolean
+  webhookOccurredAt?: Date
   source?: string
 }
 

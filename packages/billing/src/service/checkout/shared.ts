@@ -2,7 +2,35 @@ import { env } from "@crikket/env/server"
 import { ORPCError } from "@orpc/server"
 import type { BillingPlan } from "../../model"
 import { getErrorMessage } from "../utils"
+import {
+  type HostedPaymentsEnvVar,
+  resolveMissingHostedPaymentsConfiguration,
+} from "./hosted-payments-configuration"
 import type { BillingInterval } from "./types"
+
+export function getMissingHostedPaymentsConfiguration(): HostedPaymentsEnvVar[] {
+  return resolveMissingHostedPaymentsConfiguration({
+    ENABLE_PAYMENTS: env.ENABLE_PAYMENTS,
+    POLAR_ACCESS_TOKEN: env.POLAR_ACCESS_TOKEN,
+    POLAR_SUCCESS_URL: env.POLAR_SUCCESS_URL,
+    POLAR_WEBHOOK_SECRET: env.POLAR_WEBHOOK_SECRET,
+    POLAR_PRO_PRODUCT_ID: env.POLAR_PRO_PRODUCT_ID,
+    POLAR_PRO_YEARLY_PRODUCT_ID: env.POLAR_PRO_YEARLY_PRODUCT_ID,
+    POLAR_STUDIO_PRODUCT_ID: env.POLAR_STUDIO_PRODUCT_ID,
+    POLAR_STUDIO_YEARLY_PRODUCT_ID: env.POLAR_STUDIO_YEARLY_PRODUCT_ID,
+  })
+}
+
+export function assertHostedPaymentsConfiguration(): void {
+  const missingVariables = getMissingHostedPaymentsConfiguration()
+  if (missingVariables.length === 0) {
+    return
+  }
+
+  throw new Error(
+    `ENABLE_PAYMENTS=true requires: ${missingVariables.join(", ")}`
+  )
+}
 
 export function resolveProductIdByPlan(input: {
   plan: Exclude<BillingPlan, "free">

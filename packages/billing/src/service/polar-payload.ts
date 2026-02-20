@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto"
 import { env } from "@crikket/env/server"
 
 import {
@@ -13,6 +14,48 @@ import {
   getNestedString,
   toDateOrUndefined,
 } from "./utils"
+
+function normalizeForStableJson(
+  value: unknown,
+  seen: WeakSet<object>
+): unknown {
+  if (value === null || typeof value !== "object") {
+    return value
+  }
+
+  if (value instanceof Date) {
+    return value.toISOString()
+  }
+
+  if (seen.has(value)) {
+    return "[circular]"
+  }
+
+  seen.add(value)
+
+  if (Array.isArray(value)) {
+    return value.map((entry) => normalizeForStableJson(entry, seen))
+  }
+
+  const record = value as Record<string, unknown>
+  const normalizedRecord: Record<string, unknown> = {}
+  const sortedKeys = Object.keys(record).sort()
+
+  for (const key of sortedKeys) {
+    normalizedRecord[key] = normalizeForStableJson(record[key], seen)
+  }
+
+  return normalizedRecord
+}
+
+function serializeStablePayloadForHash(payload: PolarWebhookPayload): string {
+  try {
+    const normalized = normalizeForStableJson(payload, new WeakSet<object>())
+    return JSON.stringify(normalized)
+  } catch {
+    return ""
+  }
+}
 
 export function resolvePlanFromProductId(
   productId: string | undefined
@@ -215,6 +258,25 @@ export function extractCancelAtPeriodEnd(
   return undefined
 }
 
+export function extractWebhookOccurredAt(
+  payload: PolarWebhookPayload
+): Date | undefined {
+  const payloadData = asRecord(payload.data)
+  const value =
+    payloadData?.createdAt ??
+    payloadData?.created_at ??
+    payloadData?.occurredAt ??
+    payloadData?.occurred_at ??
+    getNestedString(payload, ["createdAt"]) ??
+    getNestedString(payload, ["created_at"]) ??
+    getNestedString(payload, ["data", "createdAt"]) ??
+    getNestedString(payload, ["data", "created_at"]) ??
+    getNestedString(payload, ["data", "occurredAt"]) ??
+    getNestedString(payload, ["data", "occurred_at"])
+
+  return toDateOrUndefined(value)
+}
+
 export function extractProviderEventId(
   payload: PolarWebhookPayload,
   eventType: string
@@ -235,11 +297,15 @@ export function extractProviderEventId(
     getNestedString(payload, ["data", "checkoutId"]) ??
     getNestedString(payload, ["data", "checkout_id"]) ??
     "unknown"
-  const timestamp =
-    getNestedString(payload, ["createdAt"]) ??
-    getNestedString(payload, ["data", "createdAt"]) ??
-    getNestedString(payload, ["data", "created_at"]) ??
-    crypto.randomUUID()
+  const serializedPayload = serializeStablePayloadForHash(payload)
+  const payloadFingerprint = createHash("sha256")
+    .update(eventType)
+    .update(":")
+    .update(secondaryId)
+    .update(":")
+    .update(serializedPayload)
+    .digest("hex")
+    .slice(0, 32)
 
-  return `polar:fallback:${eventType}:${secondaryId}:${timestamp}`
+  return `polar:fallback:${eventType}:${secondaryId}:${payloadFingerprint}`
 }

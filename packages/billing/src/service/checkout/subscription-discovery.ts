@@ -1,14 +1,80 @@
 import { polarClient } from "../../lib/payments"
+import { BILLING_SUBSCRIPTION_STATUS } from "../../model"
 import { collectPaginatedPolarItems } from "../polar-pagination"
 import { isPolarResourceNotFoundError } from "../utils"
 import {
   type ActiveSubscriptionListFilter,
   EMPTY_BILLING_ACCOUNT_SNAPSHOT,
-  isActivePaidSubscriptionStatus,
   isSubscriptionBoundToOrganization,
+  isUpdatableSubscriptionStatus,
   type OrganizationBillingAccountSnapshot,
   type PolarSubscription,
 } from "./types"
+
+function resolveSubscriptionStatusPriority(status: unknown): number {
+  if (
+    status === BILLING_SUBSCRIPTION_STATUS.active ||
+    status === BILLING_SUBSCRIPTION_STATUS.trialing
+  ) {
+    return 3
+  }
+
+  if (status === BILLING_SUBSCRIPTION_STATUS.pastDue) {
+    return 2
+  }
+
+  if (status === BILLING_SUBSCRIPTION_STATUS.unpaid) {
+    return 1
+  }
+
+  if (status === BILLING_SUBSCRIPTION_STATUS.incomplete) {
+    return 0
+  }
+
+  return -1
+}
+
+function resolveSubscriptionRecencyScore(
+  subscription: PolarSubscription
+): number {
+  const periodEnd = subscription.currentPeriodEnd?.getTime() ?? 0
+  if (periodEnd > 0) {
+    return periodEnd
+  }
+
+  const periodStart = subscription.currentPeriodStart?.getTime() ?? 0
+  if (periodStart > 0) {
+    return periodStart
+  }
+
+  return 0
+}
+
+function selectBestUpdatableSubscription(
+  subscriptions: PolarSubscription[]
+): PolarSubscription | null {
+  if (subscriptions.length === 0) {
+    return null
+  }
+
+  return subscriptions.reduce((best, candidate) => {
+    const bestPriority = resolveSubscriptionStatusPriority(best.status)
+    const candidatePriority = resolveSubscriptionStatusPriority(
+      candidate.status
+    )
+    if (candidatePriority > bestPriority) {
+      return candidate
+    }
+    if (candidatePriority < bestPriority) {
+      return best
+    }
+
+    return resolveSubscriptionRecencyScore(candidate) >
+      resolveSubscriptionRecencyScore(best)
+      ? candidate
+      : best
+  })
+}
 
 async function findCandidateSubscriptionById(input: {
   billingAccount: OrganizationBillingAccountSnapshot
@@ -24,7 +90,7 @@ async function findCandidateSubscriptionById(input: {
     const subscription = await polarClient.subscriptions.get({
       id: candidateSubscriptionId,
     })
-    if (!isActivePaidSubscriptionStatus(subscription.status)) {
+    if (!isUpdatableSubscriptionStatus(subscription.status)) {
       return null
     }
 
@@ -42,10 +108,10 @@ async function findCandidateSubscriptionById(input: {
   }
 }
 
-async function listActiveSubscriptionsByFilters(
+async function listUpdatableSubscriptionsByFilters(
   listFilters: ActiveSubscriptionListFilter[]
 ): Promise<PolarSubscription[]> {
-  const activeSubscriptions: PolarSubscription[] = []
+  const updatableSubscriptions: PolarSubscription[] = []
   const seenSubscriptionIds = new Set<string>()
 
   for (const listFilter of listFilters) {
@@ -53,14 +119,13 @@ async function listActiveSubscriptionsByFilters(
       fetchPage: (page, limit) =>
         polarClient.subscriptions.list({
           ...listFilter,
-          active: true,
           limit,
           page,
         }),
     })
 
     for (const subscription of subscriptions) {
-      if (!isActivePaidSubscriptionStatus(subscription.status)) {
+      if (!isUpdatableSubscriptionStatus(subscription.status)) {
         continue
       }
 
@@ -69,21 +134,21 @@ async function listActiveSubscriptionsByFilters(
       }
 
       seenSubscriptionIds.add(subscription.id)
-      activeSubscriptions.push(subscription)
+      updatableSubscriptions.push(subscription)
     }
   }
 
-  return activeSubscriptions
+  return updatableSubscriptions
 }
 
 async function findOrganizationSubscriptionByMetadata(
   organizationId: string
 ): Promise<PolarSubscription | null> {
-  const subscriptions = await listActiveSubscriptionsByFilters([
+  const subscriptions = await listUpdatableSubscriptionsByFilters([
     { metadata: { referenceId: organizationId } },
   ])
 
-  return subscriptions[0] ?? null
+  return selectBestUpdatableSubscription(subscriptions)
 }
 
 export async function findUpdatableSubscription(input: {
@@ -115,13 +180,13 @@ export async function findUpdatableSubscription(input: {
   }
   listFilters.push({ externalCustomerId: input.organizationId })
 
-  const activeSubscriptions =
-    await listActiveSubscriptionsByFilters(listFilters)
+  const updatableSubscriptions =
+    await listUpdatableSubscriptionsByFilters(listFilters)
 
-  const organizationMatchedSubscription = activeSubscriptions.find(
+  const organizationMatchedSubscriptions = updatableSubscriptions.filter(
     (subscription) =>
       isSubscriptionBoundToOrganization(subscription, input.organizationId)
   )
 
-  return organizationMatchedSubscription ?? null
+  return selectBestUpdatableSubscription(organizationMatchedSubscriptions)
 }

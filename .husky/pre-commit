@@ -1,4 +1,6 @@
 #!/bin/sh
+bun test
+
 # Exit on any error
 set -e
 
