@@ -59,6 +59,13 @@ export function BillingSummary(props: BillingSummaryProps) {
           ? `Next renewal: ${renewalDate}`
           : "No renewal date available yet."}
       </p>
+      {snapshot.cancelAtPeriodEnd ? (
+        <p className="mt-1 text-amber-700 text-sm">
+          {renewalDate
+            ? `Cancellation scheduled for ${renewalDate}.`
+            : "Cancellation is scheduled for the end of this billing period."}
+        </p>
+      ) : null}
 
       <div className="mt-3 space-y-1 text-sm">
         <p>

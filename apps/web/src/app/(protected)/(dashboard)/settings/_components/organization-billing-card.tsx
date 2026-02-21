@@ -27,6 +27,7 @@ import type {
 } from "./organization-billing/types"
 import { useBillingActions } from "./organization-billing/use-billing-actions"
 import {
+  formatDateLabel,
   formatMoney,
   formatPlanLabel,
   getPendingPlanPrice,
@@ -35,12 +36,67 @@ import {
   inferCurrentBillingInterval,
 } from "./organization-billing/utils"
 
+function BillingManagementActions(props: {
+  canManageBilling: boolean
+  isBillingEnabled: boolean
+  canCancelSubscription: boolean
+  canUncancelSubscription: boolean
+  canOpenPortal: boolean
+  isMutating: boolean
+  onCancelSubscription: () => void
+  onUncancelSubscription: () => void
+  onOpenPortal: () => void
+}) {
+  if (!(props.canManageBilling && props.isBillingEnabled)) {
+    return (
+      <p className="text-muted-foreground text-sm">
+        {props.isBillingEnabled
+          ? "Only organization owners can manage billing."
+          : "Payments are disabled in this deployment."}
+      </p>
+    )
+  }
+
+  return (
+    <div className="flex flex-wrap gap-2">
+      {props.canOpenPortal ? (
+        <Button
+          disabled={props.isMutating}
+          onClick={props.onOpenPortal}
+          variant="outline"
+        >
+          Open Billing Portal
+        </Button>
+      ) : null}
+      {props.canCancelSubscription ? (
+        <Button
+          disabled={props.isMutating}
+          onClick={props.onCancelSubscription}
+          variant="destructive"
+        >
+          Cancel Subscription
+        </Button>
+      ) : null}
+      {props.canUncancelSubscription ? (
+        <Button
+          disabled={props.isMutating}
+          onClick={props.onUncancelSubscription}
+          variant="default"
+        >
+          Resume Subscription
+        </Button>
+      ) : null}
+    </div>
+  )
+}
+
 export function OrganizationBillingCard({
   billing,
   organizationId,
   canManageBilling,
 }: OrganizationBillingCardProps) {
   const {
+    cancelAtPeriodEnd,
     currentPeriodEnd,
     currentPeriodStart,
     limits,
@@ -92,16 +148,27 @@ export function OrganizationBillingCard({
     studioPrice,
     studioYearlyPrice,
   })
+  const cancellationDateLabel = formatDateLabel(currentPeriodEnd)
 
+  const hasManageablePaidSubscription =
+    subscriptionStatus !== "none" && subscriptionStatus !== "canceled"
   const canOpenPortal = plan !== "free" && canManageBilling && isBillingEnabled
+  const isPlanSelectionLocked =
+    cancelAtPeriodEnd && hasManageablePaidSubscription
+  const canCancelSubscription =
+    canOpenPortal && !cancelAtPeriodEnd && hasManageablePaidSubscription
+  const canUncancelSubscription =
+    canOpenPortal && cancelAtPeriodEnd && hasManageablePaidSubscription
   const planOptionContext: PlanOptionCardContext = {
     billingInterval,
     canManageBilling,
     currentBillingInterval,
     currentPlan: plan,
+    isPlanSelectionLocked,
     isMutating: actions.isMutating,
   }
   const billingSummarySnapshot: BillingSummarySnapshot = {
+    cancelAtPeriodEnd,
     currentBillingInterval,
     currentPeriodEnd,
     memberCap,
@@ -169,28 +236,26 @@ export function OrganizationBillingCard({
                 />
               ))}
             </div>
+            {isPlanSelectionLocked ? (
+              <p className="text-amber-700 text-sm">
+                This subscription is set to cancel at period end. Resume it
+                first before switching plans.
+              </p>
+            ) : null}
           </div>
         ) : null}
 
-        {canManageBilling && isBillingEnabled ? (
-          <div className="flex flex-wrap gap-2">
-            {canOpenPortal ? (
-              <Button
-                disabled={actions.isMutating}
-                onClick={actions.openPortal}
-                variant="outline"
-              >
-                Open Billing Portal
-              </Button>
-            ) : null}
-          </div>
-        ) : (
-          <p className="text-muted-foreground text-sm">
-            {isBillingEnabled
-              ? "Only organization owners can manage billing."
-              : "Payments are disabled in this deployment."}
-          </p>
-        )}
+        <BillingManagementActions
+          canCancelSubscription={canCancelSubscription}
+          canManageBilling={canManageBilling}
+          canOpenPortal={canOpenPortal}
+          canUncancelSubscription={canUncancelSubscription}
+          isBillingEnabled={isBillingEnabled}
+          isMutating={actions.isMutating}
+          onCancelSubscription={actions.requestCancelSubscription}
+          onOpenPortal={actions.openPortal}
+          onUncancelSubscription={actions.requestUncancelSubscription}
+        />
       </CardContent>
 
       <ConfirmationDialog
@@ -205,8 +270,9 @@ export function OrganizationBillingCard({
             <Alert>
               <AlertTitle>Billing notice</AlertTitle>
               <AlertDescription>
-                Changing plans can charge your payment method immediately
-                according to Polar prorations.
+                Your plan updates right away. Any unused time on your current
+                plan is automatically applied as a credit, and any difference is
+                charged to your payment method.
               </AlertDescription>
             </Alert>
           ) : null
@@ -216,7 +282,7 @@ export function OrganizationBillingCard({
             ? `Switch this organization to ${formatPlanLabel(actions.pendingPlan)} at ${formatMoney(
                 pendingPlanPrice,
                 billingInterval
-              )}. Polar applies changes according to your billing configuration, including prorations when applicable.`
+              )}. Your next renewal will follow this new plan.`
             : ""
         }
         isLoading={actions.isPlanChangePending}
@@ -228,6 +294,33 @@ export function OrganizationBillingCard({
             ? `Change plan to ${formatPlanLabel(actions.pendingPlan)}?`
             : "Change plan"
         }
+      />
+
+      <ConfirmationDialog
+        cancelText="Keep subscription"
+        confirmText="Cancel at period end"
+        description={
+          cancellationDateLabel
+            ? `Your subscription stays active until ${cancellationDateLabel}, then it will be canceled.`
+            : "Your subscription will stay active until the end of the current billing period, then it will be canceled."
+        }
+        isLoading={actions.isCancelPending}
+        onConfirm={actions.handleConfirmCancellation}
+        onOpenChange={actions.handleCancelDialogOpenChange}
+        open={actions.isCancelConfirmOpen}
+        title="Cancel subscription?"
+        variant="destructive"
+      />
+
+      <ConfirmationDialog
+        cancelText="Keep cancellation"
+        confirmText="Resume subscription"
+        description="This removes the pending cancellation so billing continues on the current cycle."
+        isLoading={actions.isUncancelPending}
+        onConfirm={actions.handleConfirmUncancel}
+        onOpenChange={actions.handleUncancelDialogOpenChange}
+        open={actions.isUncancelConfirmOpen}
+        title="Resume subscription?"
       />
     </Card>
   )

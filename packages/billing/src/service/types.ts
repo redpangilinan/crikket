@@ -54,6 +54,34 @@ export type ChangeOrganizationPlanResult =
       plan: BillingPlan
     }
 
+export type CancelOrganizationSubscriptionResult =
+  | {
+      action: "scheduled"
+      plan: BillingPlan
+    }
+  | {
+      action: "already_scheduled"
+      plan: BillingPlan
+    }
+  | {
+      action: "not_found"
+      plan: BillingPlan
+    }
+
+export type UncancelOrganizationSubscriptionResult =
+  | {
+      action: "resumed"
+      plan: BillingPlan
+    }
+  | {
+      action: "already_active"
+      plan: BillingPlan
+    }
+  | {
+      action: "not_found"
+      plan: BillingPlan
+    }
+
 export type OrganizationBillingSnapshot = {
   organizationId: string
   plan: BillingPlan

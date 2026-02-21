@@ -15,6 +15,7 @@ export type BillingPlanLimits = Record<
 
 export interface OrganizationBillingCardProps {
   billing: {
+    cancelAtPeriodEnd: boolean
     currentPeriodEnd: string | Date | null
     currentPeriodStart: string | Date | null
     limits: BillingPlanLimits | null
@@ -37,6 +38,7 @@ export interface PlanOption {
 }
 
 export interface BillingSummarySnapshot {
+  cancelAtPeriodEnd: boolean
   currentBillingInterval: BillingInterval | null
   currentPeriodEnd: string | Date | null
   memberCap: number | null
@@ -56,5 +58,6 @@ export interface PlanOptionCardContext {
   canManageBilling: boolean
   currentBillingInterval: BillingInterval | null
   currentPlan: BillingPlan
+  isPlanSelectionLocked: boolean
   isMutating: boolean
 }

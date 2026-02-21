@@ -97,6 +97,7 @@ export default async function BillingSettingsPage() {
 
       <OrganizationBillingCard
         billing={{
+          cancelAtPeriodEnd: billingState.data?.cancelAtPeriodEnd ?? false,
           currentPeriodEnd: billingState.data?.currentPeriodEnd ?? null,
           currentPeriodStart: billingState.data?.currentPeriodStart ?? null,
           limits: planLimitsState.data,

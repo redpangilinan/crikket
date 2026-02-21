@@ -14,12 +14,32 @@ interface UseBillingActionsInput {
   billingInterval: BillingInterval
 }
 
+function getFriendlyPlanChangeErrorMessage(
+  error: { message?: string } | null | undefined
+): string {
+  const rawMessage = getErrorMessage(error, "Failed to change plan")
+  const normalizedMessage = rawMessage.toLowerCase()
+  const isCancellationConflict =
+    normalizedMessage.includes("alreadycanceledsubscription") ||
+    normalizedMessage.includes("already canceled") ||
+    normalizedMessage.includes("end of the period")
+
+  if (isCancellationConflict) {
+    return "This subscription is set to cancel at period end. Resume it first before switching plans."
+  }
+
+  return rawMessage
+}
+
 export function useBillingActions(input: UseBillingActionsInput) {
   const router = useRouter()
   const [pendingPlan, setPendingPlan] = React.useState<SwitchablePlan | null>(
     null
   )
   const [isPlanConfirmOpen, setIsPlanConfirmOpen] = React.useState(false)
+  const [isCancelConfirmOpen, setIsCancelConfirmOpen] = React.useState(false)
+  const [isUncancelConfirmOpen, setIsUncancelConfirmOpen] =
+    React.useState(false)
 
   const changePlanMutation = useMutation({
     mutationFn: async (nextPlan: SwitchablePlan) => {
@@ -52,7 +72,7 @@ export function useBillingActions(input: UseBillingActionsInput) {
       router.refresh()
     },
     onError: (error) => {
-      toast.error(getErrorMessage(error, "Failed to change plan"))
+      toast.error(getFriendlyPlanChangeErrorMessage(error))
     },
   })
 
@@ -73,6 +93,48 @@ export function useBillingActions(input: UseBillingActionsInput) {
     },
   })
 
+  const cancelSubscriptionMutation = useMutation({
+    mutationFn: async () =>
+      client.billing.cancelSubscription({
+        organizationId: input.organizationId,
+      }),
+    onSuccess: (data) => {
+      if (data.action === "scheduled") {
+        toast.success("Subscription cancellation is scheduled for period end.")
+      } else if (data.action === "already_scheduled") {
+        toast.message("Subscription is already set to cancel at period end.")
+      } else {
+        toast.message("No updatable subscription found for this organization.")
+      }
+
+      router.refresh()
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Failed to cancel subscription"))
+    },
+  })
+
+  const uncancelSubscriptionMutation = useMutation({
+    mutationFn: async () =>
+      client.billing.uncancelSubscription({
+        organizationId: input.organizationId,
+      }),
+    onSuccess: (data) => {
+      if (data.action === "resumed") {
+        toast.success("Subscription resumed.")
+      } else if (data.action === "already_active") {
+        toast.message("Subscription is already active.")
+      } else {
+        toast.message("No updatable subscription found for this organization.")
+      }
+
+      router.refresh()
+    },
+    onError: (error) => {
+      toast.error(getErrorMessage(error, "Failed to resume subscription"))
+    },
+  })
+
   const handlePlanDialogOpenChange = (open: boolean) => {
     setIsPlanConfirmOpen(open)
     if (!open) {
@@ -80,12 +142,30 @@ export function useBillingActions(input: UseBillingActionsInput) {
     }
   }
 
+  const handleCancelDialogOpenChange = (open: boolean) => {
+    setIsCancelConfirmOpen(open)
+  }
+
+  const handleUncancelDialogOpenChange = (open: boolean) => {
+    setIsUncancelConfirmOpen(open)
+  }
+
   return {
     pendingPlan,
     isPlanConfirmOpen,
-    isMutating: changePlanMutation.isPending || portalMutation.isPending,
+    isCancelConfirmOpen,
+    isUncancelConfirmOpen,
+    isMutating:
+      changePlanMutation.isPending ||
+      portalMutation.isPending ||
+      cancelSubscriptionMutation.isPending ||
+      uncancelSubscriptionMutation.isPending,
     isPlanChangePending: changePlanMutation.isPending,
+    isCancelPending: cancelSubscriptionMutation.isPending,
+    isUncancelPending: uncancelSubscriptionMutation.isPending,
     handlePlanDialogOpenChange,
+    handleCancelDialogOpenChange,
+    handleUncancelDialogOpenChange,
     handlePlanSelection: (nextPlan: SwitchablePlan) => {
       setPendingPlan(nextPlan)
       setIsPlanConfirmOpen(true)
@@ -96,6 +176,14 @@ export function useBillingActions(input: UseBillingActionsInput) {
       }
 
       await changePlanMutation.mutateAsync(pendingPlan)
+    },
+    requestCancelSubscription: () => setIsCancelConfirmOpen(true),
+    requestUncancelSubscription: () => setIsUncancelConfirmOpen(true),
+    handleConfirmCancellation: async () => {
+      await cancelSubscriptionMutation.mutateAsync()
+    },
+    handleConfirmUncancel: async () => {
+      await uncancelSubscriptionMutation.mutateAsync()
     },
     openPortal: () => portalMutation.mutate(),
   }

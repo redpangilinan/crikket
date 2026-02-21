@@ -20,6 +20,16 @@ export function PlanOptionCard(props: PlanOptionCardProps) {
   const isCurrentPlan =
     context.currentPlan === option.slug &&
     context.currentBillingInterval === context.billingInterval
+  const isSelectionDisabled =
+    context.isMutating ||
+    isCurrentPlan ||
+    !context.canManageBilling ||
+    context.isPlanSelectionLocked
+  const buttonLabel = isCurrentPlan
+    ? "Current plan"
+    : context.isPlanSelectionLocked
+      ? "Resume subscription first"
+      : "Select plan"
 
   return (
     <div className="rounded-xl border p-4">
@@ -39,13 +49,13 @@ export function PlanOptionCard(props: PlanOptionCardProps) {
 
       <Button
         className="mt-3"
-        disabled={
-          context.isMutating || isCurrentPlan || !context.canManageBilling
-        }
+        disabled={isSelectionDisabled}
         onClick={() => props.onSelect(option.slug)}
-        variant={isCurrentPlan ? "outline" : "default"}
+        variant={
+          isCurrentPlan || context.isPlanSelectionLocked ? "outline" : "default"
+        }
       >
-        {isCurrentPlan ? "Current plan" : "Select plan"}
+        {buttonLabel}
       </Button>
     </div>
   )
