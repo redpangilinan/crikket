@@ -1,14 +1,12 @@
 import { beforeAll, describe, expect, it } from "bun:test"
+import { ensureBillingTestEnv } from "./utils/env"
 
-process.env.DATABASE_URL ??= "postgres://postgres:postgres@localhost:5432/test"
-process.env.BETTER_AUTH_SECRET ??= "01234567890123456789012345678901"
-process.env.BETTER_AUTH_URL ??= "http://localhost:3000"
-Object.assign(process.env, { NODE_ENV: "development" })
+ensureBillingTestEnv()
 
-let extractProviderEventId: typeof import("../service/polar-payload").extractProviderEventId
+let extractProviderEventId: typeof import("../src/service/polar-payload").extractProviderEventId
 
 beforeAll(async () => {
-  ;({ extractProviderEventId } = await import("../service/polar-payload"))
+  ;({ extractProviderEventId } = await import("../src/service/polar-payload"))
 })
 
 describe("extractProviderEventId flow", () => {

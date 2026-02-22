@@ -11,19 +11,25 @@ import { ORPCError } from "@orpc/server"
 import { nanoid } from "nanoid"
 import { z } from "zod"
 
+import { assertAttachmentIsSupported } from "../lib/attachment-validation"
 import {
   bugReportDebuggerInputSchema,
   type PersistBugReportDebuggerDataResult,
   persistBugReportDebuggerData,
-} from "../debugger"
-import { generateFilename, getStorageProvider } from "../storage"
+} from "../lib/debugger"
+import {
+  generateFilename,
+  getStorageProvider,
+  removeAttachmentEventually,
+  runAttachmentCleanupPass,
+} from "../lib/storage"
 import {
   buildFallbackTitle,
   formatDurationMs,
   metadataInputSchema,
   optionalText,
   visibilityValues,
-} from "../utils"
+} from "../lib/utils"
 import { protectedProcedure } from "./context"
 import { normalizeTags, requireActiveOrgId } from "./helpers"
 
@@ -114,13 +120,16 @@ export const createBugReport = protectedProcedure
         },
       },
     })
+    await assertAttachmentIsSupported({
+      attachment: input.attachment,
+      attachmentType: input.attachmentType,
+    })
 
     const storage = getStorageProvider()
     const filename = generateFilename(input.attachmentType)
 
-    let attachmentUrl: string
     try {
-      attachmentUrl = await storage.save(filename, input.attachment)
+      await storage.save(filename, input.attachment)
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Unknown storage error"
@@ -136,9 +145,7 @@ export const createBugReport = protectedProcedure
           ? formatDurationMs(input.metadata.durationMs)
           : undefined),
       durationMs: input.metadata?.durationMs,
-      thumbnailUrl:
-        input.metadata?.thumbnailUrl ??
-        (input.attachmentType === "screenshot" ? attachmentUrl : undefined),
+      thumbnailUrl: input.metadata?.thumbnailUrl,
       pageTitle: input.metadata?.pageTitle,
     }
 
@@ -149,29 +156,41 @@ export const createBugReport = protectedProcedure
 
     const normalizedTags = normalizeTags(input.tags)
 
-    const { id } = await retryOnUniqueViolation(async () => {
-      const generatedId = nanoid(12)
+    let id: string
+    try {
+      const result = await retryOnUniqueViolation(async () => {
+        const generatedId = nanoid(12)
 
-      await db.insert(bugReport).values({
-        id: generatedId,
-        organizationId: activeOrgId,
-        reporterId: context.session.user.id,
-        title: inferredTitle,
-        description: input.description,
-        priority: input.priority,
-        tags: normalizedTags,
-        url: input.url,
-        attachmentUrl,
-        attachmentKey: filename,
-        attachmentType: input.attachmentType,
-        visibility: input.visibility,
-        deviceInfo: input.deviceInfo,
-        status: "open",
-        metadata: normalizedMetadata,
+        await db.insert(bugReport).values({
+          id: generatedId,
+          organizationId: activeOrgId,
+          reporterId: context.session.user.id,
+          title: inferredTitle,
+          description: input.description,
+          priority: input.priority,
+          tags: normalizedTags,
+          url: input.url,
+          attachmentUrl: null,
+          attachmentKey: filename,
+          attachmentType: input.attachmentType,
+          visibility: input.visibility,
+          deviceInfo: input.deviceInfo,
+          status: "open",
+          metadata: normalizedMetadata,
+        })
+
+        return { id: generatedId }
       })
+      id = result.id
+    } catch (error) {
+      await removeAttachmentEventually(filename)
 
-      return { id: generatedId }
-    })
+      throw new ORPCError("INTERNAL_SERVER_ERROR", {
+        message:
+          "Failed to persist bug report after uploading attachment. The attachment has been scheduled for cleanup.",
+        cause: error,
+      })
+    }
 
     let debuggerPersistence: PersistBugReportDebuggerDataResult
     try {
@@ -203,6 +222,8 @@ export const createBugReport = protectedProcedure
         warnings: ["Failed to store debugger data for this report."],
       }
     }
+
+    await runAttachmentCleanupPass({ limit: 5 })
 
     return {
       id,

@@ -14,7 +14,7 @@ import {
 } from "@crikket/shared/lib/server/pagination"
 import { and, asc, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 import { z } from "zod"
-
+import { resolveAttachmentUrl } from "../lib/storage"
 import {
   formatDurationMs,
   isAttachmentType,
@@ -22,7 +22,7 @@ import {
   isVisibility,
   statusValues,
   visibilityValues,
-} from "../utils"
+} from "../lib/utils"
 import { protectedProcedure } from "./context"
 import { requireActiveOrgId } from "./helpers"
 
@@ -169,6 +169,7 @@ interface BugReportListRecord {
   title: string | null
   description: string | null
   metadata: unknown
+  attachmentKey: string | null
   attachmentUrl: string | null
   attachmentType: string | null
   visibility: string
@@ -189,6 +190,10 @@ function mapBugReportListItem(report: BugReportListRecord): BugReportListItem {
   const attachmentType = isAttachmentType(report.attachmentType)
     ? report.attachmentType
     : undefined
+  const attachmentUrl = resolveAttachmentUrl({
+    attachmentKey: report.attachmentKey,
+    attachmentUrl: report.attachmentUrl,
+  })
 
   return {
     id: report.id,
@@ -198,9 +203,9 @@ function mapBugReportListItem(report: BugReportListRecord): BugReportListItem {
     thumbnail:
       (metadata?.thumbnailUrl as string | undefined) ??
       (attachmentType === "screenshot"
-        ? (report.attachmentUrl ?? undefined)
+        ? (attachmentUrl ?? undefined)
         : undefined),
-    attachmentUrl: report.attachmentUrl ?? undefined,
+    attachmentUrl: attachmentUrl ?? undefined,
     attachmentType,
     visibility: isVisibility(report.visibility) ? report.visibility : "private",
     status: isStatus(report.status) ? report.status : "open",

@@ -16,6 +16,11 @@ BETTER_AUTH_COOKIE_DOMAIN (required when app and API use different subdomains)
 GOOGLE_CLIENT_ID
 GOOGLE_CLIENT_SECRET
 ENABLE_PAYMENTS (false)
+STORAGE_BUCKET
+STORAGE_ACCESS_KEY_ID
+STORAGE_SECRET_ACCESS_KEY
+STORAGE_REGION (required when STORAGE_ENDPOINT is unset)
+STORAGE_ENDPOINT (recommended for R2/custom S3 endpoints)
 ```
 
 Set these in `apps/web/.env`:
@@ -28,10 +33,6 @@ NEXT_PUBLIC_SERVER_URL
 > Google OAuth is currently the only login method. Keep `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET` configured.
 >
 > For self-hosting, set `ENABLE_PAYMENTS=false` and ignore `POLAR_*`.
-
-Optional but common:
-
-- `STORAGE_*` for S3/R2
 
 Notes:
 
@@ -61,20 +62,16 @@ If using a separate API domain:
 
 ## Storage
 
-Default:
-
-- Local volume mounted at `/app/storage`
-
-For better durability and scale:
-
-- Use `STORAGE_PROVIDER=s3` or `STORAGE_PROVIDER=r2`
-- Configure `STORAGE_BUCKET`, `STORAGE_REGION`, `STORAGE_ENDPOINT`, and credentials
+- Cloud storage is mandatory in all environments.
+- Configure `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID`, and `STORAGE_SECRET_ACCESS_KEY`.
+- Use `STORAGE_REGION` for AWS S3.
+- Use `STORAGE_ENDPOINT` for Cloudflare R2/custom S3-compatible storage.
+- Set `STORAGE_PUBLIC_URL` if you want stable public URLs instead of signed URLs.
 
 ## Data Durability
 
 Compose volume persistence:
 
 - PostgreSQL data in `postgres_data`
-- Upload data in `uploads_data`
 
 Also implement off-host backups and periodic restore tests.

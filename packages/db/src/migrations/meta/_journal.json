@@ -50,6 +50,13 @@
       "when": 1771450769357,
       "tag": "0006_bored_riptide",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1771723819182,
+      "tag": "0007_modern_the_phantom",
+      "breakpoints": true
     }
   ]
 }

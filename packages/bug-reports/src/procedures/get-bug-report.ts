@@ -6,13 +6,13 @@ import {
 } from "@crikket/shared/constants/priorities"
 import { ORPCError } from "@orpc/server"
 import { eq } from "drizzle-orm"
-
+import { resolveAttachmentUrl } from "../lib/storage"
 import {
   assertVisibilityAccess,
   bugReportIdInputSchema,
   isStatus,
   statusValues,
-} from "../utils"
+} from "../lib/utils"
 import { o } from "./context"
 
 const priorityValues = Object.values(PRIORITY_OPTIONS) as [
@@ -45,6 +45,10 @@ export const getBugReportById = o
     const priority = priorityValues.includes(report.priority as Priority)
       ? (report.priority as Priority)
       : PRIORITY_OPTIONS.none
+    const attachmentUrl = resolveAttachmentUrl({
+      attachmentKey: report.attachmentKey,
+      attachmentUrl: report.attachmentUrl,
+    })
 
     return {
       id: report.id,
@@ -54,7 +58,7 @@ export const getBugReportById = o
       priority,
       tags: Array.isArray(report.tags) ? report.tags : [],
       url: report.url,
-      attachmentUrl: report.attachmentUrl,
+      attachmentUrl,
       attachmentType: report.attachmentType,
       visibility,
       deviceInfo: report.deviceInfo,

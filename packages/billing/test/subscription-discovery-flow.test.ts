@@ -1,10 +1,16 @@
-import { beforeAll, beforeEach, describe, expect, it, mock } from "bun:test"
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mock,
+} from "bun:test"
+import { ensureBillingTestEnv } from "./utils/env"
+import { BILLING_SRC } from "./utils/paths"
 
-const BILLING_SRC = `${process.cwd()}/packages/billing/src`
-process.env.DATABASE_URL ??= "postgres://postgres:postgres@localhost:5432/test"
-process.env.BETTER_AUTH_SECRET ??= "01234567890123456789012345678901"
-process.env.BETTER_AUTH_URL ??= "http://localhost:3000"
-Object.assign(process.env, { NODE_ENV: "development" })
+ensureBillingTestEnv()
 
 type TestSubscription = {
   id: string
@@ -85,7 +91,7 @@ mock.module(`${BILLING_SRC}/lib/payments.ts`, () => ({
   },
 }))
 
-let findUpdatableSubscription: typeof import("../service/checkout/subscription-discovery").findUpdatableSubscription
+let findUpdatableSubscription: typeof import("../src/service/checkout/subscription-discovery").findUpdatableSubscription
 
 beforeAll(async () => {
   ;({ findUpdatableSubscription } = await import(
@@ -95,6 +101,10 @@ beforeAll(async () => {
 
 beforeEach(() => {
   resetState()
+})
+
+afterAll(() => {
+  mock.restore()
 })
 
 describe("findUpdatableSubscription flow", () => {

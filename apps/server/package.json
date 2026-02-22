@@ -12,6 +12,7 @@
   "dependencies": {
     "@crikket/api": "workspace:*",
     "@crikket/auth": "workspace:*",
+    "@crikket/bug-reports": "workspace:*",
     "@crikket/db": "workspace:*",
     "@crikket/env": "workspace:*",
     "@orpc/openapi": "catalog:",

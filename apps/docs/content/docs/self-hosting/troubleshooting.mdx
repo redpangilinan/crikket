@@ -43,6 +43,6 @@ BETTER_AUTH_COOKIE_DOMAIN (if app/api are different subdomains)
 
 ### Uploads Not Accessible
 
-- Check `STORAGE_BASE_URL`
-- For local storage, verify volume mount + write permissions
-- For S3/R2, verify bucket policy and credentials
+- Verify `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID`, and `STORAGE_SECRET_ACCESS_KEY`
+- Verify `STORAGE_REGION`/`STORAGE_ENDPOINT` for your provider
+- If using `STORAGE_PUBLIC_URL`, confirm it points to accessible objects

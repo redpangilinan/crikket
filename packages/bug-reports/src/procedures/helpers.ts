@@ -1,6 +1,6 @@
 import { ORPCError } from "@orpc/server"
 
-import type { SessionContext } from "../utils"
+import type { SessionContext } from "../lib/utils"
 
 export function requireActiveOrgId(session: SessionContext): string {
   const activeOrgId = session.session.activeOrganizationId

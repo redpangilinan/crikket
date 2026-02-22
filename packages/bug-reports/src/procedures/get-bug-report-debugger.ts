@@ -6,14 +6,14 @@ import {
   getBugReportDebuggerEventsData,
   getBugReportNetworkRequestPayload as getBugReportNetworkRequestPayloadData,
   getBugReportNetworkRequestsPage,
-} from "../debugger"
+} from "../lib/debugger"
 import {
   assertBugReportAccessById,
   bugReportIdInputSchema,
   debuggerNetworkRequestPayloadInputSchema,
   debuggerNetworkRequestsInputSchema,
   normalizeDebuggerNetworkRequestPagination,
-} from "../utils"
+} from "../lib/utils"
 import { o } from "./context"
 
 export const getBugReportDebuggerEvents = o

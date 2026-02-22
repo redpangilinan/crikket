@@ -98,6 +98,27 @@ export const bugReportAction = pgTable(
   (table) => [index("bug_report_action_bugReportId_idx").on(table.bugReportId)]
 )
 
+export const bugReportStorageCleanup = pgTable(
+  "bug_report_storage_cleanup",
+  {
+    id: text("id").primaryKey(),
+    attachmentKey: text("attachment_key").notNull().unique(),
+    attempts: integer("attempts").default(0).notNull(),
+    nextAttemptAt: timestamp("next_attempt_at").defaultNow().notNull(),
+    lastError: text("last_error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at")
+      .defaultNow()
+      .$onUpdate(() => new Date())
+      .notNull(),
+  },
+  (table) => [
+    index("bug_report_storage_cleanup_nextAttemptAt_idx").on(
+      table.nextAttemptAt
+    ),
+  ]
+)
+
 export const bugReportRelations = relations(bugReport, ({ one, many }) => ({
   organization: one(organization, {
     fields: [bugReport.organizationId],

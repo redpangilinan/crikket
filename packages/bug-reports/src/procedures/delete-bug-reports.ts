@@ -4,7 +4,11 @@ import { ORPCError } from "@orpc/server"
 import { and, eq, inArray } from "drizzle-orm"
 import { z } from "zod"
 
-import { extractStorageKeyFromUrl, getStorageProvider } from "../storage"
+import {
+  extractStorageKeyFromUrl,
+  removeAttachmentEventually,
+  runAttachmentCleanupPass,
+} from "../lib/storage"
 import { protectedProcedure } from "./context"
 import { requireActiveOrgId } from "./helpers"
 
@@ -24,16 +28,11 @@ export const deleteBugReport = protectedProcedure
       throw new ORPCError("NOT_FOUND", { message: "Bug report not found" })
     }
 
-    const storage = getStorageProvider()
     const attachmentKey =
       report.attachmentKey ??
       (report.attachmentUrl
-        ? extractStorageKeyFromUrl(report.attachmentUrl, storage)
+        ? extractStorageKeyFromUrl(report.attachmentUrl)
         : null)
-
-    if (attachmentKey) {
-      await storage.remove(attachmentKey)
-    }
 
     await db
       .delete(bugReport)
@@ -43,6 +42,13 @@ export const deleteBugReport = protectedProcedure
           eq(bugReport.organizationId, activeOrgId)
         )
       )
+
+    // Treat the database as the source of truth. Storage cleanup is best effort.
+    if (attachmentKey) {
+      await removeAttachmentEventually(attachmentKey)
+    }
+
+    await runAttachmentCleanupPass({ limit: 10 })
 
     return { id: input.id }
   })
@@ -73,20 +79,18 @@ export const deleteBugReportsBulk = protectedProcedure
       return { deletedCount: 0 }
     }
 
-    const storage = getStorageProvider()
+    const attachmentKeys = reports
+      .map((report) => {
+        return (
+          report.attachmentKey ??
+          (report.attachmentUrl
+            ? extractStorageKeyFromUrl(report.attachmentUrl)
+            : null)
+        )
+      })
+      .filter((value): value is string => typeof value === "string")
 
-    for (const report of reports) {
-      const attachmentKey =
-        report.attachmentKey ??
-        (report.attachmentUrl
-          ? extractStorageKeyFromUrl(report.attachmentUrl, storage)
-          : null)
-
-      if (attachmentKey) {
-        await storage.remove(attachmentKey)
-      }
-    }
-
+    // Persist deletion first, then clean up objects in storage.
     await db.delete(bugReport).where(
       and(
         eq(bugReport.organizationId, activeOrgId),
@@ -96,6 +100,12 @@ export const deleteBugReportsBulk = protectedProcedure
         )
       )
     )
+
+    for (const attachmentKey of attachmentKeys) {
+      await removeAttachmentEventually(attachmentKey)
+    }
+
+    await runAttachmentCleanupPass({ limit: 20 })
 
     return { deletedCount: reports.length }
   })

@@ -1,6 +1,13 @@
-import { beforeAll, beforeEach, describe, expect, it, mock } from "bun:test"
-
-const BILLING_SRC = `${process.cwd()}/packages/billing/src`
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mock,
+} from "bun:test"
+import { BILLING_SRC } from "./utils/paths"
 
 type BillingAccountSnapshot = {
   cancelAtPeriodEnd: boolean
@@ -140,8 +147,8 @@ mock.module(
   })
 )
 
-let cancelOrganizationSubscription: typeof import("../service/checkout/cancel-subscription").cancelOrganizationSubscription
-let uncancelOrganizationSubscription: typeof import("../service/checkout/cancel-subscription").uncancelOrganizationSubscription
+let cancelOrganizationSubscription: typeof import("../src/service/checkout/cancel-subscription").cancelOrganizationSubscription
+let uncancelOrganizationSubscription: typeof import("../src/service/checkout/cancel-subscription").uncancelOrganizationSubscription
 
 beforeAll(async () => {
   ;({ cancelOrganizationSubscription, uncancelOrganizationSubscription } =
@@ -150,6 +157,10 @@ beforeAll(async () => {
 
 beforeEach(() => {
   resetState()
+})
+
+afterAll(() => {
+  mock.restore()
 })
 
 describe("cancelOrganizationSubscription flow", () => {

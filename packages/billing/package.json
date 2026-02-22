@@ -7,7 +7,7 @@
     }
   },
   "scripts": {
-    "test": "bun test src/tests"
+    "test": "bun test test"
   },
   "dependencies": {
     "@crikket/db": "workspace:*",

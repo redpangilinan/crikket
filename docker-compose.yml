@@ -34,12 +34,9 @@ services:
       NODE_ENV: production
       PORT: 3000
       DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-crikket}}
-      STORAGE_PATH: /app/storage
     ports:
       - "${SERVER_PORT:-3000}:3000"
       - "${WEB_PORT:-3001}:3001"
-    volumes:
-      - uploads_data:/app/storage
     healthcheck:
       test:
         [
@@ -93,4 +90,3 @@ services:
 
 volumes:
   postgres_data:
-  uploads_data:
