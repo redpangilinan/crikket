@@ -6,7 +6,9 @@
       "default": "./src/*.ts"
     }
   },
-  "scripts": {},
+  "scripts": {
+    "test": "bun test test"
+  },
   "dependencies": {
     "@crikket/auth": "workspace:*",
     "@crikket/billing": "workspace:*",
