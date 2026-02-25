@@ -13,7 +13,7 @@ const inter = Inter({
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url.public),
   title: {
-    default: siteConfig.title,
+    default: `${siteConfig.name} | The open source bug reporting tool`,
     template: siteConfig.seo.titleTemplate,
   },
   description: siteConfig.description,

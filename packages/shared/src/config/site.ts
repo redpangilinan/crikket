@@ -29,7 +29,8 @@ export const siteConfig = {
     twitter: "@redpngilinan",
   },
   links: {
-    github: "https://github.com/redpangilinan/crikket",
+    repo: "https://github.com/redpangilinan/crikket",
+    github: "https://github.com/redpangilinan",
     twitter: "https://x.com/redpngilinan",
   },
 }

@@ -65,13 +65,13 @@ export const billingPlanEntitlementsConfig: Record<
   pro: {
     canCreateBugReports: true,
     canUploadVideo: true,
-    maxVideoDurationMs: 900_000,
+    maxVideoDurationMs: 600_000,
     memberCap: 15,
   },
   studio: {
     canCreateBugReports: true,
     canUploadVideo: true,
-    maxVideoDurationMs: 900_000,
+    maxVideoDurationMs: 1_200_000,
     memberCap: null,
   },
 }

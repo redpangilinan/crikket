@@ -125,7 +125,7 @@ mock.module(`${BILLING_SRC}/service/entitlements/projection.ts`, () => ({
       plan: input.plan,
       canCreateBugReports: true,
       canUploadVideo: true,
-      maxVideoDurationMs: 900_000,
+      maxVideoDurationMs: input.plan === "studio" ? 1_200_000 : 600_000,
       memberCap: 15,
     }
   },
