@@ -28,7 +28,6 @@
   },
   "dependencies": {
     "@crikket/shared": "workspace:*",
-    "@tanstack/react-form": "catalog:",
     "@crikket/capture-core": "workspace:*",
     "react": "catalog:",
     "react-dom": "catalog:"

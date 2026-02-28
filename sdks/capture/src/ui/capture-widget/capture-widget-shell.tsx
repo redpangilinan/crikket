@@ -1,4 +1,5 @@
 import type { CaptureUiHandlers, CaptureUiState } from "../types"
+import { CaptureWidgetView } from "./capture-widget-view"
 import { CaptureLauncherButton } from "./components/capture-launcher-button"
 import { Button } from "./components/primitives/button"
 import {
@@ -8,10 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "./components/primitives/card"
-import { ChooserSection } from "./sections/chooser-section"
 import { RecordingDock } from "./sections/recording-dock"
-import { ReviewFormSection } from "./sections/review-form-section"
-import { SuccessSection } from "./sections/success-section"
 import { getViewDescription } from "./utils/get-view-description"
 
 export function CaptureWidgetShell(props: {
@@ -69,27 +67,12 @@ export function CaptureWidgetShell(props: {
             ) : null}
 
             <CardContent className="px-0 pb-0">
-              {props.state.view === "chooser" ? (
-                <ChooserSection
-                  busy={isBusy}
-                  onStartVideo={props.handlers.onStartVideo}
-                  onTakeScreenshot={props.handlers.onTakeScreenshot}
-                />
-              ) : null}
-
-              {props.state.view === "review" ? (
-                <ReviewFormSection
-                  formKey={props.state.reviewFormKey}
-                  isSubmitting={props.isSubmitPending}
-                  onCancel={props.handlers.onCancel}
-                  onSubmit={props.handlers.onSubmit}
-                  state={props.state}
-                />
-              ) : null}
-
-              {props.state.view === "success" ? (
-                <SuccessSection handlers={props.handlers} state={props.state} />
-              ) : null}
+              <CaptureWidgetView
+                handlers={props.handlers}
+                isBusy={isBusy}
+                isSubmitPending={props.isSubmitPending}
+                state={props.state}
+              />
             </CardContent>
           </Card>
         </div>

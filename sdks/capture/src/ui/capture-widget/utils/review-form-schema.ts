@@ -5,6 +5,9 @@ import {
 import type { CaptureSubmissionDraft } from "../../../types"
 
 const priorityValues = new Set<string>(Object.values(PRIORITY_OPTIONS))
+export type ReviewDraftErrors = Partial<
+  Record<keyof CaptureSubmissionDraft, string>
+>
 
 export const capturePriorityOptions = [
   { label: "Critical", value: PRIORITY_OPTIONS.critical },
@@ -16,8 +19,8 @@ export const capturePriorityOptions = [
 
 export function validateReviewDraft(
   value: CaptureSubmissionDraft
-): Partial<Record<keyof CaptureSubmissionDraft, string>> | undefined {
-  const errors: Partial<Record<keyof CaptureSubmissionDraft, string>> = {}
+): ReviewDraftErrors | undefined {
+  const errors: ReviewDraftErrors = {}
 
   if (value.title.length > 200) {
     errors.title = "Title must be at most 200 characters."
@@ -32,6 +35,16 @@ export function validateReviewDraft(
   }
 
   return Object.keys(errors).length > 0 ? errors : undefined
+}
+
+export function trimReviewDraftForSubmission(
+  draft: CaptureSubmissionDraft
+): CaptureSubmissionDraft {
+  return {
+    description: draft.description.trim(),
+    priority: draft.priority,
+    title: draft.title.trim(),
+  }
 }
 
 export type CapturePriority = Priority

@@ -341,7 +341,6 @@
       "dependencies": {
         "@crikket/capture-core": "workspace:*",
         "@crikket/shared": "workspace:*",
-        "@tanstack/react-form": "catalog:",
         "react": "catalog:",
         "react-dom": "catalog:",
       },

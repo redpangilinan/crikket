@@ -1,4 +1,3 @@
-import { useForm } from "@tanstack/react-form"
 import type { CaptureSubmissionDraft } from "../../../types"
 import type { CaptureUiState } from "../../types"
 import { MediaPreview } from "../components/media-preview"
@@ -8,10 +7,8 @@ import { Input } from "../components/primitives/input"
 import { Label } from "../components/primitives/label"
 import { Textarea } from "../components/primitives/textarea"
 import { SummaryStat } from "../components/summary-stat"
-import {
-  capturePriorityOptions,
-  validateReviewDraft,
-} from "../utils/review-form-schema"
+import { useReviewForm } from "../hooks/use-review-form"
+import { capturePriorityOptions } from "../utils/review-form-schema"
 
 interface ReviewFormSectionProps {
   formKey: string
@@ -28,18 +25,9 @@ export function ReviewFormSection({
   onCancel,
   onSubmit,
 }: ReviewFormSectionProps): React.JSX.Element {
-  const form = useForm({
-    defaultValues: state.reviewDraft,
-    validators: {
-      onSubmit: ({ value }) => validateReviewDraft(value),
-    },
-    onSubmit: ({ value }) => {
-      onSubmit({
-        title: value.title.trim(),
-        description: value.description.trim(),
-        priority: value.priority,
-      })
-    },
+  const form = useReviewForm({
+    initialDraft: state.reviewDraft,
+    onSubmit,
   })
 
   return (
@@ -62,115 +50,87 @@ export function ReviewFormSection({
         </ul>
       ) : null}
 
-      <form
-        className="grid gap-4"
-        onSubmit={(event) => {
-          event.preventDefault()
-          event.stopPropagation()
-          form.handleSubmit()
-        }}
-      >
-        <form.Field name="title">
-          {(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && field.state.meta.errors.length > 0
+      <form className="grid gap-4" onSubmit={form.handleSubmit}>
+        <Field data-invalid={Boolean(form.visibleErrors.title)}>
+          <Label htmlFor={`${formKey}-title`}>Title (Optional)</Label>
+          <Input
+            aria-invalid={Boolean(form.visibleErrors.title)}
+            id={`${formKey}-title`}
+            maxLength={200}
+            onBlur={() => {
+              form.touchField("title")
+            }}
+            onChange={(event) => {
+              form.setFieldValue("title", event.currentTarget.value)
+            }}
+            placeholder="What went wrong?"
+            value={form.draft.title}
+          />
+          {form.visibleErrors.title ? (
+            <FieldError errors={[form.visibleErrors.title]} />
+          ) : null}
+        </Field>
 
-            return (
-              <Field data-invalid={isInvalid}>
-                <Label htmlFor={`${formKey}-title`}>Title (Optional)</Label>
-                <Input
-                  aria-invalid={isInvalid}
-                  id={`${formKey}-title`}
-                  maxLength={200}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => {
-                    field.handleChange(event.currentTarget.value)
-                  }}
-                  placeholder="What went wrong?"
-                  value={field.state.value}
-                />
-                {isInvalid ? (
-                  <FieldError errors={field.state.meta.errors} />
-                ) : null}
-              </Field>
-            )
-          }}
-        </form.Field>
+        <Field data-invalid={Boolean(form.visibleErrors.description)}>
+          <Label htmlFor={`${formKey}-description`}>Description</Label>
+          <Textarea
+            aria-invalid={Boolean(form.visibleErrors.description)}
+            className="min-h-24 resize-y"
+            id={`${formKey}-description`}
+            maxLength={4000}
+            onBlur={() => {
+              form.touchField("description")
+            }}
+            onChange={(event) => {
+              form.setFieldValue("description", event.currentTarget.value)
+            }}
+            placeholder="Steps to reproduce, expected behavior, and what happened."
+            value={form.draft.description}
+          />
+          {form.visibleErrors.description ? (
+            <FieldError errors={[form.visibleErrors.description]} />
+          ) : null}
+        </Field>
 
-        <form.Field name="description">
-          {(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && field.state.meta.errors.length > 0
-
-            return (
-              <Field data-invalid={isInvalid}>
-                <Label htmlFor={`${formKey}-description`}>Description</Label>
-                <Textarea
-                  aria-invalid={isInvalid}
-                  className="min-h-24 resize-y"
-                  id={`${formKey}-description`}
-                  maxLength={4000}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => {
-                    field.handleChange(event.currentTarget.value)
-                  }}
-                  placeholder="Steps to reproduce, expected behavior, and what happened."
-                  value={field.state.value}
-                />
-                {isInvalid ? (
-                  <FieldError errors={field.state.meta.errors} />
-                ) : null}
-              </Field>
-            )
-          }}
-        </form.Field>
-
-        <form.Field name="priority">
-          {(field) => {
-            const isInvalid =
-              field.state.meta.isTouched && field.state.meta.errors.length > 0
-
-            return (
-              <Field data-invalid={isInvalid}>
-                <Label htmlFor={`${formKey}-priority`}>Priority</Label>
-                <select
-                  aria-invalid={isInvalid}
-                  className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/60"
-                  id={`${formKey}-priority`}
-                  onBlur={field.handleBlur}
-                  onChange={(event) => {
-                    field.handleChange(
-                      event.currentTarget
-                        .value as CaptureSubmissionDraft["priority"]
-                    )
-                  }}
-                  value={field.state.value}
-                >
-                  {capturePriorityOptions.map((priority) => (
-                    <option key={priority.value} value={priority.value}>
-                      {priority.label}
-                    </option>
-                  ))}
-                </select>
-                {isInvalid ? (
-                  <FieldError errors={field.state.meta.errors} />
-                ) : null}
-              </Field>
-            )
-          }}
-        </form.Field>
+        <Field data-invalid={Boolean(form.visibleErrors.priority)}>
+          <Label htmlFor={`${formKey}-priority`}>Priority</Label>
+          <select
+            aria-invalid={Boolean(form.visibleErrors.priority)}
+            className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-xs outline-none transition-[border-color,box-shadow] focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/60"
+            id={`${formKey}-priority`}
+            onBlur={() => {
+              form.touchField("priority")
+            }}
+            onChange={(event) => {
+              form.setFieldValue(
+                "priority",
+                event.currentTarget.value as CaptureSubmissionDraft["priority"]
+              )
+            }}
+            value={form.draft.priority}
+          >
+            {capturePriorityOptions.map((priority) => (
+              <option key={priority.value} value={priority.value}>
+                {priority.label}
+              </option>
+            ))}
+          </select>
+          {form.visibleErrors.priority ? (
+            <FieldError errors={[form.visibleErrors.priority]} />
+          ) : null}
+        </Field>
 
         <div className="grid grid-cols-2 gap-2">
           <Button
             className="w-full"
-            disabled={state.busy || isSubmitting || form.state.isSubmitting}
+            disabled={state.busy || isSubmitting}
             type="submit"
           >
             Submit Report
           </Button>
           <Button
             className="w-full"
-            disabled={state.busy || isSubmitting || form.state.isSubmitting}
+            disabled={state.busy || isSubmitting}
             onClick={onCancel}
             type="button"
             variant="outline"
