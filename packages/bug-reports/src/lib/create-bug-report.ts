@@ -19,6 +19,7 @@ import {
 import {
   generateFilename,
   getStorageProvider,
+  isExpiringSignedUrl,
   removeAttachmentEventually,
   runAttachmentCleanupPass,
 } from "./storage"
@@ -161,7 +162,11 @@ export async function createBugReportRecord({
     pageTitle: input.metadata?.pageTitle,
     sdkVersion: input.metadata?.sdkVersion,
     submittedVia: input.metadata?.submittedVia,
-    thumbnailUrl: input.metadata?.thumbnailUrl,
+    thumbnailUrl:
+      input.metadata?.thumbnailUrl &&
+      !isExpiringSignedUrl(input.metadata.thumbnailUrl)
+        ? input.metadata.thumbnailUrl
+        : undefined,
   }
 
   const inferredTitle =

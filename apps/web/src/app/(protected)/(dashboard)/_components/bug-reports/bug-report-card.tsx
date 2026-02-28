@@ -2,6 +2,7 @@
 
 import type { BugReportVisibility } from "@crikket/shared/constants/bug-report"
 import { reportNonFatalError } from "@crikket/shared/lib/errors"
+import { Badge } from "@crikket/ui/components/ui/badge"
 import { Button } from "@crikket/ui/components/ui/button"
 import { Card, CardContent } from "@crikket/ui/components/ui/card"
 import { Checkbox } from "@crikket/ui/components/ui/checkbox"
@@ -17,10 +18,12 @@ import {
   DropdownMenuTrigger,
 } from "@crikket/ui/components/ui/dropdown-menu"
 import {
+  Clapperboard,
   Clock,
   Copy,
   Edit3,
   ExternalLink,
+  ImageIcon,
   MoreVertical,
   Play,
   Shield,
@@ -29,7 +32,13 @@ import {
 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
-import { type ReactNode, useState } from "react"
+import {
+  type ReactNode,
+  type SyntheticEvent,
+  useCallback,
+  useRef,
+  useState,
+} from "react"
 import { toast } from "sonner"
 import { EditBugReportSheet } from "@/components/bug-reports/edit-bug-report-sheet"
 
@@ -168,8 +177,12 @@ export function BugReportCard({
 
           <MediaPreview report={report} />
 
+          <div className="pointer-events-none absolute bottom-2 left-2 z-20">
+            <MediaTypeBadge attachmentType={report.attachmentType} />
+          </div>
+
           {report.attachmentType === "video" ? (
-            <div className="absolute right-2 bottom-2 flex items-center gap-1 rounded bg-black/70 px-2 py-1 text-white text-xs">
+            <div className="pointer-events-none absolute right-2 bottom-2 flex items-center gap-1 rounded bg-black/70 px-2 py-1 text-white text-xs">
               <Clock className="h-3 w-3" />
               {report.duration}
             </div>
@@ -231,6 +244,32 @@ export function BugReportCard({
   )
 }
 
+function MediaTypeBadge({
+  attachmentType,
+}: {
+  attachmentType: BugReportListItem["attachmentType"]
+}) {
+  if (attachmentType === "video") {
+    return (
+      <Badge className="border-white/15 bg-black/75 text-white backdrop-blur-sm hover:bg-black/75">
+        <Clapperboard className="size-3" />
+        Video
+      </Badge>
+    )
+  }
+
+  if (attachmentType === "screenshot") {
+    return (
+      <Badge className="border-white/15 bg-black/75 text-white backdrop-blur-sm hover:bg-black/75">
+        <ImageIcon className="size-3" />
+        Screenshot
+      </Badge>
+    )
+  }
+
+  return null
+}
+
 function MediaPreview({ report }: { report: BugReportListItem }) {
   if (report.thumbnail) {
     return (
@@ -245,19 +284,7 @@ function MediaPreview({ report }: { report: BugReportListItem }) {
   }
 
   if (report.attachmentType === "video" && report.attachmentUrl) {
-    return (
-      <>
-        <video
-          autoPlay
-          className="h-full w-full object-cover transition-transform group-hover:scale-105"
-          loop
-          muted
-          playsInline
-          src={report.attachmentUrl}
-        />
-        <div className="absolute inset-0 bg-black/10" />
-      </>
-    )
+    return <VideoThumbnail report={report} />
   }
 
   if (report.attachmentType === "screenshot" && report.attachmentUrl) {
@@ -276,6 +303,68 @@ function MediaPreview({ report }: { report: BugReportListItem }) {
     <div className="flex h-full w-full items-center justify-center">
       <Play className="h-12 w-12 text-muted-foreground" />
     </div>
+  )
+}
+
+function VideoThumbnail({ report }: { report: BugReportListItem }) {
+  const hasSeekedRef = useRef(false)
+
+  const handleLoadedMetadata = useCallback(
+    (event: SyntheticEvent<HTMLVideoElement>) => {
+      if (hasSeekedRef.current) {
+        return
+      }
+
+      const player = event.currentTarget
+      const durationSeconds =
+        Number.isFinite(player.duration) && player.duration > 0
+          ? player.duration
+          : 0
+      const targetSeconds =
+        durationSeconds > 0
+          ? Math.min(Math.max(durationSeconds * 0.2, 0.15), durationSeconds / 2)
+          : 0
+
+      hasSeekedRef.current = true
+
+      if (targetSeconds <= 0) {
+        return
+      }
+
+      const handleSeeked = () => {
+        player.pause()
+      }
+
+      player.addEventListener("seeked", handleSeeked, { once: true })
+
+      try {
+        player.currentTime = targetSeconds
+      } catch {
+        hasSeekedRef.current = false
+      }
+    },
+    []
+  )
+
+  return (
+    <>
+      <video
+        aria-hidden="true"
+        className="h-full w-full object-cover transition-transform group-hover:scale-105"
+        muted
+        onLoadedMetadata={handleLoadedMetadata}
+        playsInline
+        preload="metadata"
+        src={report.attachmentUrl}
+        tabIndex={-1}
+      />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-black/10" />
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+        <div className="rounded-full border border-white/20 bg-black/60 p-3 text-white shadow-sm backdrop-blur-sm">
+          <Play className="size-5 fill-current" />
+        </div>
+      </div>
+    </>
   )
 }
 

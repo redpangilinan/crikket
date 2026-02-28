@@ -65,9 +65,12 @@ mock.module("@crikket/shared/lib/errors", () => ({
 }))
 
 let extractStorageKeyFromUrl: typeof import("../src/lib/storage").extractStorageKeyFromUrl
+let isExpiringSignedUrl: typeof import("../src/lib/storage").isExpiringSignedUrl
 
 beforeAll(async () => {
-  ;({ extractStorageKeyFromUrl } = await import("../src/lib/storage"))
+  ;({ extractStorageKeyFromUrl, isExpiringSignedUrl } = await import(
+    "../src/lib/storage"
+  ))
 })
 
 beforeEach(() => {
@@ -117,5 +120,31 @@ describe("extractStorageKeyFromUrl", () => {
     const key = extractStorageKeyFromUrl("not-a-valid-url")
 
     expect(key).toBeNull()
+  })
+})
+
+describe("isExpiringSignedUrl", () => {
+  it("detects AWS v4 presigned URLs", () => {
+    const isSigned = isExpiringSignedUrl(
+      "https://cdn.example.com/file.png?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Signature=abc123"
+    )
+
+    expect(isSigned).toBeTrue()
+  })
+
+  it("detects legacy signed URLs", () => {
+    const isSigned = isExpiringSignedUrl(
+      "https://cdn.example.com/file.png?AWSAccessKeyId=key&Signature=sig&Expires=123"
+    )
+
+    expect(isSigned).toBeTrue()
+  })
+
+  it("ignores stable public URLs", () => {
+    const isSigned = isExpiringSignedUrl(
+      "https://cdn.example.com/bug-reports/file.png"
+    )
+
+    expect(isSigned).toBeFalse()
   })
 })

@@ -14,7 +14,7 @@ import {
 } from "@crikket/shared/lib/server/pagination"
 import { and, asc, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
 import { z } from "zod"
-import { resolveAttachmentUrl } from "../lib/storage"
+import { isExpiringSignedUrl, resolveAttachmentUrl } from "../lib/storage"
 import {
   formatDurationMs,
   isAttachmentType,
@@ -194,6 +194,11 @@ function mapBugReportListItem(report: BugReportListRecord): BugReportListItem {
     attachmentKey: report.attachmentKey,
     attachmentUrl: report.attachmentUrl,
   })
+  const thumbnailUrl =
+    typeof metadata?.thumbnailUrl === "string" &&
+    !isExpiringSignedUrl(metadata.thumbnailUrl)
+      ? metadata.thumbnailUrl
+      : undefined
 
   return {
     id: report.id,
@@ -201,7 +206,7 @@ function mapBugReportListItem(report: BugReportListRecord): BugReportListItem {
     description: report.description ?? undefined,
     duration: normalizeDuration(metadata),
     thumbnail:
-      (metadata?.thumbnailUrl as string | undefined) ??
+      thumbnailUrl ??
       (attachmentType === "screenshot"
         ? (attachmentUrl ?? undefined)
         : undefined),
