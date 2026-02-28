@@ -221,7 +221,7 @@ export async function handleCaptureSubmit(input: {
       priority: getOptionalString(formData, "priority"),
       title: getOptionalString(formData, "title"),
       url: getOptionalString(formData, "pageUrl"),
-      visibility: "private",
+      visibility: getOptionalString(formData, "visibility"),
     })
 
     const result = await createBugReportRecord({
@@ -235,7 +235,10 @@ export async function handleCaptureSubmit(input: {
         debugger: result.debugger,
         id: result.id,
         reportId: result.id,
-        shareUrl: new URL(result.shareUrl, input.shareOrigin).toString(),
+        shareUrl:
+          createInput.visibility === "public"
+            ? new URL(result.shareUrl, input.shareOrigin).toString()
+            : undefined,
         warnings: result.warnings,
       },
       {

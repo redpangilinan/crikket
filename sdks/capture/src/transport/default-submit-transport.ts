@@ -11,6 +11,7 @@ export async function defaultSubmitTransport(
   formData.set("title", request.report.title)
   formData.set("description", request.report.description)
   formData.set("priority", request.report.priority)
+  formData.set("visibility", request.report.visibility)
   formData.set("captureType", request.report.captureType)
   formData.set("pageUrl", request.report.pageUrl)
   formData.set("pageTitle", request.report.pageTitle)

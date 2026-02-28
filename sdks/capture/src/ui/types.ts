@@ -28,7 +28,6 @@ export interface CaptureUiHandlers {
   onStopRecording: () => void
   onSubmit: (draft: CaptureSubmissionDraft) => void
   onCancel: () => void
-  onDone: () => void
   onRetry: () => void
   onCopyLink: () => void
   onOpenLink: () => void

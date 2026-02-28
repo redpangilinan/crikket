@@ -17,6 +17,7 @@ const request = {
     title: "Checkout issue",
     description: "Button is disabled",
     priority: "high",
+    visibility: "public",
     pageUrl: "https://example.com/checkout",
     pageTitle: "Checkout",
     durationMs: null,
@@ -106,6 +107,9 @@ describe("default submit transport regression", () => {
       method: "POST",
       mode: "cors",
     })
+    const body = fetchMock.mock.calls[0]?.[1]?.body
+    expect(body).toBeInstanceOf(FormData)
+    expect((body as FormData).get("visibility")).toBe("public")
   })
 
   it("surfaces json error payloads and falls back when the response is not json", async () => {

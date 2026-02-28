@@ -115,9 +115,6 @@ export function useCaptureUiHandlers(
         input.callbacks.onReset()
         input.store.openChooser()
       },
-      onDone: () => {
-        input.callbacks.onClose()
-      },
       onRetry: () => {
         input.callbacks.onReset()
         input.store.openChooser()

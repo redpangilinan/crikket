@@ -13,6 +13,7 @@ const INITIAL_TOUCHED_STATE: ReviewDraftTouched = {
   description: false,
   priority: false,
   title: false,
+  visibility: false,
 }
 
 export function useReviewForm(input: {
@@ -78,6 +79,7 @@ export function useReviewForm(input: {
       description: true,
       priority: true,
       title: true,
+      visibility: true,
     })
 
     const submitErrors = validateReviewDraft(draft)

@@ -1,10 +1,17 @@
 import {
+  BUG_REPORT_VISIBILITY_OPTIONS,
+  type BugReportVisibility,
+} from "@crikket/shared/constants/bug-report"
+import {
   PRIORITY_OPTIONS,
   type Priority,
 } from "@crikket/shared/constants/priorities"
 import type { CaptureSubmissionDraft } from "../../../types"
 
 const priorityValues = new Set<string>(Object.values(PRIORITY_OPTIONS))
+const visibilityValues = new Set<string>(
+  Object.values(BUG_REPORT_VISIBILITY_OPTIONS)
+)
 export type ReviewDraftErrors = Partial<
   Record<keyof CaptureSubmissionDraft, string>
 >
@@ -34,6 +41,13 @@ export function validateReviewDraft(
     errors.priority = "Select a valid priority."
   }
 
+  if (
+    value.visibility !== undefined &&
+    !visibilityValues.has(value.visibility)
+  ) {
+    errors.visibility = "Select a valid visibility."
+  }
+
   return Object.keys(errors).length > 0 ? errors : undefined
 }
 
@@ -44,6 +58,9 @@ export function trimReviewDraftForSubmission(
     description: draft.description.trim(),
     priority: draft.priority,
     title: draft.title.trim(),
+    visibility: visibilityValues.has(draft.visibility ?? "")
+      ? (draft.visibility as BugReportVisibility)
+      : BUG_REPORT_VISIBILITY_OPTIONS.private,
   }
 }
 

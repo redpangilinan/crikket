@@ -1,3 +1,4 @@
+import { BUG_REPORT_VISIBILITY_OPTIONS } from "@crikket/shared/constants/bug-report"
 import type { CaptureSubmissionDraft } from "../../../types"
 import type { CaptureUiState } from "../../types"
 import { MediaPreview } from "../components/media-preview"
@@ -118,6 +119,38 @@ export function ReviewFormSection({
           {form.visibleErrors.priority ? (
             <FieldError errors={[form.visibleErrors.priority]} />
           ) : null}
+        </Field>
+
+        <Field>
+          <label
+            className="flex items-start gap-3 rounded-lg border border-input bg-muted/40 px-3 py-3"
+            htmlFor={`${formKey}-visibility`}
+          >
+            <input
+              checked={
+                form.draft.visibility === BUG_REPORT_VISIBILITY_OPTIONS.public
+              }
+              className="mt-0.5 h-4 w-4 shrink-0 rounded border border-input accent-foreground"
+              id={`${formKey}-visibility`}
+              onChange={(event) => {
+                form.setFieldValue(
+                  "visibility",
+                  event.currentTarget.checked
+                    ? BUG_REPORT_VISIBILITY_OPTIONS.public
+                    : BUG_REPORT_VISIBILITY_OPTIONS.private
+                )
+              }}
+              type="checkbox"
+            />
+            <div className="grid gap-1">
+              <span className="font-medium text-sm">
+                Allow anyone with the link to view this report.
+              </span>
+              <p className="m-0 text-muted-foreground text-xs">
+                Leave unchecked to keep it private to your team.
+              </p>
+            </div>
+          </label>
         </Field>
 
         <div className="grid grid-cols-2 gap-2">

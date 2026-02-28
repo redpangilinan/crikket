@@ -12,6 +12,7 @@ export type {
   CaptureDebuggerSummary,
   CaptureInitOptions,
   CapturePriority,
+  CaptureReportVisibility,
   CaptureRuntimeConfig,
   CaptureRuntimeController,
   CaptureSubmissionDraft,

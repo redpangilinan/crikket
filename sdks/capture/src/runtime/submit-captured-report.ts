@@ -1,4 +1,5 @@
 import { CAPTURE_CORE_VERSION } from "@crikket/capture-core"
+import { BUG_REPORT_VISIBILITY_OPTIONS } from "@crikket/shared/constants/bug-report"
 import { defaultSubmitTransport } from "../transport/default-submit-transport"
 import type {
   CapturedMedia,
@@ -26,6 +27,8 @@ export function submitCapturedReport(input: {
       title: input.draft.title.trim(),
       description: input.draft.description.trim(),
       priority: input.draft.priority,
+      visibility:
+        input.draft.visibility ?? BUG_REPORT_VISIBILITY_OPTIONS.private,
       pageUrl: getPageUrl(),
       pageTitle: getPageTitle(),
       durationMs: input.media.durationMs,

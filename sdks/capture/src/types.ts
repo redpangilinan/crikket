@@ -2,11 +2,13 @@ import type {
   BugReportDebuggerPayload,
   DebuggerEvent,
 } from "@crikket/capture-core/debugger/types"
+import type { BugReportVisibility } from "@crikket/shared/constants/bug-report"
 import type { Priority } from "@crikket/shared/constants/priorities"
 import type * as eagerCapture from "./eager"
 
 export type CaptureType = "video" | "screenshot"
 export type CapturePriority = Priority
+export type CaptureReportVisibility = BugReportVisibility
 
 export interface CaptureInitOptions {
   key: string
@@ -35,6 +37,7 @@ export interface CaptureSubmissionDraft {
   title: string
   description: string
   priority: CapturePriority
+  visibility?: CaptureReportVisibility
 }
 
 export interface CaptureSubmitRequest {
@@ -44,6 +47,7 @@ export interface CaptureSubmitRequest {
     title: string
     description: string
     priority: CapturePriority
+    visibility: CaptureReportVisibility
     pageUrl: string
     pageTitle: string
     durationMs: number | null

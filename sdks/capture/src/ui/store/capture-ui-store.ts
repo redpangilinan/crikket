@@ -1,3 +1,4 @@
+import { BUG_REPORT_VISIBILITY_OPTIONS } from "@crikket/shared/constants/bug-report"
 import { PRIORITY_OPTIONS } from "@crikket/shared/constants/priorities"
 import type {
   CaptureDebuggerSummary,
@@ -52,6 +53,7 @@ export function createCaptureUiStore(): CaptureUiStore {
         title: "",
         description: "",
         priority: DEFAULT_PRIORITY,
+        visibility: BUG_REPORT_VISIBILITY_OPTIONS.private,
       },
       reviewFormKey: input.media.objectUrl,
     })
@@ -149,6 +151,7 @@ function createInitialState(): CaptureUiState {
       title: "",
       description: "",
       priority: DEFAULT_PRIORITY,
+      visibility: BUG_REPORT_VISIBILITY_OPTIONS.private,
     },
     reviewFormKey: "",
   }
