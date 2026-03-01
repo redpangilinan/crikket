@@ -1,12 +1,12 @@
-import { RootProvider } from "fumadocs-ui/provider/next"
-
+import { env } from "@crikket/env/web"
 import "@crikket/ui/styles/globals.css"
 import { siteConfig } from "@crikket/shared/config/site"
+import { RootProvider } from "fumadocs-ui/provider/next"
 import type { Metadata } from "next"
 import type { ReactNode } from "react"
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteConfig.url.public),
+  metadataBase: new URL(env.NEXT_PUBLIC_SITE_URL),
   title: {
     default: `${siteConfig.name} | The open source bug reporting tool`,
     template: siteConfig.seo.titleTemplate,

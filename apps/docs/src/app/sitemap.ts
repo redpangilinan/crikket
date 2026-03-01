@@ -1,4 +1,4 @@
-import { siteConfig } from "@crikket/shared/config/site"
+import { env } from "@crikket/env/web"
 import type { MetadataRoute } from "next"
 
 import { source } from "@/lib/source"
@@ -12,7 +12,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
   }
 
   return [...routes].map((route) => ({
-    url: new URL(route, siteConfig.url.public).toString(),
+    url: new URL(route, env.NEXT_PUBLIC_SITE_URL).toString(),
     lastModified: now,
   }))
 }

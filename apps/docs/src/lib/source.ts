@@ -1,5 +1,5 @@
 import { docs } from "fumadocs-mdx:collections/server"
-import { siteConfig } from "@crikket/shared/config/site"
+import { env } from "@crikket/env/web"
 import { type InferPageType, loader } from "fumadocs-core/source"
 import { lucideIconsPlugin } from "fumadocs-core/source/lucide-icons"
 
@@ -17,7 +17,7 @@ export function getPageImage(page: InferPageType<typeof source>) {
   return {
     segments,
     path,
-    url: new URL(path, siteConfig.url.public).toString(),
+    url: new URL(path, env.NEXT_PUBLIC_SITE_URL).toString(),
   }
 }
 

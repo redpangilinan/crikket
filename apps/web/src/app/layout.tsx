@@ -1,12 +1,12 @@
-import type { Metadata } from "next"
-
+import { env } from "@crikket/env/web"
 import "@crikket/ui/styles/globals.css"
 import { siteConfig } from "@crikket/shared/config/site"
+import type { Metadata } from "next"
 import NextTopLoader from "nextjs-toploader"
 import Providers from "@/components/providers"
 
 export const metadata: Metadata = {
-  metadataBase: new URL(siteConfig.url.app),
+  metadataBase: new URL(env.NEXT_PUBLIC_APP_URL),
   title: {
     default: siteConfig.title,
     template: `%s | ${siteConfig.name}`,

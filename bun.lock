@@ -276,7 +276,6 @@
       "name": "@crikket/shared",
       "version": "0.0.0",
       "dependencies": {
-        "@crikket/env": "workspace:*",
         "@orpc/client": "catalog:",
         "@orpc/server": "catalog:",
         "@orpc/tanstack-query": "catalog:",
