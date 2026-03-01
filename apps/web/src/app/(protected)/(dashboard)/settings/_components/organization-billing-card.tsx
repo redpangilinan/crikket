@@ -1,11 +1,6 @@
 "use client"
 
 import { ConfirmationDialog } from "@crikket/ui/components/dialogs/confirmation-dialog"
-import {
-  Alert,
-  AlertDescription,
-  AlertTitle,
-} from "@crikket/ui/components/ui/alert"
 import { Button } from "@crikket/ui/components/ui/button"
 import {
   Card,
@@ -17,6 +12,7 @@ import {
 import * as React from "react"
 
 import { BillingSummary } from "./organization-billing/billing-summary"
+import { PlanChangeConfirmationDialog } from "./organization-billing/plan-change-confirmation-dialog"
 import { PlanOptionCard } from "./organization-billing/plan-option-card"
 import type {
   BillingInterval,
@@ -28,8 +24,6 @@ import type {
 import { useBillingActions } from "./organization-billing/use-billing-actions"
 import {
   formatDateLabel,
-  formatMoney,
-  formatPlanLabel,
   getPendingPlanPrice,
   getPlanOptions,
   getPlanPrice,
@@ -258,42 +252,14 @@ export function OrganizationBillingCard({
         />
       </CardContent>
 
-      <ConfirmationDialog
-        cancelText="Keep current plan"
-        confirmText={
-          actions.pendingPlan
-            ? `Confirm ${formatPlanLabel(actions.pendingPlan)}`
-            : "Confirm"
-        }
-        content={
-          actions.pendingPlan ? (
-            <Alert>
-              <AlertTitle>Billing notice</AlertTitle>
-              <AlertDescription>
-                Your plan updates right away. Any unused time on your current
-                plan is automatically applied as a credit, and any difference is
-                charged to your payment method.
-              </AlertDescription>
-            </Alert>
-          ) : null
-        }
-        description={
-          actions.pendingPlan
-            ? `Switch this organization to ${formatPlanLabel(actions.pendingPlan)} at ${formatMoney(
-                pendingPlanPrice,
-                billingInterval
-              )}. Your next renewal will follow this new plan.`
-            : ""
-        }
+      <PlanChangeConfirmationDialog
+        billingInterval={billingInterval}
         isLoading={actions.isPlanChangePending}
         onConfirm={actions.handleConfirmPlanChange}
         onOpenChange={actions.handlePlanDialogOpenChange}
         open={actions.isPlanConfirmOpen}
-        title={
-          actions.pendingPlan
-            ? `Change plan to ${formatPlanLabel(actions.pendingPlan)}?`
-            : "Change plan"
-        }
+        pendingPlan={actions.pendingPlan}
+        pendingPlanPrice={pendingPlanPrice}
       />
 
       <ConfirmationDialog

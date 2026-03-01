@@ -1,7 +1,6 @@
 "use client"
 
 import type { authClient } from "@crikket/auth/client"
-import { env } from "@crikket/env/web"
 import {
   Collapsible,
   CollapsibleContent,
@@ -30,6 +29,7 @@ import type * as React from "react"
 import { useState } from "react"
 import { TeamSwitcher } from "@/components/team-switcher"
 import { UserNav } from "@/components/user-nav"
+import { getDocsUrl } from "@/lib/site"
 
 type Organization = typeof authClient.$Infer.Organization
 
@@ -86,10 +86,7 @@ export function AppSidebar({
   ...props
 }: AppSidebarProps) {
   const pathname = usePathname()
-  const siteUrl = env.NEXT_PUBLIC_SITE_URL
-  const docsUrl = siteUrl
-    ? `${siteUrl.endsWith("/") ? siteUrl.slice(0, -1) : siteUrl}/docs`
-    : null
+  const docsUrl = getDocsUrl()
   const [expandedSections, setExpandedSections] = useState<
     Record<string, boolean>
   >({})
