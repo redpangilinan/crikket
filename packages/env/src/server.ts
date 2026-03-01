@@ -41,6 +41,9 @@ export const env = createEnv({
     STORAGE_PUBLIC_URL: z.url().optional(),
     UPSTASH_REDIS_REST_URL: z.url().optional(),
     UPSTASH_REDIS_REST_TOKEN: z.string().min(1).optional(),
+    CAPTURE_SUBMIT_TOKEN_SECRET: z.string().min(32).optional(),
+    TURNSTILE_SITE_KEY: z.string().min(1).optional(),
+    TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
     NODE_ENV: z
       .enum(["development", "production", "staging"])
       .default("development"),

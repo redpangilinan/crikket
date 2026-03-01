@@ -7,11 +7,24 @@ import { Ratelimit } from "@upstash/ratelimit"
 import { Redis } from "@upstash/redis"
 
 const MAX_CAPTURE_REQUEST_BODY_BYTES = 110 * 1024 * 1024
+const MAX_CAPTURE_TOKEN_REQUEST_BODY_BYTES = 16 * 1024
 const CAPTURE_RATE_LIMIT_CONFIG = {
-  ipMax: 12,
-  keyMax: 60,
-  prefix: "crikket:rate-limit:capture",
-  windowSeconds: 60,
+  submit: {
+    ipMax: 12,
+    keyMax: 60,
+    message: "Too many capture submissions. Please try again soon.",
+    originMax: 180,
+    prefix: "crikket:rate-limit:capture:submit",
+    windowSeconds: 60,
+  },
+  token: {
+    ipMax: 8,
+    keyMax: 40,
+    message: "Too many capture authorization attempts. Please try again soon.",
+    originMax: 120,
+    prefix: "crikket:rate-limit:capture:token",
+    windowSeconds: 60,
+  },
 } as const
 const RATE_LIMIT_ERROR_LOG_INTERVAL_MS = 60_000
 const CLIENT_ID_FALLBACK = "anonymous"
@@ -35,8 +48,16 @@ export type CaptureRateLimitDecision =
   | BlockedCaptureRateLimitDecision
 
 type CaptureRateLimiters = {
+  submit: CaptureScopedRateLimiters
+  token: CaptureScopedRateLimiters
+}
+
+type CaptureRateLimitScope = keyof typeof CAPTURE_RATE_LIMIT_CONFIG
+
+type CaptureScopedRateLimiters = {
   ip: Ratelimit
   key: Ratelimit
+  origin: Ratelimit
 }
 
 type RateLimitResult = {
@@ -47,18 +68,20 @@ type RateLimitResult = {
 }
 
 let captureRateLimiters: CaptureRateLimiters | undefined
+let captureRedisClient: Redis | undefined
 let lastRateLimitErrorLoggedAt = 0
 
 function getRateLimitWindow(windowSeconds: number): `${number} s` {
   return `${windowSeconds} s`
 }
 
-function hasUpstashConfig(): boolean {
+export function hasCaptureRedisConfig(): boolean {
   return Boolean(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN)
 }
 
 function getCaptureRateLimiters(): CaptureRateLimiters | null {
-  if (!hasUpstashConfig()) {
+  const redis = getCaptureRedis()
+  if (!redis) {
     return null
   }
 
@@ -66,34 +89,61 @@ function getCaptureRateLimiters(): CaptureRateLimiters | null {
     return captureRateLimiters
   }
 
-  const redis = new Redis({
-    url: env.UPSTASH_REDIS_REST_URL,
-    token: env.UPSTASH_REDIS_REST_TOKEN,
-  })
-  const captureWindow = getRateLimitWindow(
-    CAPTURE_RATE_LIMIT_CONFIG.windowSeconds
-  )
-
   captureRateLimiters = {
-    ip: new Ratelimit({
+    submit: createScopedCaptureRateLimiters({
       redis,
-      limiter: Ratelimit.fixedWindow(
-        CAPTURE_RATE_LIMIT_CONFIG.ipMax,
-        captureWindow
-      ),
-      prefix: `${CAPTURE_RATE_LIMIT_CONFIG.prefix}:ip`,
+      scope: "submit",
     }),
-    key: new Ratelimit({
+    token: createScopedCaptureRateLimiters({
       redis,
-      limiter: Ratelimit.fixedWindow(
-        CAPTURE_RATE_LIMIT_CONFIG.keyMax,
-        captureWindow
-      ),
-      prefix: `${CAPTURE_RATE_LIMIT_CONFIG.prefix}:key`,
+      scope: "token",
     }),
   }
 
   return captureRateLimiters
+}
+
+function createScopedCaptureRateLimiters(input: {
+  redis: Redis
+  scope: CaptureRateLimitScope
+}): CaptureScopedRateLimiters {
+  const config = CAPTURE_RATE_LIMIT_CONFIG[input.scope]
+  const window = getRateLimitWindow(config.windowSeconds)
+
+  return {
+    ip: new Ratelimit({
+      redis: input.redis,
+      limiter: Ratelimit.fixedWindow(config.ipMax, window),
+      prefix: `${config.prefix}:ip`,
+    }),
+    key: new Ratelimit({
+      redis: input.redis,
+      limiter: Ratelimit.fixedWindow(config.keyMax, window),
+      prefix: `${config.prefix}:key`,
+    }),
+    origin: new Ratelimit({
+      redis: input.redis,
+      limiter: Ratelimit.fixedWindow(config.originMax, window),
+      prefix: `${config.prefix}:origin`,
+    }),
+  }
+}
+
+export function getCaptureRedis(): Redis | null {
+  if (!hasCaptureRedisConfig()) {
+    return null
+  }
+
+  if (captureRedisClient) {
+    return captureRedisClient
+  }
+
+  captureRedisClient = new Redis({
+    url: env.UPSTASH_REDIS_REST_URL,
+    token: env.UPSTASH_REDIS_REST_TOKEN,
+  })
+
+  return captureRedisClient
 }
 
 function normalizeIpCandidate(value: string): string | null {
@@ -130,7 +180,7 @@ function normalizeIpCandidate(value: string): string | null {
   return isIP(candidate) ? candidate : null
 }
 
-function getClientIp(request: Request): string | null {
+export function getCaptureClientIp(request: Request): string | null {
   const directHeaders = [
     "cf-connecting-ip",
     "x-real-ip",
@@ -171,7 +221,7 @@ function getFallbackFingerprint(request: Request): string {
 }
 
 function getIpIdentifier(request: Request): string {
-  const ipAddress = getClientIp(request)
+  const ipAddress = getCaptureClientIp(request)
   if (ipAddress) {
     return ipAddress
   }
@@ -192,7 +242,8 @@ function getRetryAfterSeconds(reset: number): number {
 }
 
 function toBlockedRateLimitDecision(
-  result: RateLimitResult
+  result: RateLimitResult,
+  message: string
 ): BlockedCaptureRateLimitDecision {
   const retryAfterSeconds = getRetryAfterSeconds(result.reset)
 
@@ -202,7 +253,7 @@ function toBlockedRateLimitDecision(
       ...getRateLimitHeaders(result),
       "retry-after": String(retryAfterSeconds),
     },
-    message: "Too many capture submissions. Please try again soon.",
+    message,
     retryAfterSeconds,
   }
 }
@@ -263,17 +314,28 @@ function parseHeaderNumber(value: string | null): number | null {
   return Number.isFinite(parsed) ? parsed : null
 }
 
-export function assertCaptureRequestBodyLength(request: Request): void {
+export function assertCaptureRequestBodyLength(
+  request: Request,
+  maxBytes = MAX_CAPTURE_REQUEST_BODY_BYTES
+): void {
   const contentLength = parseHeaderNumber(request.headers.get("content-length"))
   if (contentLength === null) {
     return
   }
 
-  if (contentLength > MAX_CAPTURE_REQUEST_BODY_BYTES) {
+  if (contentLength > maxBytes) {
+    const limitLabel =
+      maxBytes >= 1024 * 1024
+        ? `${Math.floor(maxBytes / 1024 / 1024)} MB`
+        : `${Math.floor(maxBytes / 1024)} KB`
     throw new ORPCError("PAYLOAD_TOO_LARGE", {
-      message: `Capture request body exceeds ${Math.floor(MAX_CAPTURE_REQUEST_BODY_BYTES / (1024 * 1024))} MB limit.`,
+      message: `Capture request body exceeds ${limitLabel} limit.`,
     })
   }
+}
+
+export function assertCaptureTokenRequestBodyLength(request: Request): void {
+  assertCaptureRequestBodyLength(request, MAX_CAPTURE_TOKEN_REQUEST_BODY_BYTES)
 }
 
 export function getCaptureRequestOrigin(request: Request): string | null {
@@ -294,9 +356,37 @@ export function getCaptureRequestOrigin(request: Request): string | null {
   }
 }
 
-export async function evaluateCaptureSubmitRateLimit(input: {
+export function evaluateCaptureSubmitRateLimit(input: {
   keyId: string
+  origin?: string | null
   request: Request
+}): Promise<CaptureRateLimitDecision> {
+  return evaluateCaptureRateLimit({
+    keyId: input.keyId,
+    origin: input.origin,
+    request: input.request,
+    scope: "submit",
+  })
+}
+
+export function evaluateCaptureTokenRateLimit(input: {
+  keyId: string
+  origin?: string | null
+  request: Request
+}): Promise<CaptureRateLimitDecision> {
+  return evaluateCaptureRateLimit({
+    keyId: input.keyId,
+    origin: input.origin,
+    request: input.request,
+    scope: "token",
+  })
+}
+
+async function evaluateCaptureRateLimit(input: {
+  keyId: string
+  origin?: string | null
+  request: Request
+  scope: CaptureRateLimitScope
 }): Promise<CaptureRateLimitDecision> {
   if (input.request.method === "OPTIONS") {
     return {
@@ -313,24 +403,39 @@ export async function evaluateCaptureSubmitRateLimit(input: {
     }
   }
 
+  const scopedLimiters = limiters[input.scope]
+  const config = CAPTURE_RATE_LIMIT_CONFIG[input.scope]
   const results: RateLimitResult[] = []
 
-  const keyResult = await limitWithFailOpen(limiters.key, input.keyId)
+  const keyResult = await limitWithFailOpen(scopedLimiters.key, input.keyId)
   if (keyResult) {
     results.push(keyResult)
     if (!keyResult.success) {
-      return toBlockedRateLimitDecision(keyResult)
+      return toBlockedRateLimitDecision(keyResult, config.message)
     }
   }
 
   const ipResult = await limitWithFailOpen(
-    limiters.ip,
+    scopedLimiters.ip,
     getIpIdentifier(input.request)
   )
   if (ipResult) {
     results.push(ipResult)
     if (!ipResult.success) {
-      return toBlockedRateLimitDecision(ipResult)
+      return toBlockedRateLimitDecision(ipResult, config.message)
+    }
+  }
+
+  if (input.origin) {
+    const originResult = await limitWithFailOpen(
+      scopedLimiters.origin,
+      input.origin
+    )
+    if (originResult) {
+      results.push(originResult)
+      if (!originResult.success) {
+        return toBlockedRateLimitDecision(originResult, config.message)
+      }
     }
   }
 

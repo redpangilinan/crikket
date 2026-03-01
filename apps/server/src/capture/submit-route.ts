@@ -9,12 +9,18 @@ import {
 } from "@crikket/bug-reports/lib/create-bug-report"
 import { ORPCError } from "@orpc/server"
 import { z } from "zod"
+import { logCaptureSecurityError, logCaptureSecurityEvent } from "./logging"
+import {
+  assertCaptureSubmitProtectionReady,
+  isCaptureSubmitProtectionEnabled,
+  verifyCaptureSubmitToken,
+} from "./protection"
 import {
   assertCaptureRequestBodyLength,
   buildCaptureRateLimitErrorResponse,
   evaluateCaptureSubmitRateLimit,
   getCaptureRequestOrigin,
-} from "./capture-submit-security"
+} from "./security"
 
 const CAPTURE_FIELD_NAME = "capture"
 
@@ -97,7 +103,23 @@ function getFallbackDeviceInfo(request: Request): {
   }
 }
 
-function toErrorResponse(error: unknown): Response {
+function toErrorResponse(
+  error: unknown,
+  context: {
+    keyId?: string | null
+    method: string
+    origin?: string | null
+    route: string
+  }
+): Response {
+  logCaptureSecurityError({
+    error,
+    keyId: context.keyId,
+    method: context.method,
+    origin: context.origin,
+    route: context.route,
+  })
+
   if (error instanceof ORPCError) {
     return buildJsonResponse(error.toJSON(), {
       status: error.status,
@@ -135,12 +157,20 @@ export async function handleCaptureSubmit(input: {
   request: Request
   shareOrigin: string
 }): Promise<Response> {
+  const route = "/api/embed/bug-reports"
+  let keyId: string | null = null
+  let origin: string | null = null
+
   try {
     assertCaptureRequestBodyLength(input.request)
+    assertCaptureSubmitProtectionReady()
 
     const publicKey = input.request.headers.get("x-crikket-public-key")?.trim()
     if (!publicKey) {
       throw new ORPCError("UNAUTHORIZED", {
+        data: {
+          reasonCode: "missing_public_key",
+        },
         message: "Capture public key is required.",
       })
     }
@@ -148,40 +178,87 @@ export async function handleCaptureSubmit(input: {
     const resolvedKey = await resolveCapturePublicKey(publicKey)
     if (!resolvedKey) {
       throw new ORPCError("UNAUTHORIZED", {
+        data: {
+          reasonCode: "invalid_public_key",
+        },
         message: "Capture public key is invalid.",
       })
+    }
+    keyId = resolvedKey.id
+
+    const resolvedOrigin = getCaptureRequestOrigin(input.request)
+    if (resolvedOrigin) {
+      origin = resolvedOrigin
     }
 
     if (!isCapturePublicKeyActive(resolvedKey)) {
       throw new ORPCError("UNAUTHORIZED", {
+        data: {
+          reasonCode: "inactive_public_key",
+        },
         message: "Capture public key is no longer active.",
       })
     }
-
-    const origin = getCaptureRequestOrigin(input.request)
-    if (!origin) {
+    if (!resolvedOrigin) {
       throw new ORPCError("FORBIDDEN", {
+        data: {
+          reasonCode: "missing_origin",
+        },
         message: "Capture submission origin is required.",
       })
     }
+    origin = resolvedOrigin
 
     if (
       !isCaptureOriginAllowed({
-        origin,
+        origin: resolvedOrigin,
         record: resolvedKey,
       })
     ) {
       throw new ORPCError("FORBIDDEN", {
+        data: {
+          reasonCode: "disallowed_origin",
+        },
         message: "Capture submission origin is not allowed for this key.",
       })
     }
 
     const rateLimitDecision = await evaluateCaptureSubmitRateLimit({
       keyId: resolvedKey.id,
+      origin: resolvedOrigin,
       request: input.request,
     })
     if (!rateLimitDecision.allowed) {
+      logCaptureSecurityEvent({
+        decision: "rejected",
+        keyId,
+        method: input.request.method,
+        origin,
+        reasonCode: "rate_limited",
+        route,
+        status: 429,
+      })
       return buildCaptureRateLimitErrorResponse(rateLimitDecision)
+    }
+
+    if (isCaptureSubmitProtectionEnabled()) {
+      const submitToken = input.request.headers
+        .get("x-crikket-capture-token")
+        ?.trim()
+      if (!submitToken) {
+        throw new ORPCError("UNAUTHORIZED", {
+          data: {
+            reasonCode: "missing_submit_token",
+          },
+          message: "Capture submit token is required.",
+        })
+      }
+
+      await verifyCaptureSubmitToken({
+        keyId: resolvedKey.id,
+        origin: resolvedOrigin,
+        token: submitToken,
+      })
     }
 
     const formData = await input.request.formData()
@@ -235,10 +312,7 @@ export async function handleCaptureSubmit(input: {
         debugger: result.debugger,
         id: result.id,
         reportId: result.id,
-        shareUrl:
-          createInput.visibility === "public"
-            ? new URL(result.shareUrl, input.shareOrigin).toString()
-            : undefined,
+        shareUrl: new URL(result.shareUrl, input.shareOrigin).toString(),
         warnings: result.warnings,
       },
       {
@@ -246,6 +320,11 @@ export async function handleCaptureSubmit(input: {
       }
     )
   } catch (error) {
-    return toErrorResponse(error)
+    return toErrorResponse(error, {
+      keyId,
+      method: input.request.method,
+      origin,
+      route,
+    })
   }
 }

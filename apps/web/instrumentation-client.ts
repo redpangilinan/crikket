@@ -3,7 +3,7 @@ import { env } from "@crikket/env/web"
 import { initPostHog } from "@crikket/shared/lib/posthog"
 
 // hardcoded for testing purposes (this is a public key)
-const CAPTURE_TEST_KEY = "crk_J-2SFa0p5upc27vRunwKDWSA"
+const CAPTURE_TEST_KEY = "crk_-yT2YC4XrNeswJPzEIXmkXf_"
 
 init({
   key: CAPTURE_TEST_KEY,

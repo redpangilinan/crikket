@@ -1,11 +1,15 @@
 import type { CaptureSubmitRequest, CaptureSubmitResult } from "../types"
+import { runTurnstileChallenge } from "./turnstile"
 
 const ABSOLUTE_HTTP_URL_REGEX = /^https?:\/\//
+const BUG_REPORTS_PATH_SUFFIX = "/bug-reports"
+const CAPTURE_CHALLENGE_REQUIRED_CODE = "CAPTURE_CHALLENGE_REQUIRED"
 
 export async function defaultSubmitTransport(
   request: CaptureSubmitRequest
 ): Promise<CaptureSubmitResult> {
   const submitUrl = `${request.config.host}${request.config.submitPath}`
+  const submitToken = await fetchCaptureSubmitToken(request)
   const formData = new FormData()
 
   formData.set("title", request.report.title)
@@ -35,6 +39,7 @@ export async function defaultSubmitTransport(
   const response = await fetch(submitUrl, {
     method: "POST",
     headers: {
+      ...(submitToken ? { "x-crikket-capture-token": submitToken } : undefined),
       "x-crikket-public-key": request.config.key,
     },
     body: formData,
@@ -57,6 +62,58 @@ export async function defaultSubmitTransport(
   }
 }
 
+async function fetchCaptureSubmitToken(
+  request: CaptureSubmitRequest
+): Promise<string | undefined> {
+  const tokenUrl = `${request.config.host}${resolveCaptureTokenPath(
+    request.config.submitPath
+  )}`
+  let turnstileToken: string | undefined
+
+  for (const _attempt of [0, 1] as const) {
+    const response = await fetch(tokenUrl, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-crikket-public-key": request.config.key,
+      },
+      body: JSON.stringify(
+        turnstileToken ? { turnstileToken } : { turnstileToken: undefined }
+      ),
+      credentials: "omit",
+      mode: "cors",
+    })
+
+    if (
+      response.status === 404 ||
+      response.status === 405 ||
+      response.status === 501
+    ) {
+      return undefined
+    }
+
+    const responsePayload = await parseResponsePayload(response)
+    if (response.ok) {
+      return resolveString(responsePayload, ["token"])
+    }
+
+    const challenge = resolveChallenge(responsePayload)
+    if (
+      isChallengeRequired(responsePayload) &&
+      challenge?.provider === "turnstile" &&
+      challenge.siteKey &&
+      !turnstileToken
+    ) {
+      turnstileToken = await runTurnstileChallenge(challenge.siteKey)
+      continue
+    }
+
+    throw new Error(getResponseErrorMessage(responsePayload, response.status))
+  }
+
+  throw new Error("Anti-bot verification could not be completed.")
+}
+
 async function parseResponsePayload(response: Response): Promise<unknown> {
   const contentType = response.headers.get("content-type") ?? ""
   if (!contentType.includes("application/json")) {
@@ -77,6 +134,30 @@ function getResponseErrorMessage(payload: unknown, status: number): string {
 
   const message = resolveString(payload, ["message", "error"])
   return message ?? `Capture submission failed with status ${status}.`
+}
+
+function isChallengeRequired(payload: unknown): boolean {
+  return isRecord(payload) && payload.code === CAPTURE_CHALLENGE_REQUIRED_CODE
+}
+
+function resolveChallenge(
+  payload: unknown
+): { provider?: string; siteKey?: string } | undefined {
+  if (!isRecord(payload)) {
+    return undefined
+  }
+
+  const challenge = payload.challenge
+  if (!isRecord(challenge)) {
+    return undefined
+  }
+
+  return {
+    provider:
+      typeof challenge.provider === "string" ? challenge.provider : undefined,
+    siteKey:
+      typeof challenge.siteKey === "string" ? challenge.siteKey : undefined,
+  }
 }
 
 function resolveString(
@@ -122,6 +203,18 @@ function resolveShareUrl(
   }
 
   return `${host}${shareUrl.startsWith("/") ? shareUrl : `/${shareUrl}`}`
+}
+
+function resolveCaptureTokenPath(submitPath: string): string {
+  const normalizedSubmitPath = submitPath.endsWith("/")
+    ? submitPath.slice(0, -1)
+    : submitPath
+
+  if (normalizedSubmitPath.endsWith(BUG_REPORTS_PATH_SUFFIX)) {
+    return `${normalizedSubmitPath.slice(0, -BUG_REPORTS_PATH_SUFFIX.length)}/capture-token`
+  }
+
+  return `${normalizedSubmitPath}/token`
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {

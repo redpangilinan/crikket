@@ -3,12 +3,7 @@ import { RootProvider } from "fumadocs-ui/provider/next"
 import "@crikket/ui/styles/globals.css"
 import { siteConfig } from "@crikket/shared/config/site"
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
 import type { ReactNode } from "react"
-
-const inter = Inter({
-  subsets: ["latin"],
-})
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url.public),
@@ -52,7 +47,7 @@ export const metadata: Metadata = {
 
 export default function Layout({ children }: { children: ReactNode }) {
   return (
-    <html className={inter.className} lang="en" suppressHydrationWarning>
+    <html lang="en" suppressHydrationWarning>
       <body className="flex min-h-screen flex-col">
         <RootProvider>{children}</RootProvider>
       </body>

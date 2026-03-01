@@ -64,22 +64,29 @@ function installFetchMock(
 }
 
 describe("default submit transport regression", () => {
-  it("posts form data and resolves relative share urls against the configured host", async () => {
+  it("mints a submit token, posts form data, and resolves relative share urls against the configured host", async () => {
     const fetchMock = installFetchMock(
       (
-        _input: Parameters<typeof fetch>[0],
+        input: Parameters<typeof fetch>[0],
         _init?: Parameters<typeof fetch>[1]
       ) =>
         Promise.resolve(
-          new Response(
-            JSON.stringify({ report: { id: "br_123", url: "/s/br_123" } }),
-            {
-              status: 200,
-              headers: {
-                "content-type": "application/json",
-              },
-            }
-          )
+          String(input).endsWith("/capture-token")
+            ? new Response(JSON.stringify({ token: "tok_123" }), {
+                status: 200,
+                headers: {
+                  "content-type": "application/json",
+                },
+              })
+            : new Response(
+                JSON.stringify({ report: { id: "br_123", url: "/s/br_123" } }),
+                {
+                  status: 200,
+                  headers: {
+                    "content-type": "application/json",
+                  },
+                }
+              )
         )
     )
 
@@ -95,19 +102,34 @@ describe("default submit transport regression", () => {
         },
       },
     })
-    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(2)
     expect(fetchMock.mock.calls[0]?.[0]).toBe(
-      "https://api.crikket.io/api/embed/bug-reports"
+      "https://api.crikket.io/api/embed/capture-token"
     )
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
       credentials: "omit",
       headers: {
+        "content-type": "application/json",
         "x-crikket-public-key": "crk_transport",
       },
       method: "POST",
       mode: "cors",
     })
-    const body = fetchMock.mock.calls[0]?.[1]?.body
+    expect(fetchMock.mock.calls[1]?.[0]).toBe(
+      "https://api.crikket.io/api/embed/bug-reports"
+    )
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({
+      credentials: "omit",
+      headers: {
+        "x-crikket-capture-token": "tok_123",
+        "x-crikket-public-key": "crk_transport",
+      },
+      method: "POST",
+      mode: "cors",
+    })
+    const tokenBody = fetchMock.mock.calls[0]?.[1]?.body
+    expect(tokenBody).toBe("{}")
+    const body = fetchMock.mock.calls[1]?.[1]?.body
     expect(body).toBeInstanceOf(FormData)
     expect((body as FormData).get("visibility")).toBe("public")
   })
@@ -115,16 +137,23 @@ describe("default submit transport regression", () => {
   it("surfaces json error payloads and falls back when the response is not json", async () => {
     installFetchMock(
       (
-        _input: Parameters<typeof fetch>[0],
+        input: Parameters<typeof fetch>[0],
         _init?: Parameters<typeof fetch>[1]
       ) =>
         Promise.resolve(
-          new Response(JSON.stringify({ message: "Origin not allowed." }), {
-            status: 403,
-            headers: {
-              "content-type": "application/json",
-            },
-          })
+          String(input).endsWith("/capture-token")
+            ? new Response(JSON.stringify({ token: "tok_123" }), {
+                status: 200,
+                headers: {
+                  "content-type": "application/json",
+                },
+              })
+            : new Response(JSON.stringify({ message: "Origin not allowed." }), {
+                status: 403,
+                headers: {
+                  "content-type": "application/json",
+                },
+              })
         )
     )
 
@@ -134,16 +163,23 @@ describe("default submit transport regression", () => {
 
     installFetchMock(
       (
-        _input: Parameters<typeof fetch>[0],
+        input: Parameters<typeof fetch>[0],
         _init?: Parameters<typeof fetch>[1]
       ) =>
         Promise.resolve(
-          new Response("upstream exploded", {
-            status: 502,
-            headers: {
-              "content-type": "text/plain",
-            },
-          })
+          String(input).endsWith("/capture-token")
+            ? new Response(JSON.stringify({ token: "tok_123" }), {
+                status: 200,
+                headers: {
+                  "content-type": "application/json",
+                },
+              })
+            : new Response("upstream exploded", {
+                status: 502,
+                headers: {
+                  "content-type": "text/plain",
+                },
+              })
         )
     )
 

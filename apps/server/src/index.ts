@@ -15,7 +15,8 @@ import { ZodToJsonSchemaConverter } from "@orpc/zod/zod4"
 import { Hono } from "hono"
 import { cors } from "hono/cors"
 import { logger } from "hono/logger"
-import { handleCaptureSubmit } from "./capture-submit-route"
+import { handleCaptureSubmit } from "./capture/submit-route"
+import { handleCaptureToken } from "./capture/token-route"
 
 const app = new Hono()
 const allowedCorsOrigins = env.CORS_ORIGINS
@@ -111,7 +112,11 @@ app.use(
   "/*",
   cors({
     origin: (origin, c) => {
-      if (c.req.path === "/api/embed/bug-reports" && origin.trim().length > 0) {
+      if (
+        (c.req.path === "/api/embed/bug-reports" ||
+          c.req.path === "/api/embed/capture-token") &&
+        origin.trim().length > 0
+      ) {
         return origin
       }
       if (allowedCorsOrigins.includes(origin)) return origin
@@ -119,12 +124,22 @@ app.use(
       return fallbackCorsOrigin
     },
     allowMethods: ["GET", "POST", "OPTIONS"],
-    allowHeaders: ["Authorization", "Content-Type", "x-crikket-public-key"],
+    allowHeaders: [
+      "Authorization",
+      "Content-Type",
+      "x-crikket-capture-token",
+      "x-crikket-public-key",
+    ],
     credentials: true,
   })
 )
 
 app.on(["POST", "GET"], "/api/auth/*", (c) => auth.handler(c.req.raw))
+app.post("/api/embed/capture-token", (c) => {
+  return handleCaptureToken({
+    request: c.req.raw,
+  })
+})
 app.post("/api/embed/bug-reports", (c) => {
   return handleCaptureSubmit({
     request: c.req.raw,

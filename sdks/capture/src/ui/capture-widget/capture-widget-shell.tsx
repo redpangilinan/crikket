@@ -31,13 +31,13 @@ export function CaptureWidgetShell(props: {
 
       {props.state.overlayOpen ? (
         <div
-          className="fixed inset-0 z-[var(--capture-overlay-z-index)] grid place-items-center bg-black/60 p-4"
+          className="fixed inset-0 z-[var(--capture-overlay-z-index)] grid overflow-y-auto bg-black/60 p-4"
           style={{
             ["--capture-overlay-z-index" as string]: String(props.zIndex + 1),
           }}
         >
           <Card
-            className="w-full max-w-[560px] border-border/80 bg-card text-card-foreground shadow-2xl"
+            className="m-auto flex max-h-[calc(100dvh-2rem)] w-full max-w-[560px] flex-col overflow-hidden border-border/80 bg-card text-card-foreground shadow-2xl"
             role="dialog"
           >
             <CardHeader className="flex flex-row items-start justify-between gap-3 border-b">
@@ -66,7 +66,7 @@ export function CaptureWidgetShell(props: {
               </p>
             ) : null}
 
-            <CardContent className="px-0 pb-0">
+            <CardContent className="min-h-0 overflow-y-auto px-0 pb-0">
               <CaptureWidgetView
                 handlers={props.handlers}
                 isBusy={isBusy}

@@ -1,21 +1,9 @@
 import type { Metadata } from "next"
 
-import { Geist, Geist_Mono } from "next/font/google"
-
 import "@crikket/ui/styles/globals.css"
 import { siteConfig } from "@crikket/shared/config/site"
 import NextTopLoader from "nextjs-toploader"
 import Providers from "@/components/providers"
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-})
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-})
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteConfig.url.app),
@@ -63,9 +51,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-      >
+      <body className="antialiased">
         <NextTopLoader />
         <Providers>{children}</Providers>
       </body>

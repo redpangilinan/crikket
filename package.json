@@ -84,6 +84,7 @@
     "db:studio": "turbo -F @crikket/db db:studio",
     "db:generate": "turbo -F @crikket/db db:generate",
     "db:migrate": "turbo -F @crikket/db db:migrate",
+    "generate:secret": "node -e \"console.log(require('node:crypto').randomBytes(32).toString('base64url'))\"",
     "check": "ultracite check",
     "fix": "ultracite fix",
     "changeset:add": "changeset",

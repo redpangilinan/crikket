@@ -27,8 +27,7 @@ export function submitCapturedReport(input: {
       title: input.draft.title.trim(),
       description: input.draft.description.trim(),
       priority: input.draft.priority,
-      visibility:
-        input.draft.visibility ?? BUG_REPORT_VISIBILITY_OPTIONS.private,
+      visibility: BUG_REPORT_VISIBILITY_OPTIONS.private,
       pageUrl: getPageUrl(),
       pageTitle: getPageTitle(),
       durationMs: input.media.durationMs,
