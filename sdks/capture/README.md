@@ -102,7 +102,7 @@ For Next.js 15.3 and newer, initialize the SDK once in
 ```ts
 import { init } from "@crikket/capture"
 
-const capturePublicKey = process.env.NEXT_PUBLIC_CRIKKET_CAPTURE_KEY
+const capturePublicKey = process.env.NEXT_PUBLIC_CRIKKET_KEY
 
 if (capturePublicKey) {
   init({
@@ -118,7 +118,7 @@ Example file:
 // instrumentation-client.ts
 import { init } from "@crikket/capture"
 
-const capturePublicKey = process.env.NEXT_PUBLIC_CRIKKET_CAPTURE_KEY
+const capturePublicKey = process.env.NEXT_PUBLIC_CRIKKET_KEY
 
 if (capturePublicKey) {
   init({
@@ -131,7 +131,7 @@ if (capturePublicKey) {
 Recommended environment variables:
 
 ```bash
-NEXT_PUBLIC_CRIKKET_CAPTURE_KEY=crk_your_public_key
+NEXT_PUBLIC_CRIKKET_KEY=crk_your_public_key
 NEXT_PUBLIC_CRIKKET_HOST=https://api.crikket.io
 ```
 
@@ -169,7 +169,7 @@ With environment variables:
 import { CapturePlugin } from "@crikket/capture/react"
 
 export function CaptureProvider(): React.JSX.Element | null {
-  const publicKey = process.env.NEXT_PUBLIC_CRIKKET_CAPTURE_KEY
+  const publicKey = process.env.NEXT_PUBLIC_CRIKKET_KEY
 
   if (!publicKey) {
     return null
