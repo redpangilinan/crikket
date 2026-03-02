@@ -40,6 +40,26 @@ Notes:
 - `POSTGRES_*` vars are only for configuring the bundled Compose Postgres service.
 - Root `.env` is Docker-only (ports and bundled Postgres init).
 
+## Recommended Security
+
+These settings are not required for self-hosting, but they are recommended:
+
+```bash
+UPSTASH_REDIS_REST_URL
+UPSTASH_REDIS_REST_TOKEN
+CAPTURE_SUBMIT_TOKEN_SECRET
+TURNSTILE_SITE_KEY
+TURNSTILE_SECRET_KEY
+```
+
+What each one does:
+
+- `CAPTURE_SUBMIT_TOKEN_SECRET` enables signed short-lived capture submit tokens.
+- Upstash Redis enables rate limiting and one-time submit token replay protection.
+- Turnstile enables an anti-bot challenge for capture submissions.
+
+Without them, self-hosted instances still work, but capture submission protections are reduced.
+
 ## Reverse Proxy and HTTPS
 
 Recommended layout:
@@ -55,10 +75,12 @@ Container routing note:
 
 If using a separate API domain:
 
-- `NEXT_PUBLIC_SERVER_URL=https://api.example.com`
-- `BETTER_AUTH_URL=https://api.example.com`
-- `CORS_ORIGINS=https://app.example.com,https://admin.example.com`
-- `BETTER_AUTH_COOKIE_DOMAIN=example.com`
+```bash
+NEXT_PUBLIC_SERVER_URL=https://api.example.com
+BETTER_AUTH_URL=https://api.example.com
+CORS_ORIGINS=https://app.example.com,https://admin.example.com
+BETTER_AUTH_COOKIE_DOMAIN=example.com
+```
 
 ## Storage
 

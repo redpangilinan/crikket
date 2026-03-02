@@ -67,6 +67,16 @@ GOOGLE_CLIENT_SECRET
 ENABLE_PAYMENTS (false)
 ```
 
+Optional but recommended for public deployments:
+
+```bash
+CAPTURE_SUBMIT_TOKEN_SECRET
+UPSTASH_REDIS_REST_URL
+UPSTASH_REDIS_REST_TOKEN
+TURNSTILE_SITE_KEY
+TURNSTILE_SECRET_KEY
+```
+
   </Step>
 
   <Step>
@@ -101,5 +111,11 @@ docker compose logs -f web
 </Steps>
 
 Schema migrations run automatically through the `migrate` service before `server` starts.
+
+Crikket works without Redis or Turnstile. For internet-facing deployments, they are still recommended:
+
+- `CAPTURE_SUBMIT_TOKEN_SECRET` enables signed short-lived submit tokens.
+- Upstash Redis adds rate limiting and one-time submit token replay protection.
+- Turnstile adds an anti-bot challenge for capture submissions.
 
 Next: [Production Setup](/docs/self-hosting/production).
