@@ -4,10 +4,13 @@
 
 {$NEXT_PUBLIC_APP_URL} {
 	encode gzip zstd
-	reverse_proxy server:3001
-}
 
-{$NEXT_PUBLIC_SERVER_URL} {
-	encode gzip zstd
-	reverse_proxy server:3000
+	@api path /api/* /rpc/*
+	handle @api {
+		reverse_proxy server:3000
+	}
+
+	handle {
+		reverse_proxy server:3001
+	}
 }

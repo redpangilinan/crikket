@@ -12,8 +12,7 @@ services:
     networks:
       default:
         aliases:
-          - "${CADDY_FRONTEND_HOST}"
-          - "${CADDY_BACKEND_HOST}"
+          - "${CADDY_PUBLIC_HOST}"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data

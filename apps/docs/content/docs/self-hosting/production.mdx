@@ -12,7 +12,7 @@ DATABASE_URL
 BETTER_AUTH_SECRET
 BETTER_AUTH_URL
 CORS_ORIGINS
-BETTER_AUTH_COOKIE_DOMAIN (required when app and API use different subdomains)
+BETTER_AUTH_COOKIE_DOMAIN (optional; set it if you want root-domain cookies)
 ENABLE_PAYMENTS (false)
 STORAGE_BUCKET
 STORAGE_ACCESS_KEY_ID
@@ -75,8 +75,8 @@ The repo includes a root `Caddyfile` that reads its site addresses and ACME emai
 Manual production layout:
 
 - Public traffic -> Caddy (`80/443`)
-- Caddy -> `web:3001`
-- Caddy -> `server:3000`
+- Caddy -> `web:3001` for `/`
+- Caddy -> `server:3000` for `/api` and `/rpc`
 
 Start commands:
 
@@ -97,7 +97,7 @@ Container routing note:
 - In the default compose file, `web` and `server` run as two containers.
 - `web` shares `server` networking, so server-side calls to `localhost:3000` work without extra internal URL variables.
 
-Example `Caddyfile` for separate app and API domains:
+Example `Caddyfile` for the supported single-domain deployment:
 
 ```bash
 {
@@ -106,23 +106,26 @@ Example `Caddyfile` for separate app and API domains:
 
 {$NEXT_PUBLIC_APP_URL} {
 	encode gzip zstd
-	reverse_proxy server:3001
-}
 
-{$NEXT_PUBLIC_SERVER_URL} {
-	encode gzip zstd
-	reverse_proxy server:3000
+	@api path /api/* /rpc/*
+	handle @api {
+		reverse_proxy server:3000
+	}
+
+	handle {
+		reverse_proxy server:3001
+	}
 }
 ```
 
-Matching env for separate app and API domains:
+Matching env for the supported single-domain deployment:
 
 ```bash
 NEXT_PUBLIC_APP_URL=https://app.example.com
-NEXT_PUBLIC_SERVER_URL=https://api.example.com
-BETTER_AUTH_URL=https://api.example.com
+NEXT_PUBLIC_SERVER_URL=https://app.example.com
+BETTER_AUTH_URL=https://app.example.com
 CORS_ORIGINS=https://app.example.com
-BETTER_AUTH_COOKIE_DOMAIN=example.com
+BETTER_AUTH_COOKIE_DOMAIN=app.example.com
 ```
 
 ## Storage

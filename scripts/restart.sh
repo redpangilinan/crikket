@@ -14,6 +14,9 @@ main() {
   ensure_docker_access
   load_selfhost_mode
 
+  warn "restart.sh only restarts existing containers."
+  warn "If you changed env files, images, Compose config, or Caddyfile, use update.sh or docker compose up -d --force-recreate instead."
+
   if [[ "$#" -eq 0 ]]; then
     info "Restarting all services..."
     compose_run restart

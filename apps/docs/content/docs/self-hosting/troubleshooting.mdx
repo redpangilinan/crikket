@@ -28,7 +28,7 @@ BETTER_AUTH_URL
 NEXT_PUBLIC_SERVER_URL
 NEXT_PUBLIC_APP_URL
 CORS_ORIGINS
-BETTER_AUTH_COOKIE_DOMAIN (if app/api are different subdomains)
+BETTER_AUTH_COOKIE_DOMAIN (optional; set it if you want root-domain cookies)
 ```
 
 ### Database Connection Errors
@@ -49,6 +49,7 @@ BETTER_AUTH_COOKIE_DOMAIN (if app/api are different subdomains)
 - Verify `STORAGE_BUCKET`, `STORAGE_ACCESS_KEY_ID`, and `STORAGE_SECRET_ACCESS_KEY`
 - Verify `STORAGE_REGION`/`STORAGE_ENDPOINT` for your provider
 - Verify bucket CORS if uploads fail before the server responds
+- If uploads are restricted to known sites, keep bucket CORS origins aligned with the capture public key `allowedOrigins`
 - If using `STORAGE_PUBLIC_URL`, confirm it points to accessible objects
 
 See: [Storage Setup](/docs/self-hosting/storage)

@@ -21,6 +21,11 @@ Crikket runs as three services:
 - `server`: Hono API backend (container port `3000`)
 - `postgres`: PostgreSQL database (container port `5432`)
 
+For the supported self-hosted Caddy setup, one public hostname serves:
+
+- `/` from `web`
+- `/api` and `/rpc` from `server`
+
 Repository resources used in this guide:
 
 - `scripts/setup.sh` for the interactive terminal install flow

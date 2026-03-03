@@ -113,7 +113,7 @@ check_env_alignment() {
 check_http_endpoint() {
   local label="$1"
   local url="$2"
-  local expect_ok_body="${3:-false}"
+  local expected_body="${3:-}"
   local response_file http_code body
 
   response_file="$(mktemp /tmp/crikket-health.XXXXXX)"
@@ -142,12 +142,12 @@ check_http_endpoint() {
     return 0
   fi
 
-  if [[ "$expect_ok_body" == "true" ]]; then
+  if [[ -n "$expected_body" ]]; then
     body="$(tr -d '\r\n' <"$response_file")"
-    if [[ "$body" == "OK" ]]; then
-      pass "${label} returned expected OK body"
+    if [[ "$body" == "$expected_body" ]]; then
+      pass "${label} returned expected body"
     else
-      fail "${label} did not return expected OK body"
+      fail "${label} did not return expected body"
     fi
   fi
 
@@ -192,7 +192,7 @@ main() {
   fi
 
   if [[ -n "$API_URL" ]]; then
-    check_http_endpoint "api URL" "$API_URL" "true"
+    check_http_endpoint "auth session endpoint" "${API_URL}/api/auth/get-session" "null"
   fi
 
   if [[ "$CHECK_FAILED" -ne 0 ]]; then

@@ -100,3 +100,13 @@ docker compose run --rm migrate
 # Stop
 docker compose down
 ```
+
+`restart.sh` only restarts existing containers. Use it for routine restarts, not for env or config changes.
+
+If you changed env files, images, Compose config, or the `Caddyfile`, use:
+
+```bash
+./scripts/update.sh
+```
+
+or recreate the affected services with `docker compose up -d --force-recreate`.

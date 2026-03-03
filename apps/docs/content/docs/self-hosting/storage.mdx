@@ -79,7 +79,7 @@ Because the browser talks directly to storage, CORS is mandatory.
 
 ## CORS Requirements
 
-Your storage bucket must allow browser requests from every frontend origin that can submit bug reports.
+Your storage bucket must allow browser requests from every origin that can submit bug reports.
 
 At minimum, allow:
 
@@ -87,11 +87,15 @@ At minimum, allow:
 - `GET` and `HEAD` for direct object access and previews
 - `Origin`, `Content-Type`, and other request headers used by the browser
 
-Recommended production policy:
+Recommended self-host policy:
 
-- allow only your real frontend origins, not `*`
-- include every app domain that can submit bug reports
-- expose `ETag`
+- Recommended default:
+  if you know exactly which sites may upload, keep the bucket CORS origins aligned with the capture public key `allowedOrigins`
+- Optional broad SDK policy:
+  if you want the SDK to work on arbitrary customer websites, use `AllowedOrigins: ["*"]` for the bucket and manage site-level restriction with capture public key `allowedOrigins`
+- Expose `ETag`
+- Bucket CORS controls whether the browser may talk to storage
+- Capture public key `allowedOrigins` controls whether Crikket will authorize uploads for that site
 
 If you are testing locally, include your local frontend origin too, for example:
 
@@ -109,16 +113,28 @@ In Cloudflare Dashboard:
 3. Open `Settings`.
 4. Add a `CORS policy`.
 
-Recommended policy:
+Recommended policy for a known site:
 
 ```json
 [
   {
-    "AllowedOrigins": [
-      "https://app.example.com",
-      "https://admin.example.com",
-      "https://local.crikket.io"
-    ],
+    "AllowedOrigins": ["https://app.example.com"],
+    "AllowedMethods": ["GET", "HEAD", "PUT"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Keep `AllowedOrigins` aligned with the capture public key `allowedOrigins` for that same site.
+
+Optional wildcard policy for arbitrary SDK install sites:
+
+```json
+[
+  {
+    "AllowedOrigins": ["*"],
     "AllowedMethods": ["GET", "HEAD", "PUT"],
     "AllowedHeaders": ["*"],
     "ExposeHeaders": ["ETag"],
@@ -132,6 +148,8 @@ Notes:
 - `PUT` is the critical method for bug report uploads.
 - `GET` and `HEAD` are recommended for media access and preview behavior.
 - `DELETE` is not required for browser uploads.
+- The known-site policy above is the recommended default.
+- Use the wildcard policy only when the SDK may run on arbitrary customer domains.
 
 ## AWS S3 CORS
 
@@ -142,16 +160,28 @@ In AWS Console:
 3. Open `Permissions`.
 4. Edit `Cross-origin resource sharing (CORS)`.
 
-Recommended policy:
+Recommended policy for a known site:
 
 ```json
 [
   {
-    "AllowedOrigins": [
-      "https://app.example.com",
-      "https://admin.example.com",
-      "https://local.crikket.io"
-    ],
+    "AllowedOrigins": ["https://app.example.com"],
+    "AllowedMethods": ["GET", "HEAD", "PUT"],
+    "AllowedHeaders": ["*"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3600
+  }
+]
+```
+
+Keep `AllowedOrigins` aligned with the capture public key `allowedOrigins` for that same site.
+
+Optional wildcard policy for arbitrary SDK install sites:
+
+```json
+[
+  {
+    "AllowedOrigins": ["*"],
     "AllowedMethods": ["GET", "HEAD", "PUT"],
     "AllowedHeaders": ["*"],
     "ExposeHeaders": ["ETag"],
@@ -167,7 +197,9 @@ Before shipping, verify all of these:
 - `STORAGE_BUCKET` points to the correct bucket
 - `STORAGE_REGION` or `STORAGE_ENDPOINT` matches the provider
 - access key and secret key belong to that bucket/account
-- bucket CORS includes every frontend origin that can submit reports
+- bucket CORS matches your deployment model
+- if uploads are restricted to known sites, bucket CORS origins match the capture public key `allowedOrigins`
+- if uploads are allowed from arbitrary sites, bucket CORS uses `AllowedOrigins: ["*"]`
 - screenshot upload works
 - video upload works
 - uploaded report media is readable after finalize
@@ -184,6 +216,6 @@ the most common cause is missing or incorrect bucket CORS.
 Check:
 
 - bucket CORS policy
-- frontend origin matches exactly
+- bucket CORS origins match the capture public key `allowedOrigins`, or the bucket intentionally uses wildcard origin
 - `STORAGE_ENDPOINT` points to the right provider endpoint
 - browser `PUT` request response in DevTools

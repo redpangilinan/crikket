@@ -8,8 +8,7 @@ import { Step, Steps } from "fumadocs-ui/components/steps";
 Use this guide when you want the repo's install wizard to configure Crikket for a VPS with:
 
 - Caddy handling TLS and reverse proxying
-- one frontend domain, such as `app.example.com`
-- one API domain, such as `api.example.com`
+- one public domain, such as `app.example.com`
 - Docker Compose running the stack
 
 This guide follows the actual prompts from `./scripts/setup.sh`.
@@ -26,9 +25,7 @@ This guide follows the actual prompts from `./scripts/setup.sh`.
 
 - A Linux VPS with Docker Engine and Docker Compose v2 installed
 - A public IPv4 address for the VPS
-- Two DNS names pointing at that server:
-  - app domain, for example `app.example.com`
-  - API domain, for example `api.example.com`
+- One DNS name pointing at that server, for example `app.example.com`
 - Ports `80` and `443` open to the internet
 - S3-compatible object storage credentials
 
@@ -41,27 +38,25 @@ Recommended baseline:
 
 ## DNS Layout
 
-Create both DNS records before you start the stack. Do not rely on creating them after Caddy is already trying to issue certificates.
+Create the DNS record before you start the stack. Do not rely on creating it after Caddy is already trying to issue certificates.
 
 Example:
 
 ```text
 app.example.com  ->  your VPS public IP
-api.example.com  ->  your VPS public IP
 ```
 
 If your DNS provider supports proxying, start with plain DNS-only records until Caddy has issued certificates successfully.
 
 Wait for public DNS propagation before you answer `yes` to the wizard's final "Start Crikket now with Docker Compose" prompt.
 
-Recommended checks:
+Recommended check:
 
 ```bash
 dig @1.1.1.1 +short app.example.com
-dig @1.1.1.1 +short api.example.com
 ```
 
-Both commands should return your VPS public IP.
+The command should return your VPS public IP.
 
 <Steps>
   <Step>
@@ -93,37 +88,34 @@ Both commands should return your VPS public IP.
 
   <Step>
 
-  ### Answer the Domain Prompts
+  ### Answer the Domain Prompt
 
-  The wizard asks for these first:
+  The wizard asks for:
 
   ```text
-  Frontend domain
-  Backend/API domain
+  Public domain
   ```
 
-  Example answers:
+  Example answer:
 
   ```text
-  Frontend domain: app.example.com
-  Backend/API domain: api.example.com
+  Public domain: app.example.com
   ```
 
   Rules enforced by the wizard:
 
-  - frontend and backend domains must be different
-  - the values must be hostnames, not full URLs
-  - Caddy mode requires real public domains, not `localhost` or raw IPs
+  - the value must be a hostname, not a full URL
+  - Caddy mode requires a real public domain, not `localhost` or a raw IP
 
-  From those values, the wizard auto-builds:
+  From that value, the wizard auto-builds:
 
   - `NEXT_PUBLIC_APP_URL=https://app.example.com`
   - `NEXT_PUBLIC_SITE_URL=https://app.example.com`
-  - `NEXT_PUBLIC_SERVER_URL=https://api.example.com`
-  - `BETTER_AUTH_URL=https://api.example.com`
+  - `NEXT_PUBLIC_SERVER_URL=https://app.example.com`
+  - `BETTER_AUTH_URL=https://app.example.com`
   - `CORS_ORIGINS=https://app.example.com`
 
-  It also tries to derive `BETTER_AUTH_COOKIE_DOMAIN` from the shared suffix.
+  For new installs, `BETTER_AUTH_COOKIE_DOMAIN` defaults to the same public host. If you already use a custom cookie domain, the wizard preserves it.
 
   </Step>
 
@@ -220,7 +212,7 @@ Both commands should return your VPS public IP.
   CADDY_HTTPS_PORT=443
   CADDY_ACME_EMAIL=you@example.com
   NEXT_PUBLIC_APP_URL=https://app.example.com
-  NEXT_PUBLIC_SERVER_URL=https://api.example.com
+  NEXT_PUBLIC_SERVER_URL=https://app.example.com
   ```
 
   The committed `Caddyfile` looks like this shape:
@@ -231,17 +223,20 @@ Both commands should return your VPS public IP.
   }
 
   {$NEXT_PUBLIC_APP_URL} {
-  	encode gzip zstd
-  	reverse_proxy server:3001
-  }
+    encode gzip zstd
 
-  {$NEXT_PUBLIC_SERVER_URL} {
-  	encode gzip zstd
-  	reverse_proxy server:3000
+    @api path /api/* /rpc/*
+    handle @api {
+      reverse_proxy server:3000
+    }
+
+    handle {
+      reverse_proxy server:3001
+    }
   }
   ```
 
-  In this stack, `web` shares the `server` network namespace, so Caddy proxies both frontend and API traffic to the `server` service on different ports.
+  In this stack, `web` shares the `server` network namespace, so one public hostname can serve the web app at `/` and the API at `/api` and `/rpc`.
 
   </Step>
 
@@ -287,14 +282,13 @@ Both commands should return your VPS public IP.
 
   <Step>
 
-  ### Point the Domains to the VPS
+  ### Point the Domain to the VPS
 
   In your DNS provider:
 
   - create an `A` record for `app.example.com` pointing to the VPS public IPv4
-  - create an `A` record for `api.example.com` pointing to the VPS public IPv4
 
-  If you use IPv6, add matching `AAAA` records only if the VPS is actually reachable over IPv6.
+  If you use IPv6, add a matching `AAAA` record only if the VPS is actually reachable over IPv6.
 
   Then make sure your cloud firewall or host firewall allows:
 
@@ -317,7 +311,6 @@ Both commands should return your VPS public IP.
 
   ```bash
   dig +short app.example.com
-  dig +short api.example.com
   ```
 
   Run the built-in health check:
@@ -329,9 +322,9 @@ Both commands should return your VPS public IP.
   `healthcheck.sh` verifies:
 
   - expected services are running
-  - app and API URLs are configured consistently
+  - app and auth session URLs are configured consistently
   - bundled Postgres is reachable when you use bundled database mode
-  - the public app and API URLs respond successfully
+  - the public app URL and `/api/auth/get-session` respond successfully
 
   For targeted live logs, use Docker Compose directly:
 
@@ -344,15 +337,15 @@ Both commands should return your VPS public IP.
 
   ```bash
   curl -I https://app.example.com
-  curl -I https://api.example.com
+  curl https://app.example.com/api/auth/get-session
   ```
 
   Expected result:
 
-  - both hostnames resolve to the VPS
+  - the hostname resolves to the VPS
   - Caddy provisions certificates successfully
   - `app.example.com` loads the web app
-  - `api.example.com` returns an HTTP response from the API container
+  - `https://app.example.com/api/auth/get-session` returns `null` when no session cookie is present
 
   </Step>
 </Steps>
@@ -361,9 +354,7 @@ Both commands should return your VPS public IP.
 
 - DNS still points somewhere else, so ACME validation never reaches your VPS
 - ports `80` or `443` are blocked by the provider firewall, security group, or `ufw`
-- the frontend and backend domains were entered as the same hostname
 - storage credentials are missing, so uploads fail later even if the app boots
-- `BETTER_AUTH_COOKIE_DOMAIN` needs manual adjustment if your frontend and backend do not share a normal parent domain
 
 ## If You Need to Restart Later
 
@@ -372,7 +363,14 @@ Both commands should return your VPS public IP.
 ./scripts/healthcheck.sh
 ```
 
-For upgrades later, use:
+Use `restart.sh` only for routine restarts. It does not recreate containers, so it is not enough after:
+
+- env file changes
+- image updates
+- Compose config changes
+- `Caddyfile` changes that require container recreation instead of a live reload
+
+For those cases, use:
 
 ```bash
 ./scripts/update.sh

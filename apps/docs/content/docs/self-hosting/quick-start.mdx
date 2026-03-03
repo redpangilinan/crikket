@@ -18,7 +18,7 @@ Security baseline:
 - Keep `3000`, `3001`, and `5432` private
 - Use a strong `BETTER_AUTH_SECRET`
 
-If you plan to use the built-in Caddy production setup, create your DNS records before starting the stack and wait until they resolve from public resolvers.
+If you plan to use the built-in Caddy production setup, create your DNS record before starting the stack and wait until it resolves from public resolvers.
 
 > Want the fast path instead of following the manual steps below? Run:
 >
@@ -75,6 +75,15 @@ CORS_ORIGINS
 ENABLE_PAYMENTS (false)
 ```
 
+For the supported Caddy deployment, set these to the same public origin:
+
+```bash
+NEXT_PUBLIC_APP_URL=https://app.example.com
+NEXT_PUBLIC_SERVER_URL=https://app.example.com
+BETTER_AUTH_URL=https://app.example.com
+CORS_ORIGINS=https://app.example.com
+```
+
 Optional but recommended for security:
 
 ```bash
@@ -121,10 +130,9 @@ Before using the built-in Caddy setup, confirm public DNS propagation:
 
 ```bash
 dig @1.1.1.1 +short app.example.com
-dig @1.1.1.1 +short api.example.com
 ```
 
-Both commands should return your VPS public IP before you bring up the HTTPS stack.
+The command should return your VPS public IP before you bring up the HTTPS stack.
 
 Production with built-in Caddy and external PostgreSQL:
 

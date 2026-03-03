@@ -304,82 +304,29 @@ default_host_from_url() {
 }
 
 build_public_urls() {
-  NEXT_PUBLIC_APP_URL="https://${FRONTEND_HOST}"
+  NEXT_PUBLIC_APP_URL="https://${PUBLIC_HOST}"
   NEXT_PUBLIC_SITE_URL="$NEXT_PUBLIC_APP_URL"
-  NEXT_PUBLIC_SERVER_URL="https://${BACKEND_HOST}"
-  BETTER_AUTH_URL="$NEXT_PUBLIC_SERVER_URL"
+  NEXT_PUBLIC_SERVER_URL="$NEXT_PUBLIC_APP_URL"
+  BETTER_AUTH_URL="$NEXT_PUBLIC_APP_URL"
   CORS_ORIGINS="$NEXT_PUBLIC_APP_URL"
 }
 
-derive_cookie_domain() {
-  local frontend_host="$1"
-  local backend_host="$2"
-  local shared_suffix=""
-
-  frontend_host="${frontend_host%%:*}"
-  backend_host="${backend_host%%:*}"
-
-  shared_suffix="$(
-    awk -v left="$frontend_host" -v right="$backend_host" '
-      function split_labels(value, labels,    count) {
-        count = split(value, labels, ".")
-        return count
-      }
-
-      BEGIN {
-        left_count = split_labels(left, left_labels)
-        right_count = split_labels(right, right_labels)
-        suffix = ""
-
-        while (left_count > 0 && right_count > 0) {
-          if (left_labels[left_count] != right_labels[right_count]) {
-            break
-          }
-
-          if (suffix == "") {
-            suffix = left_labels[left_count]
-          } else {
-            suffix = left_labels[left_count] "." suffix
-          }
-
-          left_count--
-          right_count--
-        }
-
-        print suffix
-      }
-    '
-  )"
-
-  if [[ "$shared_suffix" == *.* ]]; then
-    printf '%s\n' "$shared_suffix"
-    return 0
-  fi
-
-  printf '\n'
-}
-
 configure_domains() {
-  local frontend_default backend_default existing_cookie_domain
+  local public_default existing_cookie_domain
 
-  frontend_default="$(default_host_from_url "$WEB_ENV_FILE" "NEXT_PUBLIC_APP_URL" "app.example.com")"
-  backend_default="$(default_host_from_url "$WEB_ENV_FILE" "NEXT_PUBLIC_SERVER_URL" "api.example.com")"
+  public_default="$(default_host_from_url "$WEB_ENV_FILE" "NEXT_PUBLIC_APP_URL" "app.example.com")"
   existing_cookie_domain="$(default_value "$SERVER_ENV_FILE" "BETTER_AUTH_COOKIE_DOMAIN" "")"
 
-  FRONTEND_HOST="$(normalize_host_input "$(prompt_required_value "Frontend domain" "$frontend_default")")"
-  validate_host_input "$FRONTEND_HOST" || die "Frontend domain must be a hostname like app.example.com"
-  BACKEND_HOST="$(normalize_host_input "$(prompt_required_value "Backend/API domain" "$backend_default")")"
-  validate_host_input "$BACKEND_HOST" || die "Backend/API domain must be a hostname like api.example.com"
-
-  if [[ "$FRONTEND_HOST" == "$BACKEND_HOST" ]]; then
-    die "Frontend and backend domains must be different."
-  fi
+  PUBLIC_HOST="$(normalize_host_input "$(prompt_required_value "Public domain" "$public_default")")"
+  validate_host_input "$PUBLIC_HOST" || die "Public domain must be a hostname like app.example.com"
 
   build_public_urls
-  BETTER_AUTH_COOKIE_DOMAIN="$(derive_cookie_domain "$FRONTEND_HOST" "$BACKEND_HOST")"
+  FRONTEND_HOST="$PUBLIC_HOST"
 
-  if [[ -z "$BETTER_AUTH_COOKIE_DOMAIN" && -n "$existing_cookie_domain" ]]; then
+  if [[ -n "$existing_cookie_domain" ]]; then
     BETTER_AUTH_COOKIE_DOMAIN="$existing_cookie_domain"
+  else
+    BETTER_AUTH_COOKIE_DOMAIN="${PUBLIC_HOST%%:*}"
   fi
 }
 
@@ -397,12 +344,10 @@ configure_proxy() {
     PROXY_MODE="caddy"
     PROXY_MODE_LABEL="Caddy with automatic HTTPS"
 
-    validate_caddy_host "$FRONTEND_HOST" || die "Caddy mode requires a real public frontend domain."
-    validate_caddy_host "$BACKEND_HOST" || die "Caddy mode requires a real public backend domain."
+    validate_caddy_host "$PUBLIC_HOST" || die "Caddy mode requires a real public domain."
 
     CADDY_ACME_EMAIL="$(prompt_required_value "Email for Caddy TLS certificates" "$(default_value "$ROOT_ENV_FILE" "CADDY_ACME_EMAIL" "")")"
-    CADDY_FRONTEND_HOST="$FRONTEND_HOST"
-    CADDY_BACKEND_HOST="$BACKEND_HOST"
+    CADDY_PUBLIC_HOST="$PUBLIC_HOST"
     CADDY_HTTP_PORT="$(default_value "$ROOT_ENV_FILE" "CADDY_HTTP_PORT" "80")"
     CADDY_HTTPS_PORT="$(default_value "$ROOT_ENV_FILE" "CADDY_HTTPS_PORT" "443")"
     validate_port_number "$CADDY_HTTP_PORT" || die "Caddy HTTP port must be a number between 1 and 65535."
@@ -413,8 +358,7 @@ configure_proxy() {
   PROXY_MODE="none"
   PROXY_MODE_LABEL="No built-in reverse proxy"
   CADDY_ACME_EMAIL=""
-  CADDY_FRONTEND_HOST=""
-  CADDY_BACKEND_HOST=""
+  CADDY_PUBLIC_HOST=""
   CADDY_HTTP_PORT=""
   CADDY_HTTPS_PORT=""
 }
@@ -581,8 +525,7 @@ ${postgres_bindings}
 CADDY_HTTP_PORT=${CADDY_HTTP_PORT}
 CADDY_HTTPS_PORT=${CADDY_HTTPS_PORT}
 CADDY_ACME_EMAIL=${CADDY_ACME_EMAIL}
-CADDY_FRONTEND_HOST=${CADDY_FRONTEND_HOST}
-CADDY_BACKEND_HOST=${CADDY_BACKEND_HOST}
+CADDY_PUBLIC_HOST=${CADDY_PUBLIC_HOST}
 ${postgres_settings}
 EOF
 }
@@ -684,10 +627,10 @@ Database mode:
   - $( [[ "$DATABASE_MODE" == "external" ]] && printf 'External PostgreSQL' || printf 'Bundled PostgreSQL' )
 
 Domains:
-  - Frontend: ${FRONTEND_HOST}
-  - Backend: ${BACKEND_HOST}
+  - Public: ${PUBLIC_HOST}
 
 Auto-filled URLs:
+  - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL}
   - NEXT_PUBLIC_APP_URL=${NEXT_PUBLIC_APP_URL}
   - NEXT_PUBLIC_SERVER_URL=${NEXT_PUBLIC_SERVER_URL}
   - BETTER_AUTH_URL=${BETTER_AUTH_URL}
@@ -719,20 +662,11 @@ Google OAuth callback:
   - ${BETTER_AUTH_URL}/api/auth/callback/google
 EOF
 
-  if [[ -z "$BETTER_AUTH_COOKIE_DOMAIN" ]]; then
-    cat <<EOF
-
-Warning:
-  - Frontend and backend use different hosts, but no shared cookie domain could be derived automatically.
-    If cross-subdomain auth fails, set BETTER_AUTH_COOKIE_DOMAIN manually to your shared root domain.
-EOF
-  fi
-
   if [[ "$PROXY_MODE" == "caddy" ]]; then
     cat <<EOF
 
 Next step:
-  - Point DNS for ${FRONTEND_HOST} and ${BACKEND_HOST} at this host.
+  - Point DNS for ${PUBLIC_HOST} at this host.
   - Ensure inbound ports ${CADDY_HTTP_PORT} and ${CADDY_HTTPS_PORT} are open.
 EOF
     return 0
@@ -741,7 +675,7 @@ EOF
   cat <<EOF
 
 Next step:
-  - Point your reverse proxy at ${WEB_PORT} for the app and ${SERVER_PORT} for the API.
+  - Point your reverse proxy at ${WEB_PORT} for `/` and ${SERVER_PORT} for `/api` and `/rpc`.
 EOF
 }
 
