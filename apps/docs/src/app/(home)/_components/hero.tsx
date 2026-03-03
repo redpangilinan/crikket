@@ -3,7 +3,7 @@ import { siteConfig } from "@crikket/shared/config/site"
 import { Highlighter } from "@crikket/ui/components/magicui/highlighter"
 import { InteractiveHoverButton } from "@crikket/ui/components/magicui/interactive-hover-button"
 import { Button } from "@crikket/ui/components/ui/button"
-import { Github } from "lucide-react"
+import { Star } from "lucide-react"
 import Link from "next/link"
 import { HeroDemo } from "./hero-demo"
 
@@ -20,7 +20,7 @@ export function Hero() {
           rel="noreferrer"
           target="_blank"
         >
-          <Github />
+          <Star className="mr-2 size-4" />
           Star on GitHub
         </Link>
 
