@@ -14,7 +14,7 @@ replace_placeholder() {
   placeholder="$1"
   value="$2"
   escaped_value="$(escape_replacement "$value")"
-  files="$(grep -rl --binary-files=without-match "$placeholder" "$TARGET_DIR" 2>/dev/null || true)"
+  files="$(grep -rl "$placeholder" "$TARGET_DIR" 2>/dev/null || true)"
 
   if [ -z "$files" ]; then
     return 0
@@ -37,7 +37,7 @@ replace_runtime_env_value() {
   key="$1"
   value="$2"
   escaped_value="$(escape_replacement "$value")"
-  files="$(grep -rl --binary-files=without-match "$key" "$TARGET_DIR" 2>/dev/null || true)"
+  files="$(grep -rl "$key" "$TARGET_DIR" 2>/dev/null || true)"
 
   if [ -z "$files" ]; then
     return 0
