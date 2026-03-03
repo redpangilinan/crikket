@@ -11,6 +11,12 @@ Recommended:
 ./scripts/update.sh
 ```
 
+Post-update verification:
+
+```bash
+./scripts/healthcheck.sh
+```
+
 Manual equivalent for source builds:
 
 ```bash
@@ -68,6 +74,9 @@ Track at minimum:
 # Restart
 ./scripts/restart.sh
 ./scripts/restart.sh server web
+
+# Healthcheck
+./scripts/healthcheck.sh
 
 # Status
 docker compose ps

@@ -51,6 +51,11 @@ update_source_checkout() {
   git -C "$ROOT_DIR" pull --ff-only
 }
 
+run_migrations() {
+  info "Applying database migrations..."
+  compose_run run --rm migrate
+}
+
 main() {
   info "Crikket update"
   ensure_selfhost_layout
@@ -62,11 +67,15 @@ main() {
 
   if [[ "$DEPLOY_MODE" == "source" ]]; then
     update_source_checkout
-    info "Rebuilding and restarting the stack..."
-    compose_run up -d --build
+    info "Rebuilding images..."
+    compose_run build migrate server web
+    run_migrations
+    info "Restarting the stack..."
+    compose_run up -d
   else
     info "Pulling latest images..."
     compose_run pull
+    run_migrations
     info "Restarting the stack..."
     compose_run up -d
   fi
