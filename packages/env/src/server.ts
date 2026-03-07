@@ -8,6 +8,16 @@ export const env = createEnv({
     BETTER_AUTH_SECRET: z.string().min(32),
     BETTER_AUTH_URL: z.url(),
     BETTER_AUTH_COOKIE_DOMAIN: z.string().min(1).optional(),
+    ALLOWED_SIGNUP_DOMAINS: z
+      .string()
+      .optional()
+      .transform(
+        (value) =>
+          value
+            ?.split(",")
+            .map((d) => d.trim())
+            .filter((d) => d.length > 0) ?? []
+      ),
     POLAR_ACCESS_TOKEN: z.string().min(1).optional(),
     POLAR_SUCCESS_URL: z.url().optional(),
     POLAR_WEBHOOK_SECRET: z.string().min(1).optional(),
