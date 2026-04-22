@@ -1,4 +1,9 @@
-import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto"
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from "node:crypto"
 
 const ALGORITHM = "aes-256-gcm"
 const IV_LENGTH = 12
@@ -17,7 +22,10 @@ export function encryptSecret(plaintext: string, secret: string): string {
   const key = deriveKey(secret)
   const iv = randomBytes(IV_LENGTH)
   const cipher = createCipheriv(ALGORITHM, key, iv)
-  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()])
+  const encrypted = Buffer.concat([
+    cipher.update(plaintext, "utf8"),
+    cipher.final(),
+  ])
   const authTag = cipher.getAuthTag()
   return Buffer.concat([iv, encrypted, authTag]).toString("base64")
 }
@@ -33,6 +41,9 @@ export function decryptSecret(blob: string, secret: string): string {
   const ciphertext = buf.subarray(IV_LENGTH, buf.length - AUTH_TAG_LENGTH)
   const decipher = createDecipheriv(ALGORITHM, key, iv)
   decipher.setAuthTag(authTag)
-  const decrypted = Buffer.concat([decipher.update(ciphertext), decipher.final()])
+  const decrypted = Buffer.concat([
+    decipher.update(ciphertext),
+    decipher.final(),
+  ])
   return decrypted.toString("utf8")
 }

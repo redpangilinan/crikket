@@ -19,17 +19,21 @@ const upsertInputSchema = z.object({
   token: z.string().optional(),
 })
 
-export const getIntegration = protectedProcedure.handler(async ({ context }) => {
-  const organizationId = await requireActiveOrgAdmin(context.session)
-  return getGithubIntegrationSummary(organizationId)
-})
+export const getIntegration = protectedProcedure.handler(
+  async ({ context }) => {
+    const organizationId = await requireActiveOrgAdmin(context.session)
+    return getGithubIntegrationSummary(organizationId)
+  }
+)
 
 export const upsertIntegration = protectedProcedure
   .input(upsertInputSchema)
   .handler(async ({ context, input }) => {
     const organizationId = await requireActiveOrgAdmin(context.session)
     const trimmedToken =
-      input.token && input.token.trim().length > 0 ? input.token.trim() : undefined
+      input.token && input.token.trim().length > 0
+        ? input.token.trim()
+        : undefined
 
     try {
       await upsertGithubIntegration({

@@ -47,8 +47,7 @@ export function GithubIntegrationForm({
       try {
         const result = await client.githubIntegration.upsert({
           repo: value.repo.trim(),
-          token:
-            value.token.trim().length > 0 ? value.token.trim() : undefined,
+          token: value.token.trim().length > 0 ? value.token.trim() : undefined,
         })
         setConfigured(result.configured)
         toast.success("GitHub integration saved")
@@ -63,11 +62,11 @@ export function GithubIntegrationForm({
   })
 
   async function handleRemove() {
-    if (
-      !window.confirm(
-        "Remove the GitHub integration? New bug reports will stop forwarding to the repo."
-      )
-    ) {
+    // biome-ignore lint/suspicious/noAlert: browser confirm is adequate for this destructive admin action; a styled AlertDialog is a follow-up.
+    const ok = window.confirm(
+      "Remove the GitHub integration? New bug reports will stop forwarding to the repo."
+    )
+    if (!ok) {
       return
     }
     setIsRemoving(true)
@@ -112,8 +111,7 @@ export function GithubIntegrationForm({
                 value={field.state.value}
               />
               <FieldDescription>
-                Must be in <code>owner/repo</code> format (e.g.
-                {" "}
+                Must be in <code>owner/repo</code> format (e.g.{" "}
                 <code>acme/webapp</code>).
               </FieldDescription>
               {isInvalid ? (

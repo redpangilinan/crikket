@@ -76,6 +76,6 @@ export const githubIntegrationFormSchema = z.object({
     .regex(/^[^/\s]+\/[^/\s]+$/, {
       message: "Use the format owner/repo",
     }),
-  // Token is only required the first time; on updates an empty value means "keep existing".
-  token: z.string().optional(),
+  // Token is only required the first time; on updates an empty string means "keep existing".
+  token: z.string(),
 })

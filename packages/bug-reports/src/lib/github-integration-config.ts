@@ -1,10 +1,7 @@
 import { db } from "@crikket/db"
 import { organizationGithubIntegration } from "@crikket/db/schema/github-integration"
 import { env } from "@crikket/env/server"
-import {
-  decryptSecret,
-  encryptSecret,
-} from "@crikket/shared/lib/server/crypto"
+import { decryptSecret, encryptSecret } from "@crikket/shared/lib/server/crypto"
 import { eq } from "drizzle-orm"
 import { nanoid } from "nanoid"
 
@@ -53,7 +50,10 @@ export async function upsertGithubIntegration(input: {
   token?: string
 }): Promise<void> {
   const existing = await db.query.organizationGithubIntegration.findFirst({
-    where: eq(organizationGithubIntegration.organizationId, input.organizationId),
+    where: eq(
+      organizationGithubIntegration.organizationId,
+      input.organizationId
+    ),
     columns: { id: true, tokenEncrypted: true },
   })
 

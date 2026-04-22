@@ -1,8 +1,8 @@
+import { gunzipSync } from "node:zlib"
 import { db } from "@crikket/db"
 import { bugReport } from "@crikket/db/schema/bug-report"
 import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { eq } from "drizzle-orm"
-import { gunzipSync } from "node:zlib"
 import { getGithubIntegrationCredentials } from "./github-integration-config"
 import { getStorageProvider } from "./storage"
 
@@ -122,7 +122,10 @@ export async function forwardBugReportToGitHub(
       return
     }
 
-    const issue = (await response.json()) as { html_url?: string; number?: number }
+    const issue = (await response.json()) as {
+      html_url?: string
+      number?: number
+    }
     console.info(
       `[github-integration] Created GitHub issue #${issue.number ?? "?"} for bug report ${bugReportId}: ${issue.html_url ?? "(no url)"}`
     )
@@ -160,70 +163,84 @@ async function uploadAttachments(input: {
   }
 
   if (report.captureKey) {
-    const captureLabel =
-      report.attachmentType === "video" ? "Recording" : "Screenshot"
+    const captureKey = report.captureKey
     const captureFilename = filenameForCapture(report)
-    const result: AttachmentResult = {
-      kind: "capture",
-      label: captureLabel,
-      filename: captureFilename,
-    }
-    try {
-      const bytes = await storage.read(report.captureKey)
-      if (bytes.byteLength > MAX_ATTACHMENT_BYTES) {
-        result.tooLargeBytes = bytes.byteLength
-      } else if (await ensureBranch()) {
-        result.url = await uploadArtifact({
-          repo,
-          token,
-          branch: ATTACHMENTS_BRANCH,
-          path: `${report.id}/${captureFilename}`,
-          content: bytes,
-          message: `crikket: capture for bug report ${report.id}`,
-        })
-      } else {
-        result.error = "branch setup failed"
-      }
-    } catch (error) {
-      result.error = error instanceof Error ? error.message : String(error)
-    }
-    results.push(result)
+    results.push(
+      await uploadSingleAttachment({
+        kind: "capture",
+        label: report.attachmentType === "video" ? "Recording" : "Screenshot",
+        filename: captureFilename,
+        readBytes: () => storage.read(captureKey),
+        repo,
+        token,
+        reportId: report.id,
+        commitMessage: `crikket: capture for bug report ${report.id}`,
+        ensureBranch,
+      })
+    )
   }
 
   if (report.debuggerKey) {
+    const debuggerKey = report.debuggerKey
     const debuggerFilename = `${report.id}.debugger.json`
-    const result: AttachmentResult = {
-      kind: "debugger",
-      label: "Debugger payload",
-      filename: debuggerFilename,
-    }
-    try {
-      const raw = await storage.read(report.debuggerKey)
-      const bytes =
-        report.debuggerContentEncoding === "gzip"
-          ? Buffer.from(gunzipSync(raw))
-          : raw
-      if (bytes.byteLength > MAX_ATTACHMENT_BYTES) {
-        result.tooLargeBytes = bytes.byteLength
-      } else if (await ensureBranch()) {
-        result.url = await uploadArtifact({
-          repo,
-          token,
-          branch: ATTACHMENTS_BRANCH,
-          path: `${report.id}/${debuggerFilename}`,
-          content: bytes,
-          message: `crikket: debugger payload for bug report ${report.id}`,
-        })
-      } else {
-        result.error = "branch setup failed"
-      }
-    } catch (error) {
-      result.error = error instanceof Error ? error.message : String(error)
-    }
-    results.push(result)
+    const isGzipped = report.debuggerContentEncoding === "gzip"
+    results.push(
+      await uploadSingleAttachment({
+        kind: "debugger",
+        label: "Debugger payload",
+        filename: debuggerFilename,
+        readBytes: async () => {
+          const raw = await storage.read(debuggerKey)
+          return isGzipped ? Buffer.from(gunzipSync(raw)) : raw
+        },
+        repo,
+        token,
+        reportId: report.id,
+        commitMessage: `crikket: debugger payload for bug report ${report.id}`,
+        ensureBranch,
+      })
+    )
   }
 
   return results
+}
+
+async function uploadSingleAttachment(opts: {
+  kind: AttachmentKind
+  label: string
+  filename: string
+  readBytes: () => Promise<Buffer>
+  repo: string
+  token: string
+  reportId: string
+  commitMessage: string
+  ensureBranch: () => Promise<boolean>
+}): Promise<AttachmentResult> {
+  const result: AttachmentResult = {
+    kind: opts.kind,
+    label: opts.label,
+    filename: opts.filename,
+  }
+  try {
+    const bytes = await opts.readBytes()
+    if (bytes.byteLength > MAX_ATTACHMENT_BYTES) {
+      result.tooLargeBytes = bytes.byteLength
+    } else if (await opts.ensureBranch()) {
+      result.url = await uploadArtifact({
+        repo: opts.repo,
+        token: opts.token,
+        branch: ATTACHMENTS_BRANCH,
+        path: `${opts.reportId}/${opts.filename}`,
+        content: bytes,
+        message: opts.commitMessage,
+      })
+    } else {
+      result.error = "branch setup failed"
+    }
+  } catch (error) {
+    result.error = error instanceof Error ? error.message : String(error)
+  }
+  return result
 }
 
 async function ensureAttachmentsBranch(input: {
@@ -327,7 +344,7 @@ async function uploadArtifact(input: {
   return `https://github.com/${input.repo}/blob/${encodeURIComponent(input.branch)}/${encodePath(input.path)}`
 }
 
-async function ghFetch(
+function ghFetch(
   url: string,
   init: RequestInit & { token: string }
 ): Promise<Response> {
@@ -441,10 +458,7 @@ function renderIssueBody(input: {
   }
 
   if (report.actions.length > 0) {
-    sections.push(
-      "## Reproduction steps",
-      renderActionList(report.actions)
-    )
+    sections.push("## Reproduction steps", renderActionList(report.actions))
   }
 
   if (report.logs.length > 0) {
@@ -521,7 +535,10 @@ function renderNetworkTable(
     duration: number | null
   }>
 ): string {
-  const lines = ["| Method | Status | Duration | URL |", "| --- | --- | --- | --- |"]
+  const lines = [
+    "| Method | Status | Duration | URL |",
+    "| --- | --- | --- | --- |",
+  ]
   for (const row of rows) {
     lines.push(
       `| ${row.method} | ${row.status ?? "—"} | ${
@@ -537,7 +554,9 @@ function renderActionList(
 ): string {
   return actions
     .map((action, idx) => {
-      const target = action.target ? ` — \`${truncate(action.target, 120)}\`` : ""
+      const target = action.target
+        ? ` — \`${truncate(action.target, 120)}\``
+        : ""
       return `${idx + 1}. **${action.type}**${target}`
     })
     .join("\n")
