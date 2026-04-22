@@ -46,6 +46,7 @@ export const env = createEnv({
     STORAGE_BUCKET: z.string().min(1).optional(),
     STORAGE_REGION: z.string().min(1).optional(),
     STORAGE_ENDPOINT: z.url().optional(),
+    STORAGE_PUBLIC_ENDPOINT: z.url().optional(),
     STORAGE_ADDRESSING_STYLE: z.enum(["auto", "path", "virtual"]).optional(),
     STORAGE_ACCESS_KEY_ID: z.string().min(1).optional(),
     STORAGE_SECRET_ACCESS_KEY: z.string().min(1).optional(),
@@ -55,6 +56,8 @@ export const env = createEnv({
     CAPTURE_SUBMIT_TOKEN_SECRET: z.string().min(32).optional(),
     TURNSTILE_SITE_KEY: z.string().min(1).optional(),
     TURNSTILE_SECRET_KEY: z.string().min(1).optional(),
+    GITHUB_ISSUES_REPO: z.string().min(1).optional(),
+    GITHUB_ISSUES_TOKEN: z.string().min(1).optional(),
     NODE_ENV: z
       .enum(["development", "production", "staging"])
       .default("development"),

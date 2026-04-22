@@ -35,6 +35,7 @@ interface S3StorageOptions {
   bucket: string
   region: string
   endpoint?: string
+  publicEndpoint?: string
   addressingStyle?: S3AddressingStyle
   accessKeyId: string
   secretAccessKey: string
@@ -68,6 +69,27 @@ export function createS3StorageProvider(
     },
   })
 
+  // Second client used only for presigning URLs returned to the browser. When
+  // STORAGE_PUBLIC_ENDPOINT is set (e.g. local dev where the server reaches MinIO
+  // at http://minio:9000 but the browser must use http://localhost:9000), this
+  // ensures the signed Host matches what the browser will actually send.
+  const presignerClient = options.publicEndpoint
+    ? new S3Client({
+        region: options.region,
+        endpoint: options.publicEndpoint,
+        forcePathStyle: resolveS3ForcePathStyle({
+          endpoint: options.publicEndpoint,
+          addressingStyle: options.addressingStyle,
+        }),
+        requestChecksumCalculation: "WHEN_REQUIRED",
+        responseChecksumValidation: "WHEN_REQUIRED",
+        credentials: {
+          accessKeyId: options.accessKeyId,
+          secretAccessKey: options.secretAccessKey,
+        },
+      })
+    : client
+
   const getUrl = (filename: string): Promise<string> => {
     if (options.publicUrl) {
       return Promise.resolve(
@@ -76,7 +98,7 @@ export function createS3StorageProvider(
     }
 
     return getSignedUrl(
-      client,
+      presignerClient,
       new GetObjectCommand({
         Bucket: options.bucket,
         Key: filename,
@@ -129,7 +151,7 @@ export function createS3StorageProvider(
       }
 
       const url = await getSignedUrl(
-        client,
+        presignerClient,
         new PutObjectCommand({
           Bucket: options.bucket,
           Key: input.filename,
@@ -401,6 +423,7 @@ function getCloudStorageConfig(): S3StorageOptions {
     bucket,
     region,
     endpoint: env.STORAGE_ENDPOINT,
+    publicEndpoint: env.STORAGE_PUBLIC_ENDPOINT,
     addressingStyle: env.STORAGE_ADDRESSING_STYLE,
     accessKeyId,
     secretAccessKey,

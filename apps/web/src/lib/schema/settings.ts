@@ -68,3 +68,14 @@ export const inviteMemberFormSchema = z.object({
   email: z.email("Enter a valid email address"),
   role: z.enum(["admin", "member"]),
 })
+
+export const githubIntegrationFormSchema = z.object({
+  repo: z
+    .string()
+    .trim()
+    .regex(/^[^/\s]+\/[^/\s]+$/, {
+      message: "Use the format owner/repo",
+    }),
+  // Token is only required the first time; on updates an empty value means "keep existing".
+  token: z.string().optional(),
+})

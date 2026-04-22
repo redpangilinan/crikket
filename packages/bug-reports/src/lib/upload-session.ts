@@ -29,6 +29,7 @@ import {
   processBugReportIngestionJob,
   queueBugReportIngestionJob,
 } from "./ingestion-jobs"
+import { forwardBugReportToGitHub } from "./integrations"
 import { getStorageProvider } from "./storage"
 import {
   buildFallbackTitle,
@@ -395,6 +396,10 @@ export async function finalizeBugReportUpload(input: {
       message: "Failed to process debugger data for this report.",
     })
   }
+
+  // Fire-and-forget GitHub Issues forwarding. No-op unless GITHUB_ISSUES_* envs are set;
+  // errors are logged inside the helper and never block the capture response.
+  void forwardBugReportToGitHub(uploadSession.id)
 
   return {
     id: uploadSession.id,
