@@ -1,6 +1,5 @@
 import { db } from "@crikket/db"
 import { bugReport } from "@crikket/db/schema/bug-report"
-import { env } from "@crikket/env/server"
 import { reportNonFatalError } from "@crikket/shared/lib/errors"
 import { eq } from "drizzle-orm"
 import { gunzipSync } from "node:zlib"
@@ -76,7 +75,15 @@ export async function forwardBugReportToGitHub(
       return
     }
 
-    const credentials = await resolveCredentials(report.organizationId)
+    const credentials = await getGithubIntegrationCredentials(
+      report.organizationId
+    ).catch((error) => {
+      reportNonFatalError(
+        `[github-integration] Failed to load credentials for org ${report.organizationId}`,
+        error
+      )
+      return null
+    })
     if (!credentials) {
       return
     }
@@ -125,29 +132,6 @@ export async function forwardBugReportToGitHub(
       error
     )
   }
-}
-
-async function resolveCredentials(
-  organizationId: string
-): Promise<{ repo: string; token: string } | null> {
-  // Per-org DB config takes precedence; env vars are a dev/bootstrap fallback.
-  const fromDb = await getGithubIntegrationCredentials(organizationId).catch(
-    (error) => {
-      reportNonFatalError(
-        `[github-integration] Failed to load DB credentials for org ${organizationId}`,
-        error
-      )
-      return null
-    }
-  )
-  if (fromDb) return fromDb
-
-  const envRepo = env.GITHUB_ISSUES_REPO
-  const envToken = env.GITHUB_ISSUES_TOKEN
-  if (envRepo && envToken) {
-    return { repo: envRepo, token: envToken }
-  }
-  return null
 }
 
 async function uploadAttachments(input: {

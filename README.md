@@ -47,6 +47,7 @@ Every report is designed to reduce the usual debugging back-and-forth.
 | Technical context | Console logs and network requests attached to the report |
 | Sharing | Public or private share links per report |
 | Collaboration | Team workspaces, invites, and report management |
+| Integrations | Forward reports to GitHub as issues with attachments |
 | Deployment | Quick and easy self-hosting |
 
 ## Quick Start

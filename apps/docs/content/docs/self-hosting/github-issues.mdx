@@ -1,0 +1,147 @@
+---
+title: GitHub Issue Forwarding
+description: Forward Crikket bug reports to a GitHub repo as issues, with capture and debugger artifacts attached.
+---
+
+Crikket can automatically forward every submitted bug report to a GitHub
+repository as an issue. The issue body includes the report's description,
+context table, reproduction steps, console logs, and network requests.
+Capture (screenshot or recording) and debugger payload artifacts are
+committed to a dedicated `crikket-attachments` branch on the target repo
+and linked from the issue.
+
+The integration is configured **per organization** from the web app.
+There is no server-wide env-var setup — each organization owner points
+at their own repo and token.
+
+## Prerequisites
+
+- A GitHub repository you control (public or private; private is fine).
+- A GitHub token with access to that repo.
+
+### Token scopes
+
+A fine-grained personal access token scoped to the target repo is
+recommended. Grant these repository permissions:
+
+| Permission | Access | Why |
+| --- | --- | --- |
+| Contents | Read and write | Create the `crikket-attachments` branch and commit artifacts |
+| Issues | Read and write | Create issues |
+| Metadata | Read-only | Required by GitHub for any fine-grained token |
+
+A classic token with the `repo` scope also works (or `public_repo` if the
+target repo is public). Avoid tokens with broader scopes than necessary.
+
+## Configure
+
+1. Sign in as an organization admin.
+2. Open **Settings → Integrations → GitHub**.
+3. Enter the target repo in `owner/repo` form (e.g. `my-team/app`).
+4. Paste the GitHub token.
+5. Save.
+
+The token is encrypted at rest with AES-256-GCM using a key derived from
+`BETTER_AUTH_SECRET`; the plaintext is never stored or re-surfaced in the
+UI. To rotate the token, enter a new one and save again. To keep the
+existing token while changing the repo, leave the token field blank.
+
+## What Happens When a Report Is Forwarded
+
+When a bug report is submitted, Crikket:
+
+1. Looks up the submitter's organization integration config. If no config
+   is present, the forward is skipped.
+2. Ensures the `crikket-attachments` branch exists on the target repo
+   (created from the default branch's HEAD if missing).
+3. Uploads the capture (screenshot `.png` or recording `.webm`) and the
+   debugger payload (`.debugger.json`) to
+   `crikket-attachments:/<report-id>/...` via the Contents API.
+4. Creates a new issue on the target repo titled
+   `[crikket] <report title>` with labels `crikket` and
+   `priority:<level>` (when priority is set).
+5. Renders the issue body with:
+   - **Description** — the submitter's description text.
+   - **Context** table — URL, browser, OS, viewport, priority, tags,
+     duration, SDK version.
+   - **Artifacts** — links to the uploaded capture and debugger payload.
+   - **Reproduction steps** — action events from the session.
+   - **Console logs** — up to 50 most recent entries.
+   - **Network requests** — up to 50 requests in a collapsed table.
+
+The upload and issue creation happen asynchronously after the report is
+persisted. A failure in forwarding never fails the report submission
+itself; failures are logged as non-fatal errors.
+
+## Attachment Links and Private Repos
+
+Attachment URLs use the form `https://github.com/<owner>/<repo>/blob/crikket-attachments/<report-id>/<filename>`.
+
+For **private repos**, a viewer must be signed in to GitHub with access
+to the repo — the link will then resolve through GitHub's authenticated
+viewer. The issue body does **not** embed inline image previews for
+captures: GitHub's image proxy (Camo) cannot fetch private-repo content,
+so an embed would always render as a broken icon. The filename link is
+clickable instead, and opens in GitHub's blob viewer where PNGs and JSON
+render natively.
+
+For **public repos**, the same links work for anyone without
+authentication.
+
+## Attachment Size Limit
+
+Individual artifacts are capped at **40 MB**. GitHub's Contents API
+hard-caps at 100 MB per file, and the 40 MB cap leaves headroom for
+base64 overhead in the request body and keeps issue load times sane.
+
+Oversize artifacts are not uploaded. Instead, the issue body shows a
+"not uploaded — retrieve from crikket: report id `<id>`" notice for that
+artifact. The report itself is still persisted in Crikket, so the
+artifact is retrievable from the Crikket dashboard.
+
+## Removing the Integration
+
+Return to **Settings → Integrations → GitHub** and click **Remove**.
+The stored config (repo + encrypted token) is deleted immediately.
+
+The `crikket-attachments` branch on the target repo is **not**
+auto-cleaned. To remove previously uploaded artifacts, delete the branch
+manually (or the individual files) from GitHub. Note that deleting the
+branch will break the artifact links in already-forwarded issues.
+
+## Scope
+
+- One config per organization. Members of the organization share a
+  single target repo.
+- Only organization admins can view, modify, or remove the config.
+- Reports submitted by organizations **without** a configured
+  integration are persisted in Crikket as usual; no forward attempt is
+  made.
+
+## Troubleshooting
+
+**Issue was never created.** Check the server logs for
+`[github-integration]` entries. Common causes:
+
+- Token lacks `issues:write` or `contents:write`. Re-check the token's
+  repository permissions.
+- Repo not found or not accessible by the token. Verify `owner/repo`
+  spelling and that the token can see the repo.
+- Branch creation failed (the attachments branch couldn't be created
+  from the default branch). Confirm the repo has at least one commit on
+  its default branch and the token has `contents:write`.
+
+**Artifact link returns 404 in the browser.** The link uses the
+`github.com/<repo>/blob/...` form and requires the viewer to be signed
+in to GitHub with repo access. The old `raw.githubusercontent.com` form
+does not work for private repos without a bearer token.
+
+**Inline screenshot shows as a broken image.** Expected for private
+repos — see
+[Attachment Links and Private Repos](#attachment-links-and-private-repos).
+The filename link above the (missing) preview opens the image in
+GitHub's blob viewer.
+
+**Token rotated and old reports' forwards stopped working.** Enter the
+new token in the settings form. Historical issues and attachments are
+unaffected; only future forwards need the new credentials.

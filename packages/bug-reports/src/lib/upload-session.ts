@@ -397,8 +397,10 @@ export async function finalizeBugReportUpload(input: {
     })
   }
 
-  // Fire-and-forget GitHub Issues forwarding. No-op unless GITHUB_ISSUES_* envs are set;
-  // errors are logged inside the helper and never block the capture response.
+  // Fire-and-forget GitHub Issues forwarding. No-op unless the report's
+  // organization has a GitHub integration configured (Settings → Integrations
+  // → GitHub). Errors are logged inside the helper and never block the
+  // capture response.
   void forwardBugReportToGitHub(uploadSession.id)
 
   return {
