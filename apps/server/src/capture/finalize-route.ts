@@ -86,6 +86,7 @@ export async function handleCaptureFinalize(input: {
         reportId: result.id,
         shareUrl: new URL(result.shareUrl, input.shareOrigin).toString(),
         warnings: result.warnings,
+        githubIssueUrl: result.githubIssueUrl,
       },
       {
         headers: authorization.rateLimitHeaders,

@@ -15,6 +15,13 @@
       "when": 1776875942269,
       "tag": "0001_military_black_tom",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1776975284247,
+      "tag": "0002_add_bug_report_github_issue_url",
+      "breakpoints": true
     }
   ]
 }

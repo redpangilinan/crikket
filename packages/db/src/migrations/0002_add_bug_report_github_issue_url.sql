@@ -1,0 +1,1 @@
+ALTER TABLE "bug_report" ADD COLUMN "github_issue_url" text;

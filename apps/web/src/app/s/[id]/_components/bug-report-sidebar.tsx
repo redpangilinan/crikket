@@ -105,6 +105,21 @@ export function BugReportSidebar({
                 <DetailRow label="Browser" value={deviceInfo?.browser} />
                 <DetailRow label="OS" value={deviceInfo?.os} />
                 <DetailRow label="Viewport" value={deviceInfo?.viewport} />
+                {data.githubIssueUrl ? (
+                  <div className="grid gap-1">
+                    <span className="font-medium text-muted-foreground text-xs">
+                      GitHub Issue
+                    </span>
+                    <a
+                      className="break-all text-sm underline underline-offset-2 hover:no-underline"
+                      href={data.githubIssueUrl}
+                      rel="noopener noreferrer"
+                      target="_blank"
+                    >
+                      {data.githubIssueUrl}
+                    </a>
+                  </div>
+                ) : null}
               </div>
             </div>
             <Separator />

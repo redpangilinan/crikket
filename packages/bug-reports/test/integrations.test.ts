@@ -206,9 +206,15 @@ afterAll(() => {
 // ----- Module under test ----------------------------------------------------
 
 let forwardBugReportToGitHub: typeof import("../src/lib/integrations").forwardBugReportToGitHub
+let createGitHubIssue: typeof import("../src/lib/integrations").createGitHubIssue
+let attachAndUpdateGitHubIssue: typeof import("../src/lib/integrations").attachAndUpdateGitHubIssue
 
 beforeAll(async () => {
-  ;({ forwardBugReportToGitHub } = await import("../src/lib/integrations"))
+  ;({
+    forwardBugReportToGitHub,
+    createGitHubIssue,
+    attachAndUpdateGitHubIssue,
+  } = await import("../src/lib/integrations"))
 })
 
 // ----- Helpers --------------------------------------------------------------
@@ -299,6 +305,19 @@ function lastIssuePost(): RecordedCall | undefined {
   return [...fetchCalls]
     .reverse()
     .find((c) => c.method === "POST" && c.url.endsWith("/issues"))
+}
+
+const ISSUE_PATCH_URL_RE = /\/issues\/\d+$/
+const ISSUE_42_PATCH_URL_RE = /\/issues\/42$/
+
+// After the create/attach split, attachments + size notices land in a PATCH
+// to /issues/<n> (the followup that embeds artifact links), not in the
+// initial POST /issues body. Tests asserting on attachment markdown should
+// inspect this call instead of lastIssuePost.
+function lastIssuePatch(): RecordedCall | undefined {
+  return [...fetchCalls]
+    .reverse()
+    .find((c) => c.method === "PATCH" && ISSUE_PATCH_URL_RE.test(c.url))
 }
 
 beforeEach(() => {
@@ -394,7 +413,10 @@ describe("forwardBugReportToGitHub: issue body rendering", () => {
   it("renders artifact links using github.com/<repo>/blob URLs and no inline embed", async () => {
     await forwardBugReportToGitHub(state.report!.id)
 
-    const bodyText = (lastIssuePost()!.body as { body: string }).body
+    // Attachment links land in the PATCH that updates the body after uploads,
+    // not in the initial create POST (which goes out before attachments are
+    // touched so the issue URL can be returned to the SDK quickly).
+    const bodyText = (lastIssuePatch()!.body as { body: string }).body
 
     // Uses blob URL, not raw.githubusercontent.com
     expect(bodyText).toContain(
@@ -407,6 +429,11 @@ describe("forwardBugReportToGitHub: issue body rendering", () => {
 
     // No inline screenshot embed (Camo would refuse private-repo content).
     expect(bodyText).not.toContain("![Screenshot]")
+
+    // The original POST should NOT contain the artifact links — they only
+    // appear after the upload phase finishes and PATCHes the body.
+    const initialBody = (lastIssuePost()!.body as { body: string }).body
+    expect(initialBody).not.toContain("/blob/crikket-attachments/")
   })
 
   it("renders reproduction steps, console logs, and a network table", async () => {
@@ -533,7 +560,10 @@ describe("forwardBugReportToGitHub: attachment branch + upload flow", () => {
     )
     expect(capturePuts.length).toBe(0)
 
-    const bodyText = (lastIssuePost()!.body as { body: string }).body
+    // The "not uploaded" notice is part of the attachments section, which
+    // only gets rendered into the PATCH body — the initial create POST goes
+    // out before attachments are processed.
+    const bodyText = (lastIssuePatch()!.body as { body: string }).body
     expect(bodyText).toContain("not uploaded")
     expect(bodyText).toContain("MB exceeds")
     expect(bodyText).toContain("Retrieve from crikket")
@@ -553,5 +583,62 @@ describe("forwardBugReportToGitHub: issue creation failure", () => {
     expect(
       state.nonFatalErrors.some((e) => ISSUE_CREATE_FAILED_RE.test(e.message))
     ).toBeTrue()
+  })
+})
+
+// The two-phase split exists so upload-session can await issue creation
+// (fast) and surface the URL synchronously, while the slow attachment
+// uploads + body PATCH stay fire-and-forget. These tests pin that contract.
+describe("createGitHubIssue / attachAndUpdateGitHubIssue split", () => {
+  beforeEach(() => {
+    state.report = makeReport()
+    state.credentials = { repo: "owner/repo", token: "ghp_x" }
+  })
+
+  it("createGitHubIssue returns the issue URL + number without uploading attachments", async () => {
+    const created = await createGitHubIssue(state.report!.id)
+
+    expect(created).not.toBeNull()
+    expect(created!.htmlUrl).toBe("https://github.com/test/repo/issues/42")
+    expect(created!.number).toBe(42)
+
+    // No attachment uploads should have happened — the contract is "fast,
+    // single POST". Branch ensure + Contents API PUTs belong to the second
+    // phase.
+    const attachmentWrites = fetchCalls.filter(
+      (c) => c.method === "PUT" && c.url.includes("/contents/")
+    )
+    expect(attachmentWrites.length).toBe(0)
+
+    // Initial body has no attachment markdown.
+    const initialBody = (lastIssuePost()!.body as { body: string }).body
+    expect(initialBody).not.toContain("/blob/crikket-attachments/")
+    expect(initialBody).not.toContain("## Artifacts")
+  })
+
+  it("createGitHubIssue returns null when the org has no GitHub integration", async () => {
+    state.credentials = null
+
+    const created = await createGitHubIssue(state.report!.id)
+
+    expect(created).toBeNull()
+    // No POST /issues either — we bail before hitting the API.
+    expect(lastIssuePost()).toBeUndefined()
+  })
+
+  it("attachAndUpdateGitHubIssue uploads attachments and PATCHes the issue body", async () => {
+    state.branchExists = true
+
+    await attachAndUpdateGitHubIssue({
+      bugReportId: state.report!.id,
+      issueNumber: 42,
+      repo: "owner/repo",
+      token: "ghp_x",
+    })
+
+    const patchedBody = (lastIssuePatch()!.body as { body: string }).body
+    expect(patchedBody).toContain("## Artifacts")
+    expect(patchedBody).toContain("/blob/crikket-attachments/")
+    expect(lastIssuePatch()!.url).toMatch(ISSUE_42_PATCH_URL_RE)
   })
 })

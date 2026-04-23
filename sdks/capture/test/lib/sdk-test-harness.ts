@@ -130,8 +130,11 @@ mock.module(MOUNT_CAPTURE_UI_PATH, () => ({
         showReview: (input: ReviewInput) => {
           sdkTestState.uiShowReviewInputs.push(input)
         },
-        showSuccess: (shareUrl?: string) => {
-          sdkTestState.uiShowSuccessUrls.push(shareUrl)
+        showSuccess: (input: {
+          shareUrl?: string
+          githubIssueUrl?: string
+        }) => {
+          sdkTestState.uiShowSuccessUrls.push(input.shareUrl)
         },
         showError: () => undefined,
         setTitleIfEmpty: (value: string) => {

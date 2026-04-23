@@ -48,6 +48,7 @@ export function createCaptureUiStore(): CaptureUiStore {
       warnings: [...input.warnings],
       summary: input.summary,
       shareUrl: "",
+      githubIssueUrl: "",
       copyLabel: "Copy Link",
       reviewDraft: {
         title: "",
@@ -98,7 +99,7 @@ export function createCaptureUiStore(): CaptureUiStore {
       })
     },
     showReview,
-    showSuccess: (shareUrl) => {
+    showSuccess: (input) => {
       patchState({
         overlayOpen: true,
         recordingDockOpen: false,
@@ -106,7 +107,8 @@ export function createCaptureUiStore(): CaptureUiStore {
         view: "success",
         errorMessage: null,
         busy: false,
-        shareUrl: shareUrl ?? "",
+        shareUrl: input.shareUrl ?? "",
+        githubIssueUrl: input.githubIssueUrl ?? "",
         copyLabel: "Copy Link",
       })
     },
@@ -146,6 +148,7 @@ function createInitialState(): CaptureUiState {
     summary: { ...DEFAULT_SUMMARY },
     media: null,
     shareUrl: "",
+    githubIssueUrl: "",
     copyLabel: "Copy Link",
     reviewDraft: {
       title: "",

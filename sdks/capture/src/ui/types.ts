@@ -19,6 +19,10 @@ export interface CaptureUiState {
   summary: CaptureDebuggerSummary
   media: CapturedMedia | null
   shareUrl: string
+  // GitHub issue URL surfaced by the host server when its GitHub integration
+  // is configured. Empty string when absent — keeps the field non-optional so
+  // selectors don't need null-guards.
+  githubIssueUrl: string
   copyLabel: string
   reviewDraft: CaptureSubmissionDraft
   reviewFormKey: string
@@ -64,7 +68,7 @@ export interface CaptureUiStore {
     warnings: string[]
     summary: CaptureDebuggerSummary
   }) => void
-  showSuccess: (shareUrl?: string) => void
+  showSuccess: (input: { shareUrl?: string; githubIssueUrl?: string }) => void
   showError: (message: string) => void
   setTitleIfEmpty: (value: string) => void
   destroy: () => void

@@ -45,61 +45,49 @@ interface AttachmentResult {
   error?: string
 }
 
-export async function forwardBugReportToGitHub(
-  bugReportId: string
-): Promise<void> {
-  try {
-    const report = await db.query.bugReport.findFirst({
-      where: eq(bugReport.id, bugReportId),
-      with: {
-        logs: {
-          orderBy: (t, { asc: a }) => [a(t.timestamp)],
-          limit: MAX_LOG_LINES,
-        },
-        networkRequests: {
-          orderBy: (t, { asc: a }) => [a(t.timestamp)],
-          limit: MAX_NETWORK_ROWS,
-        },
-        actions: {
-          orderBy: (t, { asc: a }) => [a(t.timestamp)],
-          limit: MAX_ACTION_ROWS,
-        },
-      },
-    })
+export interface CreatedGitHubIssue {
+  htmlUrl: string
+  number: number
+  /** Repo + token captured for the follow-up attachment phase. */
+  repo: string
+  token: string
+}
 
+/**
+ * Create a GitHub issue for the bug report (synchronous, fast).
+ *
+ * Posts a single Issues API call without attachments — attachment uploads
+ * touch GitHub's Contents API per file and run sequentially, which can take
+ * seconds and would block the capture-submit response. The caller awaits this
+ * to surface the issue URL in the success modal, then fires
+ * attachAndUpdateGitHubIssue in the background to upload artifacts and PATCH
+ * the issue body to embed the links.
+ *
+ * Returns null when:
+ *   - the bug report is missing,
+ *   - the org has no GitHub integration configured,
+ *   - the integration is misconfigured (bad repo format), or
+ *   - the GitHub API call itself failed.
+ * All of these are treated as non-fatal — capture submission still succeeds.
+ */
+export async function createGitHubIssue(
+  bugReportId: string
+): Promise<CreatedGitHubIssue | null> {
+  try {
+    const report = await loadReport(bugReportId)
     if (!report) {
       reportNonFatalError(
         `[github-integration] Bug report ${bugReportId} not found for forwarding`,
         new Error("not_found")
       )
-      return
-    }
-
-    const credentials = await getGithubIntegrationCredentials(
-      report.organizationId
-    ).catch((error) => {
-      reportNonFatalError(
-        `[github-integration] Failed to load credentials for org ${report.organizationId}`,
-        error
-      )
       return null
-    })
-    if (!credentials) {
-      return
     }
+
+    const credentials = await loadCredentials(report.organizationId)
+    if (!credentials) return null
     const { repo, token } = credentials
-    if (!REPO_PATTERN.test(repo)) {
-      reportNonFatalError(
-        `[github-integration] GitHub repo must be "owner/repo"; got "${repo}"`,
-        new Error("invalid_repo"),
-        { once: true }
-      )
-      return
-    }
 
-    const attachments = await uploadAttachments({ report, repo, token })
-
-    const body = renderIssueBody({ report, attachments })
+    const body = renderIssueBody({ report, attachments: [] })
     const title = renderIssueTitle(report)
     const labels = buildLabels(report.priority)
 
@@ -119,22 +107,146 @@ export async function forwardBugReportToGitHub(
         `[github-integration] Failed to create GitHub issue for ${bugReportId} (status ${response.status})`,
         new Error(text || response.statusText)
       )
-      return
+      return null
     }
 
     const issue = (await response.json()) as {
       html_url?: string
       number?: number
     }
+    if (!issue.html_url || typeof issue.number !== "number") {
+      reportNonFatalError(
+        `[github-integration] GitHub issue response for ${bugReportId} missing html_url/number`,
+        new Error("malformed_response")
+      )
+      return null
+    }
     console.info(
-      `[github-integration] Created GitHub issue #${issue.number ?? "?"} for bug report ${bugReportId}: ${issue.html_url ?? "(no url)"}`
+      `[github-integration] Created GitHub issue #${issue.number} for bug report ${bugReportId}: ${issue.html_url}`
     )
+    return { htmlUrl: issue.html_url, number: issue.number, repo, token }
   } catch (error) {
     reportNonFatalError(
-      `[github-integration] Unexpected failure forwarding bug report ${bugReportId}`,
+      `[github-integration] Unexpected failure creating GitHub issue for ${bugReportId}`,
+      error
+    )
+    return null
+  }
+}
+
+/**
+ * Upload bug-report attachments to the configured repo and PATCH the issue
+ * body to embed the resulting links. Designed to run fire-and-forget after
+ * createGitHubIssue — failures are logged and never propagated.
+ *
+ * The repo + token are passed in (rather than re-loaded) so the credentials
+ * fetched during issue creation are reused, avoiding a second decrypt round-
+ * trip and a race where the integration is rotated mid-flow.
+ */
+export async function attachAndUpdateGitHubIssue(input: {
+  bugReportId: string
+  issueNumber: number
+  repo: string
+  token: string
+}): Promise<void> {
+  const { bugReportId, issueNumber, repo, token } = input
+  try {
+    const report = await loadReport(bugReportId)
+    if (!report) return
+
+    const attachments = await uploadAttachments({ report, repo, token })
+    if (attachments.length === 0) return
+
+    const body = renderIssueBody({ report, attachments })
+
+    const response = await ghFetch(
+      `https://api.github.com/repos/${repo}/issues/${issueNumber}`,
+      {
+        token,
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      }
+    )
+
+    if (!response.ok) {
+      const text = await safeReadText(response)
+      reportNonFatalError(
+        `[github-integration] Failed to PATCH issue #${issueNumber} with attachments (status ${response.status})`,
+        new Error(text || response.statusText)
+      )
+    }
+  } catch (error) {
+    reportNonFatalError(
+      `[github-integration] Unexpected failure attaching artifacts for ${bugReportId}`,
       error
     )
   }
+}
+
+/**
+ * Back-compat orchestrator: create + attach in one call. Existing callers
+ * (and the original test suite) keep working; new callers (upload-session)
+ * use createGitHubIssue + attachAndUpdateGitHubIssue separately so the
+ * issue URL is available synchronously.
+ */
+export async function forwardBugReportToGitHub(
+  bugReportId: string
+): Promise<void> {
+  const created = await createGitHubIssue(bugReportId)
+  if (!created) return
+  await attachAndUpdateGitHubIssue({
+    bugReportId,
+    issueNumber: created.number,
+    repo: created.repo,
+    token: created.token,
+  })
+}
+
+function loadReport(
+  bugReportId: string
+): Promise<ReportWithRelations | undefined> {
+  return db.query.bugReport.findFirst({
+    where: eq(bugReport.id, bugReportId),
+    with: {
+      logs: {
+        orderBy: (t, { asc: a }) => [a(t.timestamp)],
+        limit: MAX_LOG_LINES,
+      },
+      networkRequests: {
+        orderBy: (t, { asc: a }) => [a(t.timestamp)],
+        limit: MAX_NETWORK_ROWS,
+      },
+      actions: {
+        orderBy: (t, { asc: a }) => [a(t.timestamp)],
+        limit: MAX_ACTION_ROWS,
+      },
+    },
+  }) as Promise<ReportWithRelations | undefined>
+}
+
+async function loadCredentials(
+  organizationId: string
+): Promise<{ repo: string; token: string } | null> {
+  const credentials = await getGithubIntegrationCredentials(
+    organizationId
+  ).catch((error) => {
+    reportNonFatalError(
+      `[github-integration] Failed to load credentials for org ${organizationId}`,
+      error
+    )
+    return null
+  })
+  if (!credentials) return null
+  if (!REPO_PATTERN.test(credentials.repo)) {
+    reportNonFatalError(
+      `[github-integration] GitHub repo must be "owner/repo"; got "${credentials.repo}"`,
+      new Error("invalid_repo"),
+      { once: true }
+    )
+    return null
+  }
+  return credentials
 }
 
 async function uploadAttachments(input: {

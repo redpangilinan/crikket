@@ -99,6 +99,9 @@ export async function defaultSubmitTransport(
       resolveString(responsePayload, ["shareUrl", "url"])
     ),
     reportId: resolveString(responsePayload, ["id", "reportId"]),
+    // GitHub URL is server-absolute (api.github.com is the source) — no host
+    // prepending. May be missing entirely when the org has no integration.
+    githubIssueUrl: resolveString(responsePayload, ["githubIssueUrl"]),
     raw: responsePayload,
   }
 }

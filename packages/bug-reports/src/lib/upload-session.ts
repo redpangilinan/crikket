@@ -29,7 +29,7 @@ import {
   processBugReportIngestionJob,
   queueBugReportIngestionJob,
 } from "./ingestion-jobs"
-import { forwardBugReportToGitHub } from "./integrations"
+import { attachAndUpdateGitHubIssue, createGitHubIssue } from "./integrations"
 import { getStorageProvider } from "./storage"
 import {
   buildFallbackTitle,
@@ -251,6 +251,10 @@ export async function finalizeBugReportUpload(input: {
   id: string
   shareUrl: string
   warnings: string[]
+  // Populated when the org has a configured GitHub integration AND the
+  // synchronous Issues POST succeeded. Null otherwise — capture submit
+  // succeeds either way.
+  githubIssueUrl: string | null
 }> {
   const uploadSession = await db.query.bugReportUploadSession.findFirst({
     where: and(
@@ -268,6 +272,7 @@ export async function finalizeBugReportUpload(input: {
       columns: {
         id: true,
         submissionStatus: true,
+        githubIssueUrl: true,
       },
     })
 
@@ -286,6 +291,10 @@ export async function finalizeBugReportUpload(input: {
         id: existingReport.id,
         shareUrl: `/s/${existingReport.id}`,
         warnings: [],
+        // Idempotent re-finalize hits the existing row directly; surface the
+        // previously-persisted GitHub URL so a retried submit shows the same
+        // link the original submit did.
+        githubIssueUrl: existingReport.githubIssueUrl,
       }
     }
 
@@ -397,21 +406,52 @@ export async function finalizeBugReportUpload(input: {
     })
   }
 
-  // Fire-and-forget GitHub Issues forwarding. No-op unless the report's
-  // organization has a GitHub integration configured (Settings → Integrations
-  // → GitHub). Errors are logged inside the helper and never block the
-  // capture response — the .catch is only here to keep the unhandled-rejection
-  // linter happy; the helper swallows its own failures.
-  forwardBugReportToGitHub(uploadSession.id).catch(() => {
-    // intentional: errors are already reported inside the helper
-  })
+  const githubIssueUrl = await forwardToGithubAndPersist(uploadSession.id)
 
   return {
     id: uploadSession.id,
     shareUrl: `/s/${uploadSession.id}`,
     warnings,
     debugger: debuggerPersistence,
+    githubIssueUrl,
   }
+}
+
+/**
+ * Two-phase GitHub forwarding so the issue URL surfaces in the success modal.
+ *
+ * 1. createGitHubIssue is awaited: a single Issues POST (~hundreds of ms),
+ *    no attachments. Returns null fast when the org has no integration. The
+ *    URL is persisted on bug_report and returned so the SDK can render it
+ *    inline.
+ * 2. attachAndUpdateGitHubIssue is fire-and-forget: per-attachment Contents
+ *    API uploads + an issue PATCH to embed the links. Slow part — would
+ *    otherwise block capture-submit. The issue exists in the interim with an
+ *    attachment-free body.
+ *
+ * Both helpers swallow their own failures and report non-fatally.
+ */
+async function forwardToGithubAndPersist(
+  bugReportId: string
+): Promise<string | null> {
+  const created = await createGitHubIssue(bugReportId)
+  if (!created) return null
+
+  await db
+    .update(bugReport)
+    .set({ githubIssueUrl: created.htmlUrl, updatedAt: new Date() })
+    .where(eq(bugReport.id, bugReportId))
+
+  attachAndUpdateGitHubIssue({
+    bugReportId,
+    issueNumber: created.number,
+    repo: created.repo,
+    token: created.token,
+  }).catch(() => {
+    // intentional: errors are already reported inside the helper
+  })
+
+  return created.htmlUrl
 }
 
 async function finalizeBugReportDebuggerIngestion(input: {

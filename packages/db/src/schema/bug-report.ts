@@ -44,6 +44,10 @@ export const bugReport = pgTable(
     debuggerIngestedAt: timestamp("debugger_ingested_at"),
     submissionStatus: text("submission_status").default("ready").notNull(),
     visibility: text("visibility").default("private").notNull(), // public | private
+    // Populated by the GitHub integration when an issue is created for this
+    // report. Null if (a) the org has no GitHub integration configured, or
+    // (b) the integration call failed — both are non-fatal for capture.
+    githubIssueUrl: text("github_issue_url"),
     metadata: jsonb("metadata"),
     deviceInfo: jsonb("device_info"), // browser, os, viewport, etc.
     createdAt: timestamp("created_at").defaultNow().notNull(),

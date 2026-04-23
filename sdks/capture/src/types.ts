@@ -130,6 +130,10 @@ export interface CaptureSubmitRequest {
 export interface CaptureSubmitResult {
   shareUrl?: string
   reportId?: string
+  // Set when the host server forwarded the report to a configured GitHub
+  // integration and the issue was created successfully. Surfaces in the SDK
+  // success modal.
+  githubIssueUrl?: string
   raw?: unknown
 }
 

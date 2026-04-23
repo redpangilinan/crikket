@@ -232,7 +232,10 @@ export class CaptureSdkRuntime implements CaptureRuntimeController {
     })
 
     if (this.mountedUi) {
-      this.mountedUi.store.showSuccess(result.shareUrl)
+      this.mountedUi.store.showSuccess({
+        shareUrl: result.shareUrl,
+        githubIssueUrl: result.githubIssueUrl,
+      })
     }
 
     return result

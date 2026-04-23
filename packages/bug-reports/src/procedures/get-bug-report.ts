@@ -68,6 +68,9 @@ export const getBugReportById = o
       priority,
       tags: Array.isArray(report.tags) ? report.tags : [],
       url: report.url,
+      // Surfaced on the bug-report detail page so admins can jump from the
+      // capture to the GitHub issue created for it.
+      githubIssueUrl: report.githubIssueUrl,
       attachmentUrl,
       attachmentType: report.attachmentType,
       submissionStatus: report.submissionStatus,
