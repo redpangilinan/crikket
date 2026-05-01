@@ -1,4 +1,5 @@
 import { LazyDebuggerCollector } from "../debugger/lazy-debugger-collector"
+import { loadPersistedSession } from "../debugger/session-storage"
 import {
   captureScreenshot,
   startDisplayRecording,
@@ -47,6 +48,10 @@ export class CaptureSdkRuntime implements CaptureRuntimeController {
       this.mount(options.mountTarget)
     }
 
+    if (loadPersistedSession()) {
+      this.resumePersistedSession()
+    }
+
     return this
   }
 
@@ -81,9 +86,16 @@ export class CaptureSdkRuntime implements CaptureRuntimeController {
         }
       },
       onStopRecording: async () => {
-        const blob = await this.stopRecording()
-        if (!blob) {
-          throw new Error("Recording capture failed.")
+        if (this.activeRecording) {
+          const blob = await this.stopRecording()
+          if (!blob) {
+            throw new Error("Recording capture failed.")
+          }
+        } else {
+          const blob = await this.takeScreenshot()
+          if (!blob) {
+            throw new Error("Screenshot capture failed.")
+          }
         }
       },
       onSubmit: (draft, options) => {
@@ -320,6 +332,17 @@ export class CaptureSdkRuntime implements CaptureRuntimeController {
     }
 
     this.mountedUi?.store.setTitleIfEmpty(captureTitle)
+  }
+
+  private resumePersistedSession(): void {
+    this.debuggerCollector
+      .ensureSessionRestored()
+      .then((startedAt) => {
+        if (startedAt !== null) {
+          this.mountedUi?.store.showRecording(startedAt)
+        }
+      })
+      .catch(() => undefined)
   }
 
   private getRuntimeConfig(): CaptureRuntimeConfig {

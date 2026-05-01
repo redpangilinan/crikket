@@ -19,6 +19,9 @@ const CAPTURE_MEDIA_PATH = fileURLToPath(
 const DEBUGGER_COLLECTOR_PATH = fileURLToPath(
   new URL("../../src/debugger/debugger-collector.ts", import.meta.url)
 )
+const SESSION_STORAGE_PATH = fileURLToPath(
+  new URL("../../src/debugger/session-storage.ts", import.meta.url)
+)
 
 type LauncherMount = {
   target: unknown
@@ -76,6 +79,7 @@ export const sdkTestState = {
   recordingStopCalls: 0,
   recordingAbortCalls: 0,
   submitRequests: [] as CaptureSubmitRequest[],
+  restoredSessionStartedAt: null as number | null,
   screenshotError: null as Error | null,
   startRecordingError: null as Error | null,
   objectUrlsCreated: [] as string[],
@@ -214,6 +218,94 @@ mock.module(DEBUGGER_COLLECTOR_PATH, () => ({
     dispose(): void {
       sdkTestState.disposeCalls += 1
     }
+
+    hasActiveSession(): boolean {
+      return sdkTestState.restoredSessionStartedAt !== null
+    }
+
+    getSessionStartedAt(): number | null {
+      return sdkTestState.restoredSessionStartedAt
+    }
+  },
+}))
+
+const STORAGE_KEY = "__crikketActiveSession"
+const SESSION_VERSION = 1
+const MAX_SESSION_AGE_MS = 5 * 60 * 1000
+
+mock.module(SESSION_STORAGE_PATH, () => ({
+  loadPersistedSession: () => {
+    if (sdkTestState.restoredSessionStartedAt !== null) {
+      return {
+        sessionId: "mock-restored",
+        captureType: "video" as const,
+        startedAt: sdkTestState.restoredSessionStartedAt,
+        recordingStartedAt: null,
+        events: [],
+      }
+    }
+
+    try {
+      const raw = sessionStorage.getItem(STORAGE_KEY)
+      if (raw === null) return null
+
+      const record = JSON.parse(raw) as Record<string, unknown>
+
+      if (
+        record.version !== SESSION_VERSION ||
+        typeof record.savedAt !== "number" ||
+        Date.now() - record.savedAt > MAX_SESSION_AGE_MS ||
+        typeof record.sessionId !== "string" ||
+        !record.sessionId ||
+        (record.captureType !== "video" && record.captureType !== "screenshot") ||
+        typeof record.startedAt !== "number"
+      ) {
+        sessionStorage.removeItem(STORAGE_KEY)
+        return null
+      }
+
+      return {
+        sessionId: record.sessionId as string,
+        captureType: record.captureType as "video" | "screenshot",
+        startedAt: record.startedAt as number,
+        recordingStartedAt:
+          typeof record.recordingStartedAt === "number"
+            ? record.recordingStartedAt
+            : null,
+        events: Array.isArray(record.events)
+          ? (record.events as unknown[]).filter(
+              (e): e is { kind: string } =>
+                typeof e === "object" &&
+                e !== null &&
+                typeof (e as Record<string, unknown>).kind === "string" &&
+                ["action", "console", "network"].includes(
+                  (e as Record<string, unknown>).kind as string
+                )
+            )
+          : [],
+      }
+    } catch {
+      return null
+    }
+  },
+  persistSession: (session: {
+    sessionId: string
+    captureType: "video" | "screenshot"
+    startedAt: number
+    recordingStartedAt: number | null
+    events: unknown[]
+  }) => {
+    try {
+      sessionStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify({ ...session, version: SESSION_VERSION, savedAt: Date.now() })
+      )
+    } catch {}
+  },
+  clearPersistedSession: () => {
+    try {
+      sessionStorage.removeItem(STORAGE_KEY)
+    } catch {}
   },
 }))
 
@@ -229,6 +321,7 @@ export function setupCaptureSdkTestHooks(): void {
   })
 
   afterAll(() => {
+    resetSdkTestState()
     captureModule?.destroy()
     mock.restore()
   })
@@ -278,6 +371,7 @@ export function resetSdkTestState(): void {
   sdkTestState.recordingStopCalls = 0
   sdkTestState.recordingAbortCalls = 0
   sdkTestState.submitRequests = []
+  sdkTestState.restoredSessionStartedAt = null
   sdkTestState.screenshotError = null
   sdkTestState.startRecordingError = null
   sdkTestState.objectUrlsCreated = []

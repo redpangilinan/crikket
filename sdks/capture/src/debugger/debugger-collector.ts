@@ -1,5 +1,10 @@
 import { PAGE_BRIDGE_SOURCE } from "@crikket/capture-core/debugger/constants"
 import {
+  clearPersistedSession,
+  loadPersistedSession,
+  persistSession,
+} from "./session-storage"
+import {
   appendActionEventWithDedup,
   appendEventWithRetentionPolicy,
   appendNetworkEventWithDedup,
@@ -19,6 +24,12 @@ export class DebuggerCollector {
   private installed = false
   private recentEvents: DebuggerEvent[] = []
   private session: DebuggerSession | null = null
+
+  private readonly handlePageHide = (): void => {
+    if (this.session) {
+      persistSession(this.session)
+    }
+  }
 
   private readonly handleWindowMessage = (event: MessageEvent<unknown>) => {
     if (event.source !== window) {
@@ -63,6 +74,19 @@ export class DebuggerCollector {
 
     installDebuggerPageRuntime()
     window.addEventListener("message", this.handleWindowMessage)
+
+    const restored = loadPersistedSession()
+    if (restored) {
+      this.session = {
+        sessionId: restored.sessionId,
+        captureType: restored.captureType,
+        startedAt: restored.startedAt,
+        recordingStartedAt: restored.recordingStartedAt,
+        events: [...restored.events],
+      }
+    }
+
+    window.addEventListener("pagehide", this.handlePageHide, { capture: true })
     this.installed = true
   }
 
@@ -72,17 +96,27 @@ export class DebuggerCollector {
     }
 
     window.removeEventListener("message", this.handleWindowMessage)
+    window.removeEventListener("pagehide", this.handlePageHide, { capture: true })
     this.installed = false
   }
 
   startSession(captureType: CaptureType, lookbackMs = 0): DebuggerSession {
     const now = Date.now()
+
+    // If a session was restored from a previous page, carry its events forward
+    // so the cross-page trace is preserved in the new recording segment.
+    const priorSession = this.session
+    const inheritedEvents: DebuggerEvent[] = priorSession
+      ? [...priorSession.events]
+      : []
+    const sessionStartedAt = priorSession?.startedAt ?? now
+
     const nextSession: DebuggerSession = {
       sessionId: createSessionId(),
       captureType,
-      startedAt: now,
+      startedAt: sessionStartedAt,
       recordingStartedAt: captureType === "screenshot" ? now : null,
-      events: [],
+      events: inheritedEvents,
     }
 
     if (lookbackMs > 0) {
@@ -107,6 +141,15 @@ export class DebuggerCollector {
 
   clearSession(): void {
     this.session = null
+    clearPersistedSession()
+  }
+
+  hasActiveSession(): boolean {
+    return this.session !== null
+  }
+
+  getSessionStartedAt(): number | null {
+    return this.session?.startedAt ?? null
   }
 
   finalizeSession(): ReviewSnapshot {

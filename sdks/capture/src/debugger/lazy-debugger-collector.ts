@@ -7,6 +7,8 @@ interface DebuggerCollectorInstance {
   finalizeSession: () => ReviewSnapshot
   markRecordingStarted: (recordingStartedAt: number) => void
   startSession: (captureType: CaptureType, lookbackMs?: number) => void
+  hasActiveSession: () => boolean
+  getSessionStartedAt: () => number | null
 }
 
 export class LazyDebuggerCollector {
@@ -33,6 +35,12 @@ export class LazyDebuggerCollector {
 
   clearSession(): void {
     this.collector?.clearSession()
+  }
+
+  async ensureSessionRestored(): Promise<number | null> {
+    const collector = await this.ensureCollector()
+    // ensureCollector() calls collector.install(), which restores the session from storage
+    return collector.getSessionStartedAt()
   }
 
   dispose(): void {
