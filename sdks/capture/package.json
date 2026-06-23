@@ -67,12 +67,10 @@
     "react": ">=18",
     "react-dom": ">=18"
   },
-  "dependencies": {
-    "@crikket/capture-core": "workspace:*",
-    "@crikket/shared": "workspace:*"
-  },
   "devDependencies": {
     "@tailwindcss/postcss": "catalog:",
+    "@crikket/capture-core": "workspace:*",
+    "@crikket/shared": "workspace:*",
     "@crikket/config": "workspace:*",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
