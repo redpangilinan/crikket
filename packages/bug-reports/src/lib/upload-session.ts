@@ -6,6 +6,7 @@ import {
 import {
   BUG_REPORT_DEBUGGER_INGESTION_STATUS_OPTIONS,
   BUG_REPORT_SUBMISSION_STATUS_OPTIONS,
+  type BugReportSubmissionStatus,
 } from "@crikket/shared/constants/bug-report"
 import {
   PRIORITY_OPTIONS,
@@ -249,6 +250,7 @@ export async function finalizeBugReportUpload(input: {
   debugger: PersistBugReportDebuggerDataResult
   id: string
   shareUrl: string
+  submissionStatus: BugReportSubmissionStatus
   warnings: string[]
 }> {
   const uploadSession = await db.query.bugReportUploadSession.findFirst({
@@ -284,6 +286,7 @@ export async function finalizeBugReportUpload(input: {
         debugger: createEmptyDebuggerPersistence(),
         id: existingReport.id,
         shareUrl: `/s/${existingReport.id}`,
+        submissionStatus: existingReport.submissionStatus,
         warnings: [],
       }
     }
@@ -390,15 +393,12 @@ export async function finalizeBugReportUpload(input: {
     })
     .where(eq(bugReport.id, uploadSession.id))
 
-  if (submissionStatus !== BUG_REPORT_SUBMISSION_STATUS_OPTIONS.ready) {
-    throw new ORPCError("INTERNAL_SERVER_ERROR", {
-      message: "Failed to process debugger data for this report.",
-    })
-  }
-
+  // Debugger ingestion is optional; the report is already persisted, so surface
+  // the failed status instead of 500ing the whole submission.
   return {
     id: uploadSession.id,
     shareUrl: `/s/${uploadSession.id}`,
+    submissionStatus,
     warnings,
     debugger: debuggerPersistence,
   }

@@ -85,6 +85,7 @@ export async function handleCaptureFinalize(input: {
         id: result.id,
         reportId: result.id,
         shareUrl: new URL(result.shareUrl, input.shareOrigin).toString(),
+        submissionStatus: result.submissionStatus,
         warnings: result.warnings,
       },
       {

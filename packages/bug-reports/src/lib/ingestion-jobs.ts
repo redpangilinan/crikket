@@ -362,10 +362,14 @@ async function ingestDebuggerPayload(input: {
 }): Promise<PersistBugReportDebuggerDataResult> {
   const storage = getStorageProvider()
   const storedPayload = await storage.read(input.debuggerKey)
-  const payloadBuffer =
-    input.debuggerContentEncoding === "gzip"
-      ? gunzipSync(storedPayload)
-      : storedPayload
+  // Some S3 backends decompress Content-Encoding: gzip on read, so check the
+  // actual magic bytes rather than the recorded encoding before gunzipping.
+  const isGzip =
+    input.debuggerContentEncoding === "gzip" &&
+    storedPayload.length >= 2 &&
+    storedPayload[0] === 0x1f &&
+    storedPayload[1] === 0x8b
+  const payloadBuffer = isGzip ? gunzipSync(storedPayload) : storedPayload
   const rawPayload = JSON.parse(payloadBuffer.toString("utf8")) as {
     actions?: unknown[]
     logs?: unknown[]
