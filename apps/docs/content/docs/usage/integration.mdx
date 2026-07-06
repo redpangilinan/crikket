@@ -1,6 +1,6 @@
 ---
 title: Integration
-description: Integrate the Capture SDK with init(), Next.js, or React.
+description: Integrate the Capture SDK with init(), Next.js, React, or Angular.
 ---
 
 This page covers the recommended ways to initialize the Capture SDK with a public key.
@@ -108,6 +108,51 @@ export function CaptureProvider(): React.JSX.Element | null {
 ```
 
 `CapturePlugin` accepts the same options as `init()`, except it uses `publicKey` instead of `key`.
+
+## Angular Integration
+
+Use `@crikket-io/capture-angular` for an idiomatic Angular setup. It lazy-loads the SDK (SSR-safe) and mounts the widget on app startup.
+
+```bash
+npm install @crikket-io/capture-angular @crikket-io/capture react react-dom
+```
+
+For a standalone app, add `provideCrikket()` at bootstrap:
+
+```ts
+import { bootstrapApplication } from "@angular/platform-browser"
+import { provideCrikket } from "@crikket-io/capture-angular"
+import { AppComponent } from "./app/app.component"
+
+bootstrapApplication(AppComponent, {
+  providers: [
+    provideCrikket({
+      key: "crk_your_public_key",
+      host: "https://api.crikket.io",
+      enabled: true,
+    }),
+  ],
+})
+```
+
+For an `NgModule` app, use `CrikketModule.forRoot()`:
+
+```ts
+import { NgModule } from "@angular/core"
+import { CrikketModule } from "@crikket-io/capture-angular"
+
+@NgModule({
+  imports: [
+    CrikketModule.forRoot({
+      key: "crk_your_public_key",
+      host: "https://api.crikket.io",
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+Inject `CrikketService` anywhere to control the widget programmatically (`open()`, `close()`, `startRecording()`, `takeScreenshot()`, ...). Set `enabled: false` to skip loading the SDK entirely — for example, to keep it out of production builds.
 
 ## Public Key Guidance
 

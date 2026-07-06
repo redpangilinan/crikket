@@ -74,6 +74,18 @@
           }
         }
       }
+    },
+    {
+      // The Angular SDK uses the standard `Module.forRoot()` provider pattern,
+      // which relies on a class with only static members.
+      "includes": ["sdks/capture-angular/**"],
+      "linter": {
+        "rules": {
+          "complexity": {
+            "noStaticOnlyClass": "off"
+          }
+        }
+      }
     }
   ]
 }
