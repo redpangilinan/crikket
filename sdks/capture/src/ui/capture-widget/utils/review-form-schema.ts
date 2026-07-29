@@ -3,8 +3,7 @@ import {
   type BugReportVisibility,
 } from "@crikket/shared/constants/bug-report"
 import {
-  PRIORITY_OPTIONS,
-  type Priority,
+  PRIORITY_OPTIONS
 } from "@crikket/shared/constants/priorities"
 import type { CaptureSubmissionDraft } from "../../../types"
 
@@ -64,4 +63,4 @@ export function trimReviewDraftForSubmission(
   }
 }
 
-export type CapturePriority = Priority
+export type CapturePriority = "none" | "low" | "medium" | "high" | "critical"
