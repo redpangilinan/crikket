@@ -1,3 +1,4 @@
+import { LazyDebuggerCollector } from "../debugger/lazy-debugger-collector"
 import type {
   CaptureInitOptions,
   CaptureRuntimeConfig,
@@ -25,6 +26,7 @@ export class LazyCaptureSdkRuntime implements CaptureRuntimeController {
   private mountedLauncher: MountedCaptureLauncher | null = null
   private eagerRuntime: CaptureSdkRuntime | null = null
   private eagerRuntimePromise: Promise<CaptureSdkRuntime> | null = null
+  private debuggerCollector: LazyDebuggerCollector | null = null
   private lifecycleVersion = 0
 
   init(options: CaptureInitOptions): CaptureRuntimeController {
@@ -44,6 +46,19 @@ export class LazyCaptureSdkRuntime implements CaptureRuntimeController {
       submitPath: runtimeConfig.submitPath,
       zIndex: runtimeConfig.zIndex,
       submitTransport: this.submitTransport,
+    }
+
+    // Start capturing network/console at init so requests made before the user
+    // opens the widget are recorded. The buffered collector is handed to the
+    // eager runtime so nothing is lost across the lazy->eager handoff.
+    if (options.collectDebuggerEagerly ?? true) {
+      this.debuggerCollector = new LazyDebuggerCollector()
+      this.debuggerCollector.warmUp().catch((error) => {
+        console.error(
+          "[crikket-capture] Failed to start debugger collector",
+          error
+        )
+      })
     }
 
     if (options.autoMount ?? true) {
@@ -111,6 +126,8 @@ export class LazyCaptureSdkRuntime implements CaptureRuntimeController {
     this.eagerRuntimePromise = null
     this.eagerRuntime?.destroy()
     this.eagerRuntime = null
+    this.debuggerCollector?.dispose()
+    this.debuggerCollector = null
     this.runtimeConfig = null
     this.initOptions = null
     this.submitTransport = undefined
@@ -178,7 +195,11 @@ export class LazyCaptureSdkRuntime implements CaptureRuntimeController {
           throw new Error("Capture SDK runtime load was cancelled.")
         }
 
-        const runtime = new CaptureSdkRuntime()
+        const runtime = new CaptureSdkRuntime(
+          this.debuggerCollector
+            ? { debuggerCollector: this.debuggerCollector }
+            : undefined
+        )
         runtime.init({
           ...initOptions,
           autoMount: true,

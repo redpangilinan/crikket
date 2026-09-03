@@ -1,3 +1,4 @@
+import { MAX_RECENT_EVENT_AGE_MS, SCREENSHOT_LOOKBACK_MS } from "../constants"
 import { LazyDebuggerCollector } from "../debugger/lazy-debugger-collector"
 import {
   captureScreenshot,
@@ -27,10 +28,22 @@ export class CaptureSdkRuntime implements CaptureRuntimeController {
   private submitTransport: CaptureSubmitTransport | undefined
   private mountedTarget: HTMLElement | null = null
   private mountedUi: MountedCaptureUi | null = null
-  private readonly debuggerCollector = new LazyDebuggerCollector()
+  private readonly debuggerCollector: LazyDebuggerCollector
+  private readonly ownsDebuggerCollector: boolean
+  private collectDebuggerEagerly = true
   private activeRecording: RecordingController | null = null
   private currentMedia: CapturedMedia | null = null
   private currentReview: ReviewSnapshot | null = null
+
+  constructor(options?: { debuggerCollector?: LazyDebuggerCollector }) {
+    if (options?.debuggerCollector) {
+      this.debuggerCollector = options.debuggerCollector
+      this.ownsDebuggerCollector = false
+    } else {
+      this.debuggerCollector = new LazyDebuggerCollector()
+      this.ownsDebuggerCollector = true
+    }
+  }
 
   init(options: CaptureInitOptions): CaptureRuntimeController {
     const config: CaptureRuntimeConfig = {
@@ -42,6 +55,18 @@ export class CaptureSdkRuntime implements CaptureRuntimeController {
 
     this.runtimeConfig = config
     this.submitTransport = options.submitTransport
+    this.collectDebuggerEagerly = options.collectDebuggerEagerly ?? true
+
+    // Start buffering network/console before the first capture. When the
+    // collector is injected (by the lazy runtime) it has already been warmed.
+    if (this.collectDebuggerEagerly && this.ownsDebuggerCollector) {
+      this.debuggerCollector.warmUp().catch((error) => {
+        console.error(
+          "[crikket-capture] Failed to start debugger collector",
+          error
+        )
+      })
+    }
 
     if (options.autoMount ?? true) {
       this.mount(options.mountTarget)
@@ -101,7 +126,9 @@ export class CaptureSdkRuntime implements CaptureRuntimeController {
     this.setUiHidden(false)
     this.mountedUi?.unmount()
     this.mountedUi = null
-    this.debuggerCollector.dispose()
+    if (this.ownsDebuggerCollector) {
+      this.debuggerCollector.dispose()
+    }
     this.mountedTarget = null
   }
 
@@ -183,7 +210,9 @@ export class CaptureSdkRuntime implements CaptureRuntimeController {
   async takeScreenshot(): Promise<Blob | null> {
     this.getRuntimeConfig()
     this.ensureBrowserContext()
-    await this.debuggerCollector.startScreenshotSession()
+    await this.debuggerCollector.startScreenshotSession(
+      this.getScreenshotLookbackMs()
+    )
 
     let blob: Blob
     try {
@@ -320,6 +349,15 @@ export class CaptureSdkRuntime implements CaptureRuntimeController {
     }
 
     this.mountedUi?.store.setTitleIfEmpty(captureTitle)
+  }
+
+  // With eager collection the recent-event buffer has been filling since init,
+  // so replay the full retained window; otherwise fall back to the short
+  // post-install lookback.
+  private getScreenshotLookbackMs(): number {
+    return this.collectDebuggerEagerly
+      ? MAX_RECENT_EVENT_AGE_MS
+      : SCREENSHOT_LOOKBACK_MS
   }
 
   private getRuntimeConfig(): CaptureRuntimeConfig {

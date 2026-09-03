@@ -80,6 +80,9 @@ Available options:
 - `mountTarget`: custom element to mount into; defaults to `document.body`
 - `submitPath`: custom bug report base path; defaults to `/api/embed/bug-reports`
 - `zIndex`: custom widget stacking order
+- `collectDebuggerEagerly`: install the network/console recorder at `init()`
+  instead of on first capture, so requests made before the widget is opened are
+  included in reports. Defaults to `true`.
 
 `submitPath` is used as the base path for the capture control-plane flow. By
 default the SDK derives these routes from `/api/embed/bug-reports`:

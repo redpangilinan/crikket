@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import { SCREENSHOT_LOOKBACK_MS } from "../src/constants"
+import { MAX_RECENT_EVENT_AGE_MS } from "../src/constants"
 import {
   browserTarget,
   createSubmitTransport,
@@ -44,7 +44,7 @@ describe("capture SDK screenshot flow", () => {
     expect(sdkTestState.startSessionCalls).toEqual([
       {
         captureType: "screenshot",
-        lookbackMs: SCREENSHOT_LOOKBACK_MS,
+        lookbackMs: MAX_RECENT_EVENT_AGE_MS,
       },
     ])
     expect(sdkTestState.uiShowReviewInputs).toHaveLength(1)

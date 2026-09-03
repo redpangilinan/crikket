@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
+import { MAX_RECENT_EVENT_AGE_MS } from "../src/constants"
 import {
   getCaptureSdk,
   sdkTestState,
@@ -28,7 +29,7 @@ describe("capture SDK capture failure regression", () => {
     expect(sdkTestState.startSessionCalls).toEqual([
       {
         captureType: "screenshot",
-        lookbackMs: 10_000,
+        lookbackMs: MAX_RECENT_EVENT_AGE_MS,
       },
     ])
     expect(sdkTestState.uiHidden).toEqual([true, false])

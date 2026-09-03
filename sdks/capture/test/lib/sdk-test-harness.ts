@@ -65,6 +65,7 @@ export const sdkTestState = {
   uiShowSuccessUrls: [] as Array<string | undefined>,
   titlePrefills: [] as string[],
   uiUnmounts: 0,
+  installCalls: 0,
   startSessionCalls: [] as StartSessionCall[],
   markRecordingStartedCalls: [] as number[],
   finalizeSessionCalls: 0,
@@ -185,7 +186,7 @@ mock.module(CAPTURE_MEDIA_PATH, () => ({
 mock.module(DEBUGGER_COLLECTOR_PATH, () => ({
   DebuggerCollector: class DebuggerCollector {
     install(): void {
-      // Install work is irrelevant in the flow regression tests.
+      sdkTestState.installCalls += 1
     }
 
     startSession(
@@ -267,6 +268,7 @@ export function resetSdkTestState(): void {
   sdkTestState.uiShowSuccessUrls = []
   sdkTestState.titlePrefills = []
   sdkTestState.uiUnmounts = 0
+  sdkTestState.installCalls = 0
   sdkTestState.startSessionCalls = []
   sdkTestState.markRecordingStartedCalls = []
   sdkTestState.finalizeSessionCalls = 0

@@ -13,9 +13,17 @@ export class LazyDebuggerCollector {
   private collector: DebuggerCollectorInstance | null = null
   private collectorPromise: Promise<DebuggerCollectorInstance> | null = null
 
-  async startScreenshotSession(): Promise<void> {
+  // Installs the page runtime (fetch/XHR/console interceptors) without starting
+  // a capture session, so events are buffered before the first capture.
+  async warmUp(): Promise<void> {
+    await this.ensureCollector()
+  }
+
+  async startScreenshotSession(
+    lookbackMs = SCREENSHOT_LOOKBACK_MS
+  ): Promise<void> {
     const collector = await this.ensureCollector()
-    collector.startSession("screenshot", SCREENSHOT_LOOKBACK_MS)
+    collector.startSession("screenshot", lookbackMs)
   }
 
   async startRecordingSession(): Promise<void> {

@@ -83,6 +83,12 @@ export interface CaptureInitOptions {
   submitPath?: string
   zIndex?: number
   submitTransport?: CaptureSubmitTransport
+  /**
+   * Install the network/console debugger at init() instead of on first
+   * capture, so requests made before the user opens the widget are captured.
+   * Defaults to true.
+   */
+  collectDebuggerEagerly?: boolean
 }
 
 export interface CaptureRuntimeConfig {
