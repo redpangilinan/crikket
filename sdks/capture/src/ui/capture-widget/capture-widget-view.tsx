@@ -23,6 +23,7 @@ export function CaptureWidgetView(props: {
         busy={props.isBusy}
         onStartVideo={props.handlers.onStartVideo}
         onTakeScreenshot={props.handlers.onTakeScreenshot}
+        onUploadScreenshot={props.handlers.onUploadScreenshot}
       />
     )
   }

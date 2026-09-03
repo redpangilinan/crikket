@@ -135,6 +135,11 @@ export class LazyCaptureSdkRuntime implements CaptureRuntimeController {
     return runtime.takeScreenshot()
   }
 
+  async attachScreenshotFile(file: Blob): Promise<Blob | null> {
+    const runtime = await this.loadEagerRuntime(false)
+    return runtime.attachScreenshotFile(file)
+  }
+
   async submit(draft: CaptureSubmissionDraft): Promise<CaptureSubmitResult> {
     const runtime = await this.loadEagerRuntime(false)
     return runtime.submit(draft)

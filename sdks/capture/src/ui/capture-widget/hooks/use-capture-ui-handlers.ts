@@ -87,6 +87,15 @@ export function useCaptureUiHandlers(
           }
         })
       },
+      onUploadScreenshot: (file: File) => {
+        startBusyTask(async () => {
+          try {
+            await input.callbacks.onUploadScreenshot(file)
+          } catch (error) {
+            showCaptureError(error)
+          }
+        })
+      },
       onStopRecording: () => {
         startBusyTask(async () => {
           try {

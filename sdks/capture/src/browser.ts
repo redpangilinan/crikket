@@ -1,4 +1,5 @@
 import {
+  attachScreenshotFile,
   close,
   defaultSubmitTransport,
   destroy,
@@ -17,6 +18,7 @@ import {
 import type { CaptureGlobalApi } from "./types"
 
 const capture = {
+  attachScreenshotFile,
   close,
   defaultSubmitTransport,
   destroy,

@@ -80,6 +80,12 @@ export class CaptureSdkRuntime implements CaptureRuntimeController {
           throw new Error("Screenshot capture failed.")
         }
       },
+      onUploadScreenshot: async (file) => {
+        const blob = await this.attachScreenshotFile(file)
+        if (!blob) {
+          throw new Error("Screenshot upload failed.")
+        }
+      },
       onStopRecording: async () => {
         const blob = await this.stopRecording()
         if (!blob) {
@@ -201,6 +207,35 @@ export class CaptureSdkRuntime implements CaptureRuntimeController {
     })
 
     return blob
+  }
+
+  // Attaches an image the user already has (e.g. an OS screenshot) as a
+  // screenshot capture. This is the capture path for mobile browsers, where
+  // getDisplayMedia is unavailable.
+  async attachScreenshotFile(file: Blob): Promise<Blob | null> {
+    this.getRuntimeConfig()
+    this.ensureBrowserContext()
+
+    if (!(file instanceof Blob) || file.size === 0) {
+      throw new Error("Please choose an image file to attach.")
+    }
+
+    if (file.type && !file.type.startsWith("image/")) {
+      throw new Error("Only image files can be attached as a screenshot.")
+    }
+
+    // No display capture and nothing is being screen-grabbed, so the widget UI
+    // does not need to be hidden. Still open a debugger session so the report
+    // carries the console/network context collected on this page.
+    await this.debuggerCollector.startScreenshotSession()
+
+    await this.finalizeCapturedMedia({
+      blob: file,
+      captureType: "screenshot",
+      durationMs: null,
+    })
+
+    return file
   }
 
   async submit(
