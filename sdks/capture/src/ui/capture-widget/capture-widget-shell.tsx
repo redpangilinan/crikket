@@ -1,3 +1,4 @@
+import type { CaptureLauncherPlacement } from "../../types"
 import type { CaptureUiHandlers, CaptureUiState } from "../types"
 import { CaptureWidgetView } from "./capture-widget-view"
 import { CaptureLauncherButton } from "./components/capture-launcher-button"
@@ -18,17 +19,22 @@ export function CaptureWidgetShell(props: {
   handlers: CaptureUiHandlers
   isSubmitPending: boolean
   recordingTime: string
+  launcherPlacement?: CaptureLauncherPlacement
 }): React.JSX.Element {
   const isBusy = props.state.busy || props.isSubmitPending
   const isReviewView = props.state.view === "review"
+  const isRecordingView = props.state.view === "recording"
 
   return (
     <div className="crikket-capture-root">
-      <CaptureLauncherButton
-        disabled={isBusy}
-        onClick={props.handlers.onLauncherClick}
-        zIndex={props.zIndex}
-      />
+      {isRecordingView ? null : (
+        <CaptureLauncherButton
+          disabled={isBusy}
+          onClick={props.handlers.onLauncherClick}
+          placement={props.launcherPlacement}
+          zIndex={props.zIndex}
+        />
+      )}
 
       {props.state.overlayOpen ? (
         <div

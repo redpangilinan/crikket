@@ -73,6 +73,10 @@ export function isInitialized(): boolean {
   return runtime.isInitialized()
 }
 
+export function isOpen(): boolean {
+  return runtime.isOpen()
+}
+
 export function getConfig() {
   return runtime.getConfig()
 }

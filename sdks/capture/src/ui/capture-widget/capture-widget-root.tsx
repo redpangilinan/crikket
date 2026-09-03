@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react"
+import type { CaptureLauncherPlacement } from "../../types"
 import type { CaptureUiCallbacks, CaptureUiStore } from "../types"
 import { CaptureWidgetShell } from "./capture-widget-shell"
 import { useCaptureUiHandlers } from "./hooks/use-capture-ui-handlers"
@@ -8,6 +9,7 @@ export function CaptureWidgetRoot(props: {
   callbacks: CaptureUiCallbacks
   store: CaptureUiStore
   zIndex: number
+  launcherPlacement?: CaptureLauncherPlacement
 }): React.JSX.Element {
   const state = useSyncExternalStore(
     props.store.subscribe,
@@ -28,6 +30,7 @@ export function CaptureWidgetRoot(props: {
     <CaptureWidgetShell
       handlers={handlers}
       isSubmitPending={isSubmitPending}
+      launcherPlacement={props.launcherPlacement}
       recordingTime={recordingTime}
       state={state}
       zIndex={props.zIndex}

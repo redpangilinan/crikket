@@ -75,6 +75,20 @@ export interface BugReportDebuggerPayload {
   }>
 }
 
+export type CaptureLauncherPosition =
+  | "bottom-right"
+  | "bottom-left"
+  | "top-right"
+  | "top-left"
+
+export interface CaptureLauncherPlacement {
+  position?: CaptureLauncherPosition
+  offset?: {
+    x?: number
+    y?: number
+  }
+}
+
 export interface CaptureInitOptions {
   key: string
   host?: string
@@ -83,6 +97,15 @@ export interface CaptureInitOptions {
   submitPath?: string
   zIndex?: number
   submitTransport?: CaptureSubmitTransport
+  /**
+   * Where the launcher button is anchored. Lets a host position the launcher
+   * without reaching into the widget's shadow tree.
+   */
+  launcher?: CaptureLauncherPlacement
+  /** Called when the capture dialog opens. */
+  onOpen?: () => void
+  /** Called when the capture dialog closes. */
+  onClose?: () => void
 }
 
 export interface CaptureRuntimeConfig {
@@ -90,6 +113,7 @@ export interface CaptureRuntimeConfig {
   host: string
   submitPath: string
   zIndex: number
+  launcher: CaptureLauncherPlacement
 }
 
 export interface CaptureDebuggerSummary {
@@ -189,6 +213,7 @@ export interface CaptureRuntimeController {
   submit: (draft: CaptureSubmissionDraft) => Promise<CaptureSubmitResult>
   reset: () => void
   isInitialized: () => boolean
+  isOpen: () => boolean
   getConfig: () => CaptureRuntimeConfig | null
 }
 

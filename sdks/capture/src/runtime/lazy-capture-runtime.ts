@@ -10,6 +10,7 @@ import { mountCaptureLauncher } from "../ui/mount-capture-launcher"
 import {
   normalizeHost,
   normalizeKey,
+  normalizeLauncherPlacement,
   normalizeSubmitPath,
   normalizeZIndex,
 } from "../utils"
@@ -33,6 +34,7 @@ export class LazyCaptureSdkRuntime implements CaptureRuntimeController {
       host: normalizeHost(options.host),
       submitPath: normalizeSubmitPath(options.submitPath),
       zIndex: normalizeZIndex(options.zIndex),
+      launcher: normalizeLauncherPlacement(options.launcher),
     }
 
     this.runtimeConfig = runtimeConfig
@@ -43,6 +45,7 @@ export class LazyCaptureSdkRuntime implements CaptureRuntimeController {
       key: runtimeConfig.key,
       submitPath: runtimeConfig.submitPath,
       zIndex: runtimeConfig.zIndex,
+      launcher: runtimeConfig.launcher,
       submitTransport: this.submitTransport,
     }
 
@@ -55,6 +58,10 @@ export class LazyCaptureSdkRuntime implements CaptureRuntimeController {
 
   isInitialized(): boolean {
     return this.runtimeConfig !== null
+  }
+
+  isOpen(): boolean {
+    return this.eagerRuntime?.isOpen() ?? false
   }
 
   getConfig(): CaptureRuntimeConfig | null {
@@ -84,6 +91,7 @@ export class LazyCaptureSdkRuntime implements CaptureRuntimeController {
       onPrefetch: () => {
         this.prefetchRuntime().catch(() => undefined)
       },
+      placement: runtimeConfig.launcher,
       zIndex: runtimeConfig.zIndex,
     })
   }

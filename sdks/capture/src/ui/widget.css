@@ -90,8 +90,10 @@
 
   .capture-launcher {
     position: fixed;
-    right: 24px;
-    bottom: 24px;
+    top: var(--capture-launcher-top, auto);
+    right: var(--capture-launcher-right, 24px);
+    bottom: var(--capture-launcher-bottom, 24px);
+    left: var(--capture-launcher-left, auto);
     z-index: var(--capture-z-index);
     display: inline-flex;
     align-items: center;

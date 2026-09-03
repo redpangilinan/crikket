@@ -80,6 +80,13 @@ Available options:
 - `mountTarget`: custom element to mount into; defaults to `document.body`
 - `submitPath`: custom bug report base path; defaults to `/api/embed/bug-reports`
 - `zIndex`: custom widget stacking order
+- `launcher`: where the launcher is anchored, e.g.
+  `{ position: "bottom-left", offset: { x: 16, y: 16 } }`. `position` is one of
+  `bottom-right` (default), `bottom-left`, `top-right`, `top-left`. This lets you
+  move the launcher without reaching into the widget's shadow tree.
+- `onOpen` / `onClose`: callbacks fired when the capture dialog opens/closes.
+  Useful for pausing app-level keyboard shortcuts while someone is typing a
+  report. `isOpen()` is also exported.
 
 `submitPath` is used as the base path for the capture control-plane flow. By
 default the SDK derives these routes from `/api/embed/bug-reports`:

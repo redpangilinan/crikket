@@ -1,4 +1,5 @@
 import { createRoot } from "react-dom/client"
+import type { CaptureLauncherPlacement } from "../types"
 import { CaptureWidgetRoot } from "./capture-widget/capture-widget-root"
 import { createCaptureUiStore } from "./store/capture-ui-store"
 import type { CaptureUiCallbacks, MountedCaptureUi } from "./types"
@@ -8,7 +9,8 @@ const CAPTURE_WIDGET_CSS_PLACEHOLDER = "__CRIKKET_CAPTURE_WIDGET_CSS__"
 export function mountCaptureUi(
   target: HTMLElement,
   zIndex: number,
-  callbacks: CaptureUiCallbacks
+  callbacks: CaptureUiCallbacks,
+  launcherPlacement?: CaptureLauncherPlacement
 ): MountedCaptureUi {
   const hostElement = document.createElement("div")
   const shadowRoot = hostElement.attachShadow({
@@ -24,7 +26,12 @@ export function mountCaptureUi(
   const reactRoot = createRoot(container)
   const store = createCaptureUiStore()
   reactRoot.render(
-    <CaptureWidgetRoot callbacks={callbacks} store={store} zIndex={zIndex} />
+    <CaptureWidgetRoot
+      callbacks={callbacks}
+      launcherPlacement={launcherPlacement}
+      store={store}
+      zIndex={zIndex}
+    />
   )
 
   return {

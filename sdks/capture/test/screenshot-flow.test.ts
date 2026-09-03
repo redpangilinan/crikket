@@ -26,6 +26,10 @@ describe("capture SDK screenshot flow", () => {
     expect(capture.getConfig()).toEqual({
       host: "https://api.crikket.io",
       key: "crk_screenshot_flow",
+      launcher: {
+        position: "bottom-right",
+        offset: { x: 24, y: 24 },
+      },
       submitPath: "/api/embed/bug-reports",
       zIndex: 2_147_483_640,
     })

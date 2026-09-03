@@ -29,7 +29,9 @@ describe("capture SDK recording flow", () => {
       },
     ])
     expect(sdkTestState.markRecordingStartedCalls).toEqual([1_700_000_000_000])
-    expect(sdkTestState.uiHidden).toEqual([true])
+    // UI is hidden while the picker opens, then revealed once recording is live
+    // so the recording dock's Stop control is reachable.
+    expect(sdkTestState.uiHidden).toEqual([true, false])
 
     const recordingBlob = await capture.stopRecording()
     expect(recordingBlob).toBe(sdkTestState.recordingBlob)
@@ -43,7 +45,7 @@ describe("capture SDK recording flow", () => {
         durationMs: sdkTestState.recordingDurationMs,
       },
     })
-    expect(sdkTestState.uiHidden).toEqual([true, false])
+    expect(sdkTestState.uiHidden).toEqual([true, false, false])
 
     await waitFor(() => sdkTestState.finalizeSessionCalls === 1)
 

@@ -1,10 +1,23 @@
 import {
   DEFAULT_ENDPOINT,
+  DEFAULT_LAUNCHER_OFFSET_PX,
+  DEFAULT_LAUNCHER_POSITION,
   DEFAULT_SUBMIT_PATH,
   DEFAULT_Z_INDEX,
   TRAILING_SLASHES_REGEX,
 } from "./constants"
-import type { BridgePayload } from "./types"
+import type {
+  BridgePayload,
+  CaptureLauncherPlacement,
+  CaptureLauncherPosition,
+} from "./types"
+
+const LAUNCHER_POSITIONS: readonly CaptureLauncherPosition[] = [
+  "bottom-right",
+  "bottom-left",
+  "top-right",
+  "top-left",
+]
 
 export function normalizeKey(value: string): string {
   const normalized = value.trim()
@@ -39,6 +52,52 @@ export function normalizeZIndex(value?: number): number {
   }
 
   return Math.max(1, Math.floor(value))
+}
+
+export function normalizeLauncherPlacement(
+  value?: CaptureLauncherPlacement
+): CaptureLauncherPlacement {
+  const position =
+    value?.position && LAUNCHER_POSITIONS.includes(value.position)
+      ? value.position
+      : DEFAULT_LAUNCHER_POSITION
+
+  return {
+    position,
+    offset: {
+      x: normalizeOffset(value?.offset?.x),
+      y: normalizeOffset(value?.offset?.y),
+    },
+  }
+}
+
+function normalizeOffset(value?: number): number {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return DEFAULT_LAUNCHER_OFFSET_PX
+  }
+
+  return Math.max(0, Math.floor(value))
+}
+
+// Produces the CSS custom properties that position the launcher, so the launcher
+// stylesheet stays the single source of truth and consumers never have to inject
+// rules into the shadow tree.
+export function resolveLauncherPlacementVars(
+  placement?: CaptureLauncherPlacement
+): Record<string, string> {
+  const normalized = normalizeLauncherPlacement(placement)
+  const position = normalized.position ?? DEFAULT_LAUNCHER_POSITION
+  const x = `${normalized.offset?.x ?? DEFAULT_LAUNCHER_OFFSET_PX}px`
+  const y = `${normalized.offset?.y ?? DEFAULT_LAUNCHER_OFFSET_PX}px`
+  const isTop = position.startsWith("top")
+  const isRight = position.endsWith("right")
+
+  return {
+    "--capture-launcher-top": isTop ? y : "auto",
+    "--capture-launcher-bottom": isTop ? "auto" : y,
+    "--capture-launcher-left": isRight ? "auto" : x,
+    "--capture-launcher-right": isRight ? x : "auto",
+  }
 }
 
 export function isBridgePayload(value: unknown): value is BridgePayload {

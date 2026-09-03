@@ -1,3 +1,6 @@
+import type { CaptureLauncherPlacement } from "../types"
+import { resolveLauncherPlacementVars } from "../utils"
+
 interface MountedCaptureLauncher {
   setLoading: (loading: boolean) => void
   unmount: () => void
@@ -7,6 +10,7 @@ interface MountCaptureLauncherOptions {
   zIndex: number
   onOpen: () => void
   onPrefetch: () => void
+  placement?: CaptureLauncherPlacement
 }
 
 const CAPTURE_LAUNCHER_CSS_PLACEHOLDER = "__CRIKKET_CAPTURE_LAUNCHER_CSS__"
@@ -25,6 +29,11 @@ export function mountCaptureLauncher(
   const button = document.createElement("button")
   button.className = "capture-launcher"
   button.style.setProperty("--capture-z-index", String(options.zIndex))
+  for (const [name, value] of Object.entries(
+    resolveLauncherPlacementVars(options.placement)
+  )) {
+    button.style.setProperty(name, value)
+  }
   button.type = "button"
   button.textContent = "Report Issue"
   button.setAttribute("aria-label", "Report an issue")
