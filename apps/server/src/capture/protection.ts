@@ -1,7 +1,7 @@
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto"
 import { env } from "@crikket/env/server"
 import { ORPCError } from "@orpc/server"
-import { getCaptureRedis } from "./security"
+import { reserveCaptureNonce } from "./security"
 
 const CAPTURE_SUBMIT_TOKEN_VERSION = 1
 const CAPTURE_SUBMIT_TOKEN_TTL_MS = 5 * 60 * 1000
@@ -398,19 +398,14 @@ async function consumeCaptureSubmitToken(input: {
   jti: string
   now: number
 }): Promise<void> {
-  const redis = getCaptureRedis()
-  if (!redis) {
-    return
-  }
-
   const ttlMs = Math.max(1, input.expiresAt - input.now)
   const replayKey = `${CAPTURE_SUBMIT_TOKEN_REPLAY_PREFIX}:${input.jti}`
-  const result = await redis.set(replayKey, "1", {
-    nx: true,
-    px: ttlMs,
+  const reserved = await reserveCaptureNonce({
+    key: replayKey,
+    ttlMs,
   })
 
-  if (result !== "OK") {
+  if (!reserved) {
     throw new ORPCError("UNAUTHORIZED", {
       data: {
         reasonCode: "replayed_submit_token",

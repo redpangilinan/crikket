@@ -5,6 +5,11 @@ import { env } from "@crikket/env/server"
 import { ORPCError } from "@orpc/server"
 import { Ratelimit } from "@upstash/ratelimit"
 import { Redis } from "@upstash/redis"
+import {
+  InMemoryFixedWindowRateLimiter,
+  InMemoryNonceStore,
+  type ScopedRateLimiter,
+} from "./in-memory-rate-limit"
 
 const MAX_CAPTURE_REQUEST_BODY_BYTES = 110 * 1024 * 1024
 const MAX_CAPTURE_TOKEN_REQUEST_BODY_BYTES = 16 * 1024
@@ -55,9 +60,9 @@ type CaptureRateLimiters = {
 type CaptureRateLimitScope = keyof typeof CAPTURE_RATE_LIMIT_CONFIG
 
 type CaptureScopedRateLimiters = {
-  ip: Ratelimit
-  key: Ratelimit
-  origin: Ratelimit
+  ip: ScopedRateLimiter
+  key: ScopedRateLimiter
+  origin: ScopedRateLimiter
 }
 
 type RateLimitResult = {
@@ -69,6 +74,7 @@ type RateLimitResult = {
 
 let captureRateLimiters: CaptureRateLimiters | undefined
 let captureRedisClient: Redis | undefined
+let captureNonceStore: InMemoryNonceStore | undefined
 let lastRateLimitErrorLoggedAt = 0
 
 function getRateLimitWindow(windowSeconds: number): `${number} s` {
@@ -79,15 +85,16 @@ export function hasCaptureRedisConfig(): boolean {
   return Boolean(env.UPSTASH_REDIS_REST_URL && env.UPSTASH_REDIS_REST_TOKEN)
 }
 
-function getCaptureRateLimiters(): CaptureRateLimiters | null {
-  const redis = getCaptureRedis()
-  if (!redis) {
-    return null
-  }
-
+// Rate limiting is always on. When Redis (Upstash) is configured the limiters
+// are distributed and shared across instances; otherwise they fall back to an
+// in-process fixed-window limiter so a self-hosted single instance is still
+// protected.
+function getCaptureRateLimiters(): CaptureRateLimiters {
   if (captureRateLimiters) {
     return captureRateLimiters
   }
+
+  const redis = getCaptureRedis()
 
   captureRateLimiters = {
     submit: createScopedCaptureRateLimiters({
@@ -104,29 +111,77 @@ function getCaptureRateLimiters(): CaptureRateLimiters | null {
 }
 
 function createScopedCaptureRateLimiters(input: {
-  redis: Redis
+  redis: Redis | null
   scope: CaptureRateLimitScope
 }): CaptureScopedRateLimiters {
   const config = CAPTURE_RATE_LIMIT_CONFIG[input.scope]
+  const redis = input.redis
+
+  if (!redis) {
+    return {
+      ip: new InMemoryFixedWindowRateLimiter({
+        limit: config.ipMax,
+        windowSeconds: config.windowSeconds,
+      }),
+      key: new InMemoryFixedWindowRateLimiter({
+        limit: config.keyMax,
+        windowSeconds: config.windowSeconds,
+      }),
+      origin: new InMemoryFixedWindowRateLimiter({
+        limit: config.originMax,
+        windowSeconds: config.windowSeconds,
+      }),
+    }
+  }
+
   const window = getRateLimitWindow(config.windowSeconds)
 
   return {
     ip: new Ratelimit({
-      redis: input.redis,
+      redis,
       limiter: Ratelimit.fixedWindow(config.ipMax, window),
       prefix: `${config.prefix}:ip`,
     }),
     key: new Ratelimit({
-      redis: input.redis,
+      redis,
       limiter: Ratelimit.fixedWindow(config.keyMax, window),
       prefix: `${config.prefix}:key`,
     }),
     origin: new Ratelimit({
-      redis: input.redis,
+      redis,
       limiter: Ratelimit.fixedWindow(config.originMax, window),
       prefix: `${config.prefix}:origin`,
     }),
   }
+}
+
+function getCaptureNonceStore(): InMemoryNonceStore {
+  if (!captureNonceStore) {
+    captureNonceStore = new InMemoryNonceStore()
+  }
+
+  return captureNonceStore
+}
+
+// Reserves a single-use nonce (for submit/finalize token replay protection).
+// Returns true when newly reserved, false on replay. Uses Redis when
+// configured, otherwise an in-process store so replay protection also works on
+// a single self-hosted instance.
+export async function reserveCaptureNonce(input: {
+  key: string
+  ttlMs: number
+}): Promise<boolean> {
+  const redis = getCaptureRedis()
+  if (redis) {
+    const result = await redis.set(input.key, "1", {
+      nx: true,
+      px: input.ttlMs,
+    })
+
+    return result === "OK"
+  }
+
+  return getCaptureNonceStore().reserve(input.key, input.ttlMs)
 }
 
 export function getCaptureRedis(): Redis | null {
@@ -274,7 +329,7 @@ function logRateLimitError(error: unknown): void {
 }
 
 async function limitWithFailOpen(
-  limiter: Ratelimit,
+  limiter: ScopedRateLimiter,
   key: string
 ): Promise<RateLimitResult | null> {
   try {
@@ -396,13 +451,6 @@ async function evaluateCaptureRateLimit(input: {
   }
 
   const limiters = getCaptureRateLimiters()
-  if (!limiters) {
-    return {
-      allowed: true,
-      headers: {},
-    }
-  }
-
   const scopedLimiters = limiters[input.scope]
   const config = CAPTURE_RATE_LIMIT_CONFIG[input.scope]
   const results: RateLimitResult[] = []
