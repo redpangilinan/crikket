@@ -1,7 +1,6 @@
 import {
   DeleteObjectCommand,
   GetObjectCommand,
-  HeadObjectCommand,
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3"
@@ -148,16 +147,39 @@ export function createS3StorageProvider(
       }
     },
     async exists(filename: string): Promise<boolean> {
+      // A signed HeadObject cannot be used here: some proxies (e.g. Cloudflare
+      // on a first-touch cache MISS) rewrite the first HEAD for a URL into a
+      // GET, which changes the SigV4 canonical request and makes the object's
+      // own storage reject it with 403 SignatureDoesNotMatch even though it
+      // exists. A single-byte ranged GET is signed as the method that is
+      // actually sent, so it survives the rewrite.
       try {
-        await client.send(
-          new HeadObjectCommand({
+        const response = await client.send(
+          new GetObjectCommand({
             Bucket: options.bucket,
             Key: filename,
+            Range: "bytes=0-0",
           })
         )
+        await drainStorageBody(response.Body)
         return true
-      } catch {
-        return false
+      } catch (error) {
+        if (isStorageNotFoundError(error)) {
+          return false
+        }
+
+        // A zero-byte object exists but cannot satisfy a byte range.
+        if (isRangeNotSatisfiableError(error)) {
+          return true
+        }
+
+        // Anything else (403, 5xx, DNS, timeout) is not "upload incomplete" —
+        // surface it instead of masking a real failure as a missing object.
+        const message =
+          error instanceof Error ? error.message : "Unknown storage error"
+        throw new Error(
+          `Failed to verify object ${filename} in cloud storage (bucket: ${options.bucket}, endpoint: ${options.endpoint ?? "aws-default"}): ${message}`
+        )
       }
     },
     async read(filename: string): Promise<Buffer> {
@@ -480,6 +502,85 @@ async function normalizeUploadBody(data: Blob | Buffer): Promise<Buffer> {
 
   const arrayBuffer = await data.arrayBuffer()
   return Buffer.from(arrayBuffer)
+}
+
+function getErrorHttpStatus(error: unknown): number | undefined {
+  if (typeof error !== "object" || error === null) {
+    return undefined
+  }
+
+  const metadata = (error as { $metadata?: { httpStatusCode?: number } })
+    .$metadata
+  if (metadata && typeof metadata.httpStatusCode === "number") {
+    return metadata.httpStatusCode
+  }
+
+  return undefined
+}
+
+function getErrorName(error: unknown): string | undefined {
+  if (typeof error !== "object" || error === null) {
+    return undefined
+  }
+
+  const name = (error as { name?: unknown }).name
+  return typeof name === "string" ? name : undefined
+}
+
+export function isStorageNotFoundError(error: unknown): boolean {
+  if (getErrorHttpStatus(error) === 404) {
+    return true
+  }
+
+  const name = getErrorName(error)
+  return name === "NoSuchKey" || name === "NotFound"
+}
+
+export function isRangeNotSatisfiableError(error: unknown): boolean {
+  if (getErrorHttpStatus(error) === 416) {
+    return true
+  }
+
+  const name = getErrorName(error)
+  return name === "InvalidRange" || name === "RequestedRangeNotSatisfiable"
+}
+
+async function drainStorageBody(body: unknown): Promise<void> {
+  if (!body) {
+    return
+  }
+
+  try {
+    if (
+      typeof body === "object" &&
+      "transformToByteArray" in body &&
+      typeof (body as { transformToByteArray?: unknown })
+        .transformToByteArray === "function"
+    ) {
+      await (
+        body as { transformToByteArray: () => Promise<Uint8Array> }
+      ).transformToByteArray()
+      return
+    }
+
+    if (body instanceof ReadableStream) {
+      const reader = body.getReader()
+      while (true) {
+        const { done } = await reader.read()
+        if (done) {
+          break
+        }
+      }
+    }
+  } catch (error) {
+    // Draining the probe body is best-effort socket cleanup; a drain failure
+    // does not change whether the object exists, so report it without masking
+    // the existence result.
+    reportNonFatalError(
+      "Failed to drain storage existence-probe response body",
+      error
+    )
+  }
 }
 
 async function readBodyToBuffer(body: unknown): Promise<Buffer> {
