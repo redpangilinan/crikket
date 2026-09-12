@@ -30,42 +30,32 @@ function createDisplayStreamOptions(
   }
 }
 
-export async function requestDisplayStream(
-  audio: boolean
-): Promise<MediaStream> {
+// Display audio capture is a Chromium-only extension of getDisplayMedia, and
+// Chromium is also the only engine exposing the spec's
+// `suppressLocalAudioPlayback` constraint, so that is the feature detect.
+// Requesting audio where it is unimplemented is at best ignored and at worst
+// rejects the whole call.
+export function supportsDisplayAudioCapture(): boolean {
+  if (
+    typeof navigator === "undefined" ||
+    !navigator.mediaDevices?.getSupportedConstraints
+  ) {
+    return false
+  }
+
+  return (
+    "suppressLocalAudioPlayback" in
+    navigator.mediaDevices.getSupportedConstraints()
+  )
+}
+
+export function requestDisplayStream(audio: boolean): Promise<MediaStream> {
   if (!navigator.mediaDevices?.getDisplayMedia) {
     throw new Error("This browser does not support screen capture.")
   }
 
-  try {
-    return await navigator.mediaDevices.getDisplayMedia(
-      createDisplayStreamOptions(audio)
-    )
-  } catch (error) {
-    if (!audio) {
-      throw error
-    }
-
-    return navigator.mediaDevices.getDisplayMedia(
-      createDisplayStreamOptions(false)
-    )
-  }
-}
-
-export function assertBrowserTabSurface(stream: MediaStream): void {
-  const track = stream.getVideoTracks()[0]
-  const displaySurface = track?.getSettings().displaySurface
-
-  if (displaySurface === "browser") {
-    return
-  }
-
-  for (const currentTrack of stream.getTracks()) {
-    currentTrack.stop()
-  }
-
-  throw new Error(
-    "Please choose the current browser tab. Window and full-screen capture are not supported in the web SDK."
+  return navigator.mediaDevices.getDisplayMedia(
+    createDisplayStreamOptions(audio && supportsDisplayAudioCapture())
   )
 }
 

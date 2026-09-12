@@ -1,6 +1,5 @@
 import type { RecordingController } from "../types"
 import {
-  assertBrowserTabSurface,
   prepareCaptureVideo,
   releaseCaptureVideo,
   requestDisplayStream,
@@ -12,7 +11,6 @@ const RECORDING_VIDEO_BITS_PER_SECOND = 550_000
 
 export async function startDisplayRecording(): Promise<RecordingController> {
   const stream = await requestDisplayStream(true)
-  assertBrowserTabSurface(stream)
   const warmupVideo = document.createElement("video")
   await prepareCaptureVideo(warmupVideo, stream)
   releaseCaptureVideo(warmupVideo)

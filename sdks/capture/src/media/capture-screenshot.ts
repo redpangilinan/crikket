@@ -1,5 +1,4 @@
 import {
-  assertBrowserTabSurface,
   canvasToBlob,
   prepareCaptureVideo,
   releaseCaptureVideo,
@@ -8,7 +7,6 @@ import {
 
 export async function captureScreenshot(): Promise<Blob> {
   const stream = await requestDisplayStream(false)
-  assertBrowserTabSurface(stream)
   const video = document.createElement("video")
 
   try {

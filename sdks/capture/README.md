@@ -201,3 +201,11 @@ export function CaptureProvider(): React.JSX.Element | null {
   origins you want to permit.
 - The SDK must run in a browser environment.
 - Browser permission prompts for screen capture are expected platform behavior.
+- Whatever display surface the reporter picks in that prompt is what gets
+  captured. The SDK asks for the current tab (`preferCurrentTab` and a
+  `displaySurface` hint), but per the Screen Capture spec the browser still
+  offers a free choice, and Firefox and Safari offer no tab option at all — so
+  a report may contain a window or a whole screen. The chooser says so before
+  the prompt opens.
+- Display audio is captured only where the engine implements it (Chromium
+  today); elsewhere a recording is video-only.
