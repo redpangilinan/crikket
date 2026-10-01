@@ -7,6 +7,7 @@ import { Separator } from "@crikket/ui/components/ui/separator"
 import { Home } from "lucide-react"
 import Link from "next/link"
 import type { ReactNode } from "react"
+import { ExportDiagnosticsButton } from "./export-diagnostics-button"
 import type { SharedBugReport } from "./types"
 
 interface BugReportHeaderProps {
@@ -61,6 +62,7 @@ export function BugReportHeader({
           {new Date(data.createdAt).toLocaleString()}
         </span>
         <Separator className="hidden sm:block" orientation="vertical" />
+        <ExportDiagnosticsButton reportId={data.id} />
         {editAction}
         <Button
           nativeButton={false}

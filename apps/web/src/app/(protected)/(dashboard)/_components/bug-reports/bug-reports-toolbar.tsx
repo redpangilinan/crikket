@@ -34,6 +34,8 @@ import {
 } from "lucide-react"
 import type { ReactNode } from "react"
 
+import { useAssigneeMembers } from "@/hooks/use-assignee-members"
+
 import {
   type DashboardFilters,
   formatPriorityLabel,
@@ -53,6 +55,7 @@ interface BugReportsToolbarProps {
   stats?: BugReportStats
   onSearchChange: (value: string) => void
   onSortChange: (value: BugReportSort) => void
+  onAssigneeChange: (value: string) => void
   onToggleStatus: (value: BugReportStatus) => void
   onTogglePriority: (value: Priority) => void
   onToggleVisibility: (value: BugReportVisibility) => void
@@ -63,7 +66,8 @@ function countActiveFilters(filters: DashboardFilters): number {
   return (
     filters.statuses.length +
     filters.priorities.length +
-    filters.visibilities.length
+    filters.visibilities.length +
+    (filters.assignee !== "" ? 1 : 0)
   )
 }
 
@@ -74,12 +78,24 @@ export function BugReportsToolbar({
   stats,
   onSearchChange,
   onSortChange,
+  onAssigneeChange,
   onToggleStatus,
   onTogglePriority,
   onToggleVisibility,
   onClearFilters,
 }: BugReportsToolbarProps) {
   const activeFilters = countActiveFilters(filters)
+  const { membersQuery } = useAssigneeMembers()
+  const members = membersQuery.data ?? []
+  const selectedMember = members.find(
+    (member) => member.userId === filters.assignee
+  )
+  let assigneeLabel = "All assignees"
+  if (filters.assignee === "__unassigned__") {
+    assigneeLabel = "Unassigned"
+  } else if (filters.assignee) {
+    assigneeLabel = selectedMember?.user.name ?? "Selected member"
+  }
   const selectedSortLabel =
     SORT_OPTIONS.find((option) => option.value === sort)?.label ?? "Sort"
 
@@ -112,6 +128,58 @@ export function BugReportsToolbar({
               ))}
             </SelectContent>
           </Select>
+
+          <Select
+            onValueChange={(value) => {
+              if (typeof value === "string") {
+                onAssigneeChange(value === "__all__" ? "" : value)
+              }
+            }}
+            value={filters.assignee || "__all__"}
+          >
+            <SelectTrigger
+              aria-label="Filter by assignee"
+              className="w-[200px]"
+            >
+              <SelectValue>{assigneeLabel}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="__all__">All assignees</SelectItem>
+              <SelectItem value="__unassigned__">Unassigned</SelectItem>
+              {filters.assignee &&
+              filters.assignee !== "__unassigned__" &&
+              !selectedMember ? (
+                <SelectItem disabled value={filters.assignee}>
+                  Selected member
+                </SelectItem>
+              ) : null}
+              {membersQuery.isPending ? (
+                <SelectItem disabled value="__loading__">
+                  Loading members…
+                </SelectItem>
+              ) : null}
+              {membersQuery.isError ? (
+                <SelectItem disabled value="__error__">
+                  Could not load members
+                </SelectItem>
+              ) : null}
+              {members.map((member) => (
+                <SelectItem key={member.userId} value={member.userId}>
+                  {member.user.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {membersQuery.isError ? (
+            <Button
+              disabled={membersQuery.isFetching}
+              onClick={() => membersQuery.refetch()}
+              size="sm"
+              variant="ghost"
+            >
+              Retry members
+            </Button>
+          ) : null}
 
           <DropdownMenu>
             <DropdownMenuTrigger
@@ -206,6 +274,7 @@ export function BugReportsToolbar({
         {filters.visibilities.map((visibility) => (
           <Pill key={visibility}>{formatVisibilityLabel(visibility)}</Pill>
         ))}
+        {filters.assignee ? <Pill>Assignee: {assigneeLabel}</Pill> : null}
       </div>
     </div>
   )

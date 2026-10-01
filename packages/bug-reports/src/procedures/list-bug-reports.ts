@@ -16,7 +16,18 @@ import {
   buildPaginationMeta,
   type PaginatedResult,
 } from "@crikket/shared/lib/server/pagination"
-import { and, asc, count, desc, eq, ilike, inArray, or, sql } from "drizzle-orm"
+import {
+  and,
+  asc,
+  count,
+  desc,
+  eq,
+  ilike,
+  inArray,
+  isNull,
+  or,
+  sql,
+} from "drizzle-orm"
 import { z } from "zod"
 import { isExpiringSignedUrl, resolveCaptureUrl } from "../lib/storage"
 import {
@@ -60,6 +71,8 @@ export interface BugReportListItem {
   debuggerIngestionStatus: BugReportDebuggerIngestionStatus
   debuggerIngestionError: string | undefined
   priority: Priority
+  assigneeId: string | null
+  assigneeName: string | null
   tags: string[]
   url: string | undefined
   createdAt: string
@@ -98,6 +111,7 @@ const listBugReportsInputSchema = z
       .max(visibilityValues.length)
       .optional(),
     sort: z.enum(sortValues).default(BUG_REPORT_SORT_OPTIONS.newest),
+    assigneeId: z.string().trim().min(1).nullable().optional(),
   })
   .optional()
 
@@ -184,6 +198,7 @@ interface BugReportListRecord {
   visibility: string
   status: string
   priority: string
+  assigneeId: string | null
   tags: string[] | null
   url: string | null
   createdAt: Date
@@ -192,6 +207,21 @@ interface BugReportListRecord {
     name: string | null
     image: string | null
   } | null
+  assignee: {
+    name: string | null
+  } | null
+}
+
+function normalizeSubmissionStatus(value: string): BugReportSubmissionStatus {
+  if (
+    value === BUG_REPORT_SUBMISSION_STATUS_OPTIONS.failed ||
+    value === BUG_REPORT_SUBMISSION_STATUS_OPTIONS.processing ||
+    value === BUG_REPORT_SUBMISSION_STATUS_OPTIONS.ready
+  ) {
+    return value
+  }
+
+  return BUG_REPORT_SUBMISSION_STATUS_OPTIONS.ready
 }
 
 async function mapBugReportListItem(
@@ -219,6 +249,8 @@ async function mapBugReportListItem(
 
   return {
     id: report.id,
+    assigneeId: report.assigneeId,
+    assigneeName: report.assignee?.name?.trim() || null,
     title: report.title || "Untitled Bug Report",
     description: report.description ?? undefined,
     duration: normalizeDuration(metadata),
@@ -231,13 +263,7 @@ async function mapBugReportListItem(
     attachmentType,
     visibility: isVisibility(report.visibility) ? report.visibility : "private",
     status: isStatus(report.status) ? report.status : "open",
-    submissionStatus:
-      report.submissionStatus === BUG_REPORT_SUBMISSION_STATUS_OPTIONS.failed ||
-      report.submissionStatus ===
-        BUG_REPORT_SUBMISSION_STATUS_OPTIONS.processing ||
-      report.submissionStatus === BUG_REPORT_SUBMISSION_STATUS_OPTIONS.ready
-        ? report.submissionStatus
-        : BUG_REPORT_SUBMISSION_STATUS_OPTIONS.ready,
+    submissionStatus: normalizeSubmissionStatus(report.submissionStatus),
     debuggerIngestionStatus:
       report.debuggerIngestionStatus ===
         BUG_REPORT_DEBUGGER_INGESTION_STATUS_OPTIONS.notUploaded ||
@@ -300,6 +326,12 @@ export const listBugReports = protectedProcedure
         )
       }
 
+      if (input?.assigneeId === null) {
+        filters.push(isNull(bugReport.assigneeId))
+      } else if (input?.assigneeId !== undefined) {
+        filters.push(eq(bugReport.assigneeId, input.assigneeId))
+      }
+
       const whereClause =
         filters.length === 1 ? filters[0] : (and(...filters) ?? filters[0])
       const orderBy = buildOrderBy(
@@ -315,6 +347,9 @@ export const listBugReports = protectedProcedure
           offset,
           with: {
             reporter: true,
+            assignee: {
+              columns: { name: true },
+            },
           },
         }),
       ])

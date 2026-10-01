@@ -46,6 +46,7 @@ export function BugReportsList() {
     >
       <BugReportsToolbar
         filters={filtersState.filters}
+        onAssigneeChange={filtersState.setAssignee}
         onClearFilters={filtersState.clearFilters}
         onSearchChange={filtersState.setSearchValue}
         onSortChange={filtersState.setSort}

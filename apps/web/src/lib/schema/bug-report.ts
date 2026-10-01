@@ -60,5 +60,6 @@ export const editBugReportFormSchema = z.object({
   }),
   status: z.enum(statusValues),
   priority: z.enum(priorityValues),
+  assigneeId: z.string().min(1).nullable(),
   visibility: z.enum(visibilityValues),
 })

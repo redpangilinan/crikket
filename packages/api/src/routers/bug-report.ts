@@ -2,6 +2,7 @@ import {
   deleteBugReport,
   deleteBugReportsBulk,
 } from "@crikket/bug-reports/procedures/delete-bug-reports"
+import { exportBugReportDiagnostics } from "@crikket/bug-reports/procedures/export-bug-report"
 import { getBugReportById } from "@crikket/bug-reports/procedures/get-bug-report"
 import {
   getBugReportDebuggerEvents,
@@ -22,7 +23,6 @@ import {
   finalizeBugReportUploadProcedure,
   retryBugReportDebuggerIngestionProcedure,
 } from "@crikket/bug-reports/procedures/upload-bug-report"
-
 /**
  * Bug Report Router
  * All logic lives in @crikket/bug-reports package modules
@@ -37,6 +37,7 @@ export const bugReportRouter = {
   getNetworkRequests: getBugReportNetworkRequests,
   getNetworkRequestPayload: getBugReportNetworkRequestPayload,
   getDashboardStats: getBugReportDashboardStats,
+  exportDiagnostics: exportBugReportDiagnostics,
   delete: deleteBugReport,
   deleteBulk: deleteBugReportsBulk,
   update: updateBugReport,

@@ -283,6 +283,7 @@ function renderBugReportLoadedView(input: {
           open={input.isEditSheetOpen}
           report={{
             id: input.data.id,
+            assigneeId: input.data.assigneeId,
             title: input.data.title,
             tags: input.data.tags,
             status: input.data.status,

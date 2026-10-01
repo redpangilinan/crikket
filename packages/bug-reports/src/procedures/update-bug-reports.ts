@@ -1,4 +1,5 @@
 import { db } from "@crikket/db"
+import { member } from "@crikket/db/schema/auth"
 import { bugReport } from "@crikket/db/schema/bug-report"
 import {
   PRIORITY_OPTIONS,
@@ -30,6 +31,7 @@ const bugReportUpdateInputSchema = z
     title: optionalText(200),
     status: z.enum(statusValues).optional(),
     priority: z.enum(priorityValues).optional(),
+    assigneeId: z.string().trim().min(1).nullable().optional(),
     visibility: z.enum(visibilityValues).optional(),
     tags: tagsInputSchema.optional(),
   })
@@ -39,7 +41,8 @@ const bugReportUpdateInputSchema = z
       value.status === undefined &&
       value.priority === undefined &&
       value.visibility === undefined &&
-      value.tags === undefined
+      value.tags === undefined &&
+      value.assigneeId === undefined
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
@@ -76,6 +79,7 @@ function buildUpdateValues(input: {
   priority?: Priority
   visibility?: (typeof visibilityValues)[number]
   tags?: string[]
+  assigneeId?: string | null
 }) {
   const values: {
     title?: string
@@ -83,6 +87,7 @@ function buildUpdateValues(input: {
     priority?: string
     visibility?: string
     tags?: string[]
+    assigneeId?: string | null
   } = {}
 
   if (input.title !== undefined) {
@@ -105,6 +110,10 @@ function buildUpdateValues(input: {
     values.tags = normalizeTags(input.tags) ?? []
   }
 
+  if (input.assigneeId !== undefined) {
+    values.assigneeId = input.assigneeId
+  }
+
   return values
 }
 
@@ -112,6 +121,24 @@ export const updateBugReport = protectedProcedure
   .input(bugReportUpdateInputSchema)
   .handler(async ({ context, input }) => {
     const activeOrgId = requireActiveOrgId(context.session)
+
+    if (input.assigneeId !== undefined && input.assigneeId !== null) {
+      const assigneeMembership = await db.query.member.findFirst({
+        where: and(
+          eq(member.organizationId, activeOrgId),
+          eq(member.userId, input.assigneeId)
+        ),
+        columns: {
+          id: true,
+        },
+      })
+
+      if (!assigneeMembership) {
+        throw new ORPCError("BAD_REQUEST", {
+          message: "Assignee must be a member of this organization.",
+        })
+      }
+    }
     const values = buildUpdateValues(input)
 
     const updated = await db
@@ -130,6 +157,7 @@ export const updateBugReport = protectedProcedure
         priority: bugReport.priority,
         visibility: bugReport.visibility,
         tags: bugReport.tags,
+        assigneeId: bugReport.assigneeId,
       })
 
     const report = updated[0]
@@ -148,6 +176,7 @@ export const updateBugReport = protectedProcedure
         ? report.visibility
         : visibilityValues[1],
       tags: Array.isArray(report.tags) ? report.tags : [],
+      assigneeId: report.assigneeId,
     }
   })
 

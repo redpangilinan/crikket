@@ -56,14 +56,18 @@ const EMPTY_DASHBOARD_FILTERS: DashboardFilters = {
   statuses: [],
   priorities: [],
   visibilities: [],
+  assignee: "",
 }
 
 export function useBugReportsFilters() {
   const [
-    { search, sort, statuses, priorities, visibilities },
+    { search, sort, statuses, priorities, visibilities, assignee },
     setFilterSearchQuery,
   ] = useQueryStates(
     {
+      assignee: parseAsString
+        .withOptions({ clearOnDefault: true })
+        .withDefault(""),
       search: parseAsString
         .withOptions({ clearOnDefault: true })
         .withDefault(""),
@@ -101,15 +105,16 @@ export function useBugReportsFilters() {
   }, [debouncedSearch, search, setFilterSearchQuery])
 
   const filters = useMemo<DashboardFilters>(
-    () => ({ statuses, priorities, visibilities }),
-    [statuses, priorities, visibilities]
+    () => ({ statuses, priorities, visibilities, assignee }),
+    [statuses, priorities, visibilities, assignee]
   )
 
   const hasFilters = useMemo(
     () =>
       filters.statuses.length > 0 ||
       filters.priorities.length > 0 ||
-      filters.visibilities.length > 0,
+      filters.visibilities.length > 0 ||
+      filters.assignee !== "",
     [filters]
   )
 
@@ -122,11 +127,14 @@ export function useBugReportsFilters() {
       setFilterSearchQuery({ sort: value }).catch(() => undefined)
     },
     filters,
+    setAssignee: (value: string) =>
+      setFilterSearchQuery({ assignee: value }).catch(() => undefined),
     clearFilters: () => {
       setFilterSearchQuery({
         statuses: EMPTY_DASHBOARD_FILTERS.statuses,
         priorities: EMPTY_DASHBOARD_FILTERS.priorities,
         visibilities: EMPTY_DASHBOARD_FILTERS.visibilities,
+        assignee: EMPTY_DASHBOARD_FILTERS.assignee,
       }).catch(() => undefined)
     },
     resetFiltersAndSearch: () => {
@@ -136,6 +144,7 @@ export function useBugReportsFilters() {
         statuses: EMPTY_DASHBOARD_FILTERS.statuses,
         priorities: EMPTY_DASHBOARD_FILTERS.priorities,
         visibilities: EMPTY_DASHBOARD_FILTERS.visibilities,
+        assignee: EMPTY_DASHBOARD_FILTERS.assignee,
       }).catch(() => undefined)
     },
     hasActiveFilters: hasFilters || debouncedSearch.length > 0,

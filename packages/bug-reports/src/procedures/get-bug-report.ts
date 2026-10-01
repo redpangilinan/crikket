@@ -62,6 +62,7 @@ export const getBugReportById = o
 
     return {
       id: report.id,
+      assigneeId: canEdit ? report.assigneeId : null,
       title: report.title,
       description: report.description,
       status,
