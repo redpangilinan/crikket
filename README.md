@@ -1,5 +1,19 @@
 <h1 align="center">Crikket</h1>
 
+## About this fork
+
+An extended fork of [Crikket](https://github.com/redpangilinan/crikket),
+maintained by Rohail Nawaz.
+
+Changes made in September–October 2026:
+
+- Report assignment and assignee badges
+- Dashboard filtering by assignee
+- JSON diagnostics export
+
+Further improvements are planned for project organization and collaboration.
+The original license and copyright notices are retained.
+
 <p align="center">
   <strong>Open-source bug reporting with the context engineers actually need.</strong>
 </p>

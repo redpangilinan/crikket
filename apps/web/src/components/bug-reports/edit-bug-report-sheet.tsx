@@ -32,6 +32,7 @@ import { useForm } from "@tanstack/react-form"
 import { useState } from "react"
 import { toast } from "sonner"
 
+import { useAssigneeMembers } from "@/hooks/use-assignee-members"
 import { editBugReportFormSchema } from "@/lib/schema/bug-report"
 import { client } from "@/utils/orpc"
 
@@ -93,6 +94,7 @@ interface EditBugReportSheetProps {
     tags: string[]
     status: BugReportStatus
     priority: Priority
+    assigneeId: string | null
     visibility: BugReportVisibility
   }
 }
@@ -104,6 +106,8 @@ export function EditBugReportSheet({
   report,
 }: EditBugReportSheetProps) {
   const [isSaving, setIsSaving] = useState(false)
+  const { organizationId, membersQuery } = useAssigneeMembers(open)
+  const members = membersQuery.data ?? []
 
   const form = useForm({
     defaultValues: {
@@ -111,6 +115,7 @@ export function EditBugReportSheet({
       tagsInput: report.tags.join(", "),
       status: report.status,
       priority: report.priority,
+      assigneeId: report.assigneeId,
       visibility: report.visibility,
     },
     validators: {
@@ -126,6 +131,7 @@ export function EditBugReportSheet({
           tags: parseTagInput(value.tagsInput),
           status: value.status,
           priority: value.priority,
+          assigneeId: value.assigneeId,
           visibility: value.visibility,
         })
         await onUpdated?.()
@@ -147,6 +153,7 @@ export function EditBugReportSheet({
       tagsInput: report.tags.join(", "),
       status: report.status,
       priority: report.priority,
+      assigneeId: report.assigneeId,
       visibility: report.visibility,
     })
   }
@@ -289,6 +296,85 @@ export function EditBugReportSheet({
                 )}
               </form.Field>
             </div>
+
+            <form.Field name="assigneeId">
+              {(field) => {
+                const selectedMember = members.find(
+                  (member) => member.userId === field.state.value
+                )
+
+                const selectedLabel =
+                  field.state.value === null
+                    ? "Unassigned"
+                    : (selectedMember?.user.name ?? "Current assignee")
+
+                return (
+                  <Field>
+                    <FieldLabel htmlFor={field.name}>Assignee</FieldLabel>
+
+                    <Select
+                      disabled={
+                        !organizationId ||
+                        membersQuery.isPending ||
+                        membersQuery.isError ||
+                        isSaving
+                      }
+                      onValueChange={(value) => {
+                        if (typeof value !== "string") {
+                          return
+                        }
+
+                        field.handleChange(
+                          value === "__unassigned__" ? null : value
+                        )
+                      }}
+                      value={field.state.value ?? "__unassigned__"}
+                    >
+                      <SelectTrigger className="w-full" id={field.name}>
+                        <SelectValue>
+                          {membersQuery.isPending
+                            ? "Loading members..."
+                            : selectedLabel}
+                        </SelectValue>
+                      </SelectTrigger>
+
+                      <SelectContent>
+                        <SelectItem value="__unassigned__">
+                          Unassigned
+                        </SelectItem>
+
+                        {field.state.value && !selectedMember ? (
+                          <SelectItem disabled value={field.state.value}>
+                            Current assignee — unavailable
+                          </SelectItem>
+                        ) : null}
+
+                        {members.map((member) => (
+                          <SelectItem key={member.userId} value={member.userId}>
+                            {member.user.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    {membersQuery.isError ? (
+                      <div role="alert">
+                        <p className="text-destructive text-sm">
+                          Could not load organization members.
+                        </p>
+                        <Button
+                          onClick={() => membersQuery.refetch()}
+                          type="button"
+                          variant="ghost"
+                        >
+                          Retry
+                        </Button>
+                      </div>
+                    ) : null}
+                  </Field>
+                )
+              }}
+            </form.Field>
 
             <form.Field name="visibility">
               {(field) => (

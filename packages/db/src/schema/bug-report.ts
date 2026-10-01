@@ -20,6 +20,9 @@ export const bugReport = pgTable(
     reporterId: text("reporter_id").references(() => user.id, {
       onDelete: "set null",
     }),
+    assigneeId: text("assignee_id").references(() => user.id, {
+      onDelete: "set null",
+    }),
     title: text("title"),
     description: text("description"),
     status: text("status").default("open").notNull(), // open, in_progress, resolved, closed
@@ -55,6 +58,7 @@ export const bugReport = pgTable(
   (table) => [
     index("bug_report_organizationId_idx").on(table.organizationId),
     index("bug_report_reporterId_idx").on(table.reporterId),
+    index("bug_report_assigneeId_idx").on(table.assigneeId),
     index("bug_report_submissionStatus_idx").on(table.submissionStatus),
     index("bug_report_debuggerIngestionStatus_idx").on(
       table.debuggerIngestionStatus
@@ -242,6 +246,10 @@ export const bugReportRelations = relations(bugReport, ({ one, many }) => ({
   }),
   reporter: one(user, {
     fields: [bugReport.reporterId],
+    references: [user.id],
+  }),
+  assignee: one(user, {
+    fields: [bugReport.assigneeId],
     references: [user.id],
   }),
   logs: many(bugReportLog),

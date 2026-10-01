@@ -240,6 +240,13 @@ export function BugReportCard({
           <div className="flex flex-wrap items-center gap-1.5">
             <Chip>{formatStatusLabel(report.status)}</Chip>
             <Chip>{formatPriorityLabel(report.priority)}</Chip>
+            <Chip>
+              <span className="whitespace-normal break-words [overflow-wrap:anywhere]">
+                {report.assigneeId
+                  ? `Assigned to: ${report.assigneeName || "Unknown user"}`
+                  : "Unassigned"}
+              </span>
+            </Chip>
             {report.submissionStatus !==
             BUG_REPORT_SUBMISSION_STATUS_OPTIONS.ready ? (
               <Chip>
@@ -274,6 +281,7 @@ export function BugReportCard({
         open={isEditSheetOpen}
         report={{
           id: report.id,
+          assigneeId: report.assigneeId,
           title: report.title,
           tags: report.tags,
           status: report.status,
@@ -424,7 +432,7 @@ function VideoThumbnail({ report }: { report: BugReportListItem }) {
 
 function Chip({ children }: { children: ReactNode }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-md border bg-background px-2 py-0.5 text-[11px]">
+    <span className="inline-flex max-w-full items-center gap-1 rounded-md border bg-background px-2 py-0.5 text-[11px]">
       {children}
     </span>
   )

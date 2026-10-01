@@ -22,6 +22,9 @@ export function useBugReportsData({
 }: UseBugReportsDataInput) {
   const loadMoreRef = useRef<HTMLDivElement | null>(null)
 
+  const assigneeId =
+    filters.assignee === "__unassigned__" ? null : filters.assignee || undefined
+
   const query = useInfiniteQuery(
     orpc.bugReport.list.infiniteOptions({
       initialPageParam: 1,
@@ -30,6 +33,7 @@ export function useBugReportsData({
         perPage: PAGE_SIZE,
         search: search || undefined,
         sort,
+        assigneeId,
         statuses: filters.statuses.length > 0 ? filters.statuses : undefined,
         priorities:
           filters.priorities.length > 0 ? filters.priorities : undefined,
