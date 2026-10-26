@@ -1,5 +1,6 @@
 import { Button } from "@crikket/ui/components/ui/button"
-import { Camera, Video } from "lucide-react"
+import { AppWindow, Camera, Mic, MicOff, Monitor, Video } from "lucide-react"
+import { CaptureOptionToggle } from "@/components/capture-option-toggle"
 import { ShortcutKbd } from "@/components/shortcut-kbd"
 import type { PopupCaptureType } from "@/hooks/use-popup-capture"
 import { formatDuration } from "@/lib/utils"
@@ -13,6 +14,10 @@ interface PopupCaptureActionsProps {
   startRecordingShortcut: string | null
   startScreenshotShortcut: string | null
   stopRecordingShortcut: string | null
+  microphoneEnabled: boolean
+  onMicrophoneToggle: () => void
+  fullScreenEnabled: boolean
+  onFullScreenToggle: () => void
   onRequestCapture: (captureType: PopupCaptureType) => void
   onStopFromPopup: () => Promise<void>
   onStartCapture: (captureType: PopupCaptureType) => Promise<void>
@@ -28,6 +33,10 @@ export function PopupCaptureActions({
   startRecordingShortcut,
   startScreenshotShortcut,
   stopRecordingShortcut,
+  microphoneEnabled,
+  onMicrophoneToggle,
+  fullScreenEnabled,
+  onFullScreenToggle,
   onRequestCapture,
   onStopFromPopup,
   onStartCapture,
@@ -36,7 +45,7 @@ export function PopupCaptureActions({
   if (recordingCountdown) {
     return (
       <div className="rounded-md border bg-primary/5 p-3 text-center">
-        <p className="font-medium text-sm">Recording starts in</p>
+        <p className="font-medium text-sm">La grabación comienza en</p>
         <p className="font-bold text-2xl">{recordingCountdown}...</p>
       </div>
     )
@@ -48,7 +57,7 @@ export function PopupCaptureActions({
         <div className="space-y-2">
           <div className="rounded-md border bg-destructive/5 p-3 text-center">
             <p className="font-medium text-destructive text-sm">
-              Recording now
+              Grabando ahora
             </p>
             <p className="font-mono font-semibold text-destructive text-xl">
               {formatDuration(recordingDurationMs)}
@@ -62,7 +71,7 @@ export function PopupCaptureActions({
             variant="destructive"
           >
             <Video className="h-5 w-5" />
-            <span>Stop Recording</span>
+            <span>Detener grabación</span>
             <ShortcutKbd
               className="bg-destructive-foreground/15 text-destructive-foreground"
               shortcut={stopRecordingShortcut}
@@ -79,7 +88,7 @@ export function PopupCaptureActions({
             variant="default"
           >
             <Video className="h-5 w-5" />
-            <span>Record Screen</span>
+            <span>Grabar pantalla</span>
             <ShortcutKbd
               className="bg-primary-foreground/15 text-primary-foreground"
               shortcut={startRecordingShortcut}
@@ -94,20 +103,43 @@ export function PopupCaptureActions({
             variant="outline"
           >
             <Camera className="h-5 w-5" />
-            <span>Take Screenshot</span>
+            <span>Tomar captura</span>
             <ShortcutKbd
               className="bg-muted text-foreground"
               shortcut={startScreenshotShortcut}
             />
           </Button>
+
+          <CaptureOptionToggle
+            checked={microphoneEnabled}
+            disabled={isBusy}
+            iconOff={
+              <MicOff className="h-4 w-4 shrink-0 text-muted-foreground" />
+            }
+            iconOn={<Mic className="h-4 w-4 shrink-0 text-primary" />}
+            labelOff="Micrófono desactivado"
+            labelOn="Micrófono activado"
+            onToggle={onMicrophoneToggle}
+          />
+
+          <CaptureOptionToggle
+            checked={fullScreenEnabled}
+            disabled={isBusy}
+            iconOff={
+              <AppWindow className="h-4 w-4 shrink-0 text-muted-foreground" />
+            }
+            iconOn={<Monitor className="h-4 w-4 shrink-0 text-primary" />}
+            labelOff="Pantalla completa desactivada"
+            labelOn="Pantalla completa activada"
+            onToggle={onFullScreenToggle}
+          />
         </div>
       )}
 
       {pendingCaptureType ? (
         <div className="space-y-2 rounded-md border border-primary/20 bg-primary/5 p-3">
           <p className="text-sm">
-            Allow Crikket to capture your current tab for{" "}
-            {pendingCaptureType === "video" ? "recording" : "screenshot"}?
+            {getCaptureConfirmation(pendingCaptureType, fullScreenEnabled)}
           </p>
           <div className="flex gap-2">
             <Button
@@ -116,7 +148,7 @@ export function PopupCaptureActions({
               onClick={() => onStartCapture(pendingCaptureType)}
               size="sm"
             >
-              Continue
+              Continuar
             </Button>
             <Button
               className="flex-1"
@@ -125,11 +157,26 @@ export function PopupCaptureActions({
               size="sm"
               variant="outline"
             >
-              Cancel
+              Cancelar
             </Button>
           </div>
         </div>
       ) : null}
     </>
   )
+}
+
+function getCaptureConfirmation(
+  captureType: PopupCaptureType,
+  fullScreenEnabled: boolean
+): string {
+  if (captureType === "screenshot") {
+    return "¿Permitir a Crikket capturar tu pestaña actual para captura de pantalla?"
+  }
+
+  if (fullScreenEnabled) {
+    return "¿Permitir a Crikket grabar tu pantalla completa? Podrás elegir qué pantalla grabar."
+  }
+
+  return "¿Permitir a Crikket capturar tu pestaña actual para grabación?"
 }

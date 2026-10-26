@@ -18,3 +18,14 @@ export function formatDuration(ms: number): string {
   const remainingSeconds = seconds % 60
   return `${minutes.toString().padStart(2, "0")}:${remainingSeconds.toString().padStart(2, "0")}`
 }
+
+/**
+ * Bring the extension page running this code to the front of its window
+ */
+export async function focusCurrentTab(): Promise<void> {
+  const currentTab = await chrome.tabs.getCurrent()
+  if (typeof currentTab?.id !== "number") return
+
+  await chrome.windows.update(currentTab.windowId, { focused: true })
+  await chrome.tabs.update(currentTab.id, { active: true })
+}

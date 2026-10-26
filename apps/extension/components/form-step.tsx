@@ -24,10 +24,10 @@ const priorityValues = Object.values(PRIORITY_OPTIONS) as [
 ]
 
 const formSchema = z.object({
-  title: z.string().max(200, "Title must be at most 200 characters."),
+  title: z.string().max(200, "El título debe tener máximo 200 caracteres."),
   description: z
     .string()
-    .max(3000, "Description must be at most 3000 characters."),
+    .max(3000, "La descripción debe tener máximo 3000 caracteres."),
   priority: z.enum(priorityValues),
 })
 
@@ -185,16 +185,18 @@ export function FormStep({
       >
         <div className="space-y-4">
           <section className="space-y-2 rounded-xl border bg-muted/20 p-4">
-            <p className="font-medium text-sm">Captured debugger data</p>
+            <p className="font-medium text-sm">
+              Datos de depuración capturados
+            </p>
             <p className="text-muted-foreground text-xs">
-              {totalCapturedEvents} total events
+              {totalCapturedEvents} eventos en total
             </p>
             <div className="flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
-              <span>Actions: {debuggerSummary.actions}</span>
+              <span>Acciones: {debuggerSummary.actions}</span>
               <span aria-hidden="true">•</span>
-              <span>Logs: {debuggerSummary.logs}</span>
+              <span>Registros: {debuggerSummary.logs}</span>
               <span aria-hidden="true">•</span>
-              <span>Requests: {debuggerSummary.networkRequests}</span>
+              <span>Solicitudes: {debuggerSummary.networkRequests}</span>
             </div>
           </section>
 
@@ -207,7 +209,7 @@ export function FormStep({
                 return (
                   <Field data-invalid={isInvalid}>
                     <FieldLabel htmlFor={field.name}>
-                      Title (Optional)
+                      Título (opcional)
                     </FieldLabel>
                     <Input
                       aria-invalid={isInvalid}
@@ -216,7 +218,7 @@ export function FormStep({
                       onChange={(event) =>
                         field.handleChange(event.target.value)
                       }
-                      placeholder="Give this report a quick title"
+                      placeholder="Escribe un título breve para este reporte"
                       value={field.state.value}
                     />
                     {isInvalid && (
@@ -235,7 +237,7 @@ export function FormStep({
                 return (
                   <Field data-invalid={isInvalid}>
                     <FieldLabel htmlFor={field.name}>
-                      Priority (Optional)
+                      Prioridad (opcional)
                     </FieldLabel>
                     <Select
                       onValueChange={(value) => {
@@ -276,7 +278,7 @@ export function FormStep({
               return (
                 <Field data-invalid={isInvalid}>
                   <FieldLabel htmlFor={field.name}>
-                    Description (Optional)
+                    Descripción (opcional)
                   </FieldLabel>
                   <Textarea
                     aria-invalid={isInvalid}
@@ -284,7 +286,7 @@ export function FormStep({
                     id={field.name}
                     onBlur={field.handleBlur}
                     onChange={(event) => field.handleChange(event.target.value)}
-                    placeholder="Describe what went wrong..."
+                    placeholder="Describe qué salió mal..."
                     rows={4}
                     value={field.state.value}
                   />
@@ -299,7 +301,7 @@ export function FormStep({
           <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
             <p className="flex items-center gap-2 font-medium text-amber-800 text-sm">
               <AlertTriangle className="h-4 w-4" />
-              Review before submitting
+              Revisar antes de enviar
             </p>
             <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-800 text-xs">
               {preSubmitWarnings.map((warning) => (
@@ -326,10 +328,10 @@ export function FormStep({
             type="button"
             variant="outline"
           >
-            Cancel
+            Cancelar
           </Button>
           <Button className="flex-1" disabled={isBusy} type="submit">
-            {isBusy ? "Submitting..." : "Submit Bug Report"}
+            {isBusy ? "Enviando..." : "Enviar reporte de error"}
           </Button>
         </div>
       </form>
@@ -337,6 +339,17 @@ export function FormStep({
   )
 }
 
+const PRIORITY_LABELS: Record<string, string> = {
+  none: "Ninguna",
+  low: "Baja",
+  medium: "Media",
+  high: "Alta",
+  critical: "Crítica",
+}
+
 function formatPriorityLabel(priority: Priority): string {
-  return `${priority.charAt(0).toUpperCase()}${priority.slice(1)}`
+  return (
+    PRIORITY_LABELS[priority] ??
+    `${priority.charAt(0).toUpperCase()}${priority.slice(1)}`
+  )
 }

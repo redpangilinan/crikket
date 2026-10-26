@@ -23,16 +23,16 @@ export function SuccessStep({
       </div>
 
       <div className="text-center">
-        <h2 className="font-semibold text-2xl">Bug Report Submitted!</h2>
+        <h2 className="font-semibold text-2xl">¡Reporte enviado!</h2>
         <p className="mt-2 text-muted-foreground">
-          Your bug report has been created successfully
+          Tu reporte de error fue creado exitosamente
         </p>
       </div>
 
       {warnings.length > 0 ? (
         <div className="w-full max-w-md rounded-md border border-amber-500/30 bg-amber-500/10 p-4 text-left">
           <p className="font-medium text-amber-700 text-sm">
-            Submitted with warnings
+            Enviado con advertencias
           </p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-700 text-xs">
             {warnings.map((warning) => (
@@ -44,7 +44,7 @@ export function SuccessStep({
 
       <div className="flex w-full max-w-md flex-col gap-3">
         <Button className="w-full" onClick={onOpenRecording} size="lg">
-          View Bug Report
+          Ver reporte de error
         </Button>
         <Button
           className="w-full"
@@ -59,10 +59,10 @@ export function SuccessStep({
           {isCopied ? (
             <>
               <Check />
-              Copied
+              Copiado
             </>
           ) : (
-            "Copy Link"
+            "Copiar enlace"
           )}
         </Button>
         <Button
@@ -70,7 +70,7 @@ export function SuccessStep({
           onClick={onClose}
           variant="ghost"
         >
-          Close
+          Cerrar
         </Button>
       </div>
     </div>

@@ -17,6 +17,10 @@ function App() {
     captureError,
     clearPendingCapture,
     isCapturing,
+    microphoneEnabled,
+    toggleMicrophone,
+    fullScreenEnabled,
+    toggleFullScreen,
     pendingCaptureType,
     recordingCountdown: localRecordingCountdown,
     requestCapture,
@@ -58,7 +62,7 @@ function App() {
       <div className="space-y-1">
         <h1 className="font-medium font-mono text-xl leading-tight">crikket</h1>
         <p className="text-muted-foreground text-sm">
-          Capture and report bugs with screenshots or recordings
+          Captura y reporta errores con capturas de pantalla o grabaciones
         </p>
       </div>
       <div className="space-y-4">
@@ -69,9 +73,13 @@ function App() {
         ) : null}
 
         <PopupCaptureActions
+          fullScreenEnabled={fullScreenEnabled}
           isBusy={isBusy}
           isRecordingInProgress={isRecordingInProgress}
+          microphoneEnabled={microphoneEnabled}
           onClearPendingCapture={clearPendingCapture}
+          onFullScreenToggle={toggleFullScreen}
+          onMicrophoneToggle={toggleMicrophone}
           onRequestCapture={requestCapture}
           onStartCapture={startCapture}
           onStopFromPopup={stopFromPopup}
@@ -85,8 +93,10 @@ function App() {
 
         <div className="rounded-md border bg-muted p-3">
           <p className="text-muted-foreground text-xs leading-relaxed">
-            We only capture your current browser tab. A new tab will open for
-            you to review and submit your report.
+            {fullScreenEnabled
+              ? "Las grabaciones capturarán la pantalla que elijas; las capturas de pantalla siguen siendo de tu pestaña actual."
+              : "Solo capturamos tu pestaña actual."}{" "}
+            Se abrirá una nueva pestaña para que revises y envíes tu reporte.
           </p>
         </div>
 
@@ -107,7 +117,7 @@ function App() {
           variant="ghost"
         >
           <Keyboard />
-          Keyboard shortcuts
+          Atajos de teclado
         </Button>
       </div>
     </div>

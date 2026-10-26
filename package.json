@@ -79,6 +79,7 @@
     "dev": "turbo run dev",
     "build": "turbo run build",
     "check-types": "turbo run check-types",
+    "test": "bun scripts/run-tests.ts",
     "dev:native": "turbo run dev --filter=native",
     "dev:web": "turbo run dev --filter=web",
     "dev:capture": "turbo run dev --filter=@crikket-io/capture",

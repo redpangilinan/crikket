@@ -5,7 +5,7 @@ set -e
 
 bun run build
 
-bun test
+bun run test
 
 # Check if there are any staged files
 if [ -z "$(git diff --cached --name-only)" ]; then
@@ -30,8 +30,12 @@ fi
 
 # Run formatter on the staged files
 set +e
-bun x ultracite fix
-FORMAT_EXIT_CODE=$?
+if [ -n "$STAGED_FILES" ]; then
+  echo "$STAGED_FILES" | tr '\n' '\0' | xargs -0 bun x ultracite fix --files-ignore-unknown=true
+  FORMAT_EXIT_CODE=$?
+else
+  FORMAT_EXIT_CODE=0
+fi
 set -e
 
 # Restore working directory state

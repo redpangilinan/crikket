@@ -27,7 +27,7 @@ export function buildCaptureContextSubmissionData(input: {
   const normalizedUrl = normalizeOptionalUrl(input.url)
   if (input.url && !normalizedUrl) {
     warnings.push(
-      "The captured page URL was invalid and was not attached to this report."
+      "La URL de la página capturada era inválida y no se adjuntó a este reporte."
     )
   }
 
@@ -39,7 +39,9 @@ export function buildCaptureContextSubmissionData(input: {
     typeof input.title === "string" &&
     input.title.trim().length > MAX_PAGE_TITLE_LENGTH
   ) {
-    warnings.push("The captured page title was shortened before upload.")
+    warnings.push(
+      "El título de la página capturada fue acortado antes de subir."
+    )
   }
 
   return {
@@ -71,18 +73,18 @@ export function getSubmissionErrorMessage(error: unknown): string {
   if (error instanceof ORPCError) {
     const validationMessages = getValidationIssueMessages(error.data)
     if (validationMessages.length > 0) {
-      return `Please fix the report input: ${validationMessages.slice(0, 3).join(" | ")}`
+      return `Por favor corrige los campos del reporte: ${validationMessages.slice(0, 3).join(" | ")}`
     }
 
     if (isUnauthorizedSubmissionError(error)) {
-      return "Unauthorized session. Sign in again, then resubmit this report."
+      return "Sesión no autorizada. Inicia sesión nuevamente y reenvía el reporte."
     }
 
     if (error.code === "PAYLOAD_TOO_LARGE") {
-      return "This report is too large to submit in one request. Retry with a shorter recording."
+      return "Este reporte es demasiado grande. Reintenta con una grabación más corta."
     }
 
-    return error.message || "Failed to submit bug report."
+    return error.message || "Error al enviar el reporte de error."
   }
 
   if (error instanceof Error) {
@@ -90,13 +92,13 @@ export function getSubmissionErrorMessage(error: unknown): string {
       error.message.includes("Failed to fetch") ||
       error.message.includes("Direct upload to storage failed")
     ) {
-      return "Direct upload to storage failed. Check storage CORS or network access, then retry."
+      return "La subida directa al almacenamiento falló. Verifica la configuración CORS o el acceso a la red e intenta de nuevo."
     }
 
     return error.message
   }
 
-  return "Failed to submit bug report."
+  return "Error al enviar el reporte de error."
 }
 
 export function normalizeOptionalText(

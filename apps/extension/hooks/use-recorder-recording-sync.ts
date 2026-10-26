@@ -10,7 +10,7 @@ import {
 
 interface UseRecorderRecordingSyncProps {
   captureType: CaptureType
-  state: "idle" | "recording" | "stopped" | "submitting" | "success"
+  state: "idle" | "ready" | "recording" | "stopped" | "submitting" | "success"
   onStopFromPopup: () => Promise<void>
 }
 

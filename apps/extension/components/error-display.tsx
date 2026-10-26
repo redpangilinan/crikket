@@ -13,7 +13,7 @@ export function ErrorDisplay({ error, onRetry }: ErrorDisplayProps) {
       <div className="text-center">
         <span className="text-5xl">⚠️</span>
         <h3 className="mt-4 font-semibold text-red-400 text-xl">
-          Something went wrong
+          Algo salió mal
         </h3>
         <p className="mt-2 text-red-300 text-sm">{error}</p>
       </div>
@@ -22,7 +22,7 @@ export function ErrorDisplay({ error, onRetry }: ErrorDisplayProps) {
         onClick={onRetry}
         variant="outline"
       >
-        Try Again
+        Intentar de nuevo
       </Button>
     </div>
   )

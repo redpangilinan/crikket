@@ -16,7 +16,7 @@ export function RecordingStep({
   return (
     <div className="flex flex-col items-center justify-center space-y-6 py-12">
       <div className="w-full max-w-sm rounded-md border border-destructive/20 bg-destructive/5 p-4 text-center">
-        <p className="font-medium text-destructive text-sm">Recording now</p>
+        <p className="font-medium text-destructive text-sm">Grabando ahora</p>
         <p className="font-mono font-semibold text-5xl text-destructive">
           {formatDuration(duration)}
         </p>
@@ -28,7 +28,7 @@ export function RecordingStep({
         size="lg"
         variant="destructive"
       >
-        <span>⏹ Stop Recording</span>
+        <span>⏹ Detener grabación</span>
         <ShortcutKbd
           className="bg-destructive-foreground/15 text-destructive-foreground"
           shortcut={stopRecordingShortcut}
@@ -36,8 +36,8 @@ export function RecordingStep({
       </Button>
 
       <p className="max-w-md text-center text-muted-foreground text-sm">
-        Click "Stop Recording" when you're done capturing the issue. You'll be
-        able to add details and submit your bug report next.
+        Haz clic en "Detener grabación" cuando termines de capturar el problema.
+        Luego podrás agregar detalles y enviar tu reporte de error.
       </p>
     </div>
   )
